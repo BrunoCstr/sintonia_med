@@ -42,6 +42,7 @@ export default function GeneratorPage() {
   const [questionCount, setQuestionCount] = useState('10')
   const [timed, setTimed] = useState(false)
   const [timeLimit, setTimeLimit] = useState('30')
+  const [errors, setErrors] = useState<{ subjects?: string; difficulty?: string }>({})
 
   useEffect(() => {
     if (!loading) {
@@ -60,6 +61,24 @@ export default function GeneratorPage() {
   }
 
   const handleGenerate = () => {
+    // Reset errors
+    setErrors({})
+
+    // Validate subjects
+    if (selectedSubjects.length === 0) {
+      setErrors((prev) => ({ ...prev, subjects: 'Selecione pelo menos uma matéria' }))
+    }
+
+    // Validate difficulty
+    if (!difficulty) {
+      setErrors((prev) => ({ ...prev, difficulty: 'Selecione a dificuldade' }))
+    }
+
+    // If there are errors, don't proceed
+    if (selectedSubjects.length === 0 || !difficulty) {
+      return
+    }
+
     const filters = {
       period: userProfile?.period || '',
       subjects: selectedSubjects,
@@ -112,14 +131,22 @@ export default function GeneratorPage() {
 
           <CardContent className="space-y-6">
             <div className="space-y-3">
-              <Label>Matérias</Label>
+              <Label>
+                Matérias <span className="text-destructive">*</span>
+              </Label>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {subjects.map((subject) => (
                   <div key={subject} className="flex items-center space-x-2">
                     <Checkbox
                       id={subject}
                       checked={selectedSubjects.includes(subject)}
-                      onCheckedChange={() => toggleSubject(subject)}
+                      onCheckedChange={() => {
+                        toggleSubject(subject)
+                        // Clear error when subject is selected
+                        if (errors.subjects && selectedSubjects.length === 0) {
+                          setErrors((prev) => ({ ...prev, subjects: undefined }))
+                        }
+                      }}
                     />
                     <label
                       htmlFor={subject}
@@ -130,12 +157,26 @@ export default function GeneratorPage() {
                   </div>
                 ))}
               </div>
+              {errors.subjects && (
+                <p className="text-sm text-destructive">{errors.subjects}</p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label>Dificuldade</Label>
-              <Select value={difficulty} onValueChange={setDifficulty}>
-                <SelectTrigger>
+              <Label>
+                Dificuldade <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={difficulty}
+                onValueChange={(value) => {
+                  setDifficulty(value)
+                  // Clear error when difficulty is selected
+                  if (errors.difficulty) {
+                    setErrors((prev) => ({ ...prev, difficulty: undefined }))
+                  }
+                }}
+              >
+                <SelectTrigger className={errors.difficulty ? 'border-destructive' : ''}>
                   <SelectValue placeholder="Selecione a dificuldade" />
                 </SelectTrigger>
                 <SelectContent>
@@ -144,6 +185,9 @@ export default function GeneratorPage() {
                   <SelectItem value="hard">Difícil</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.difficulty && (
+                <p className="text-sm text-destructive">{errors.difficulty}</p>
+              )}
             </div>
 
             <div className="flex items-center justify-between rounded-lg border p-4">
@@ -220,7 +264,11 @@ export default function GeneratorPage() {
                 {selectedSubjects.length > 0 && ` de ${selectedSubjects.length} matéria(s)`}
               </p>
             </div>
-            <Button size="lg" onClick={handleGenerate} disabled={parseInt(questionCount) === 0}>
+            <Button
+              size="lg"
+              onClick={handleGenerate}
+              disabled={parseInt(questionCount) === 0 || selectedSubjects.length === 0 || !difficulty}
+            >
               Gerar Simulado
             </Button>
           </CardContent>

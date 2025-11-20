@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { DashboardLayout } from '@/components/dashboard-layout'
 
 export const metadata: Metadata = {
   title: 'Painel Administrativo - SintoniaMed',
@@ -10,5 +11,5 @@ export default function AdminRootLayout({
 }: {
   children: React.ReactNode
 }) {
-  return <>{children}</>
+  return <DashboardLayout>{children}</DashboardLayout>
 }

@@ -8,6 +8,7 @@ import { LayoutDashboard, FileQuestion, Users, Flag, LogOut, Menu, X } from 'luc
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
 import { useState } from 'react'
+import { useTheme } from '@/lib/theme-provider'
 import Image from 'next/image'
 
 const navigation = [
@@ -41,6 +42,7 @@ export function AdminSidebar() {
   const pathname = usePathname()
   const { logout, userProfile } = useAuth()
   const { userRole } = useRole()
+  const { theme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const filteredNavigation = navigation.filter((item) =>
@@ -82,9 +84,9 @@ export function AdminSidebar() {
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center border-b px-6">
+          <div className="flex h-16 items-center justify-center border-b px-6">
             <Image
-              src="/logo-sintoniamed-full.png"
+              src={theme === 'light' ? "/logo-sintoniamed-light.png" : "/logo-sintoniamed-dark.png"}
               alt="SintoniaMed"
               width={160}
               height={40}
@@ -95,7 +97,11 @@ export function AdminSidebar() {
           {/* Navigation */}
           <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
             {filteredNavigation.map((item) => {
-              const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
+              // Para o Dashboard (/admin), só marca como ativo se for exatamente /admin
+              // Para outras rotas, marca se for exatamente igual ou começar com a rota + '/'
+              const isActive = item.href === '/admin'
+                ? pathname === '/admin'
+                : pathname === item.href || pathname?.startsWith(item.href + '/')
               return (
                 <Link
                   key={item.name}

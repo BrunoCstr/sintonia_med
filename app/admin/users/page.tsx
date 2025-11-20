@@ -1,6 +1,5 @@
 'use client'
 
-import { AdminLayout } from '@/components/admin/admin-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -177,7 +176,7 @@ export default function UsersPage() {
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -207,7 +206,7 @@ export default function UsersPage() {
 
         {/* Users Table */}
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="px-6 py-0">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -419,6 +418,6 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </AdminLayout>
+    </>
   )
 }

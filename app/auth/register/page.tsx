@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useTheme } from '@/lib/theme-provider'
 
 const periods = [
   '1º Período',
@@ -34,6 +35,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { signUp } = useAuth()
+  const { theme } = useTheme()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,7 +88,7 @@ export default function RegisterPage() {
           <CardHeader className="space-y-1 text-center">
             <div className="mx-auto mb-4">
               <Image 
-                src="/logo-sintoniamed-full.png" 
+                src={theme === 'light' ? "/logo-sintoniamed-light.png" : "/logo-sintoniamed-dark.png"} 
                 alt="SintoniaMed" 
                 width={280}
                 height={70}

@@ -1,6 +1,5 @@
 'use client'
 
-import { AdminLayout } from '@/components/admin/admin-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -76,17 +75,14 @@ export default function EditQuestionPage() {
 
   if (loadingData) {
     return (
-      <AdminLayout>
-        <div className="flex min-h-[400px] items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-      </AdminLayout>
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
     )
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
@@ -284,6 +280,5 @@ export default function EditQuestionPage() {
           </div>
         </form>
       </div>
-    </AdminLayout>
   )
 }

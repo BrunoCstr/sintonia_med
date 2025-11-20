@@ -45,14 +45,10 @@ export default function GeneratorPage() {
   const [errors, setErrors] = useState<{ subjects?: string; difficulty?: string }>({})
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/auth/login')
-      } else if (isAdminMaster || isAdminQuestoes) {
-        router.push('/admin')
-      }
+    if (!loading && !user) {
+      router.push('/auth/login')
     }
-  }, [user, loading, isAdminMaster, isAdminQuestoes, router])
+  }, [user, loading, router])
 
   const toggleSubject = (subject: string) => {
     setSelectedSubjects((prev) =>
@@ -101,9 +97,6 @@ export default function GeneratorPage() {
     )
   }
 
-  if (isAdminMaster || isAdminQuestoes) {
-    return null
-  }
 
   return (
     <DashboardLayout>

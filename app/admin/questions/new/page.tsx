@@ -1,6 +1,5 @@
 'use client'
 
-import { AdminLayout } from '@/components/admin/admin-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -52,8 +51,7 @@ export default function NewQuestionPage() {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
@@ -274,6 +272,5 @@ export default function NewQuestionPage() {
           </div>
         </form>
       </div>
-    </AdminLayout>
   )
 }

@@ -16,11 +16,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield } from 'lucide-react'
+import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
+import { RoleGuard } from '@/components/role-guard'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -30,6 +31,33 @@ const navigation = [
   { name: 'Configurações', href: '/settings', icon: Settings },
 ]
 
+const adminNavigation = [
+  {
+    name: 'Dashboard',
+    href: '/admin',
+    icon: LayoutDashboard,
+    roles: ['admin_master', 'admin_questoes'],
+  },
+  {
+    name: 'Questões',
+    href: '/admin/questions',
+    icon: FileQuestion,
+    roles: ['admin_master', 'admin_questoes'],
+  },
+  {
+    name: 'Usuários',
+    href: '/admin/users',
+    icon: Users,
+    roles: ['admin_master'],
+  },
+  {
+    name: 'Reports',
+    href: '/admin/reports',
+    icon: Flag,
+    roles: ['admin_master'],
+  },
+]
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, userProfile, logout } = useAuth()
   const { hasAccessToAdminPanel, userRole } = useRole()
@@ -37,6 +65,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  
+  const isAdminRoute = pathname?.startsWith('/admin')
+  
+  const filteredAdminNavigation = adminNavigation.filter((item) =>
+    item.roles.includes(userRole || 'aluno')
+  )
 
   const handleLogout = async () => {
     await logout()
@@ -62,7 +96,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-20 items-center justify-between px-4">
+        <div className="flex h-20 items-center justify-between px-6 lg:px-8">
           <div className="flex items-center gap-6">
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
@@ -72,9 +106,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               </SheetTrigger>
               <SheetContent side="left" className="w-72 p-0">
                 <div className="flex h-full flex-col">
-                  <div className="flex h-20 items-center gap-2 border-b px-6">
+                  <div className="flex h-20 items-center justify-center gap-2 border-b px-6">
                     <Image 
-                      src="/logo-sintoniamed-full.png" 
+                      src={theme === 'light' ? "/logo-sintoniamed-light.png" : "/logo-sintoniamed-dark.png"} 
                       alt="SintoniaMed" 
                       width={240}
                       height={60}
@@ -102,6 +136,38 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                         </Link>
                       )
                     })}
+                    {hasAccessToAdminPanel && (
+                      <>
+                        <div className="my-2 border-t" />
+                        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground">
+                          ADMINISTRAÇÃO
+                        </div>
+                        {filteredAdminNavigation.map((item) => {
+                          const Icon = item.icon
+                          // Para o Dashboard (/admin), só marca como ativo se for exatamente /admin
+                          // Para outras rotas, marca se for exatamente igual ou começar com a rota + '/'
+                          const isActive = item.href === '/admin'
+                            ? pathname === '/admin'
+                            : pathname === item.href || pathname?.startsWith(item.href + '/')
+                          return (
+                            <Link
+                              key={item.name}
+                              href={item.href}
+                              onClick={() => setMobileMenuOpen(false)}
+                              className={cn(
+                                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                                isActive
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                              )}
+                            >
+                              <Icon className="h-5 w-5" />
+                              {item.name}
+                            </Link>
+                          )
+                        })}
+                      </>
+                    )}
                   </nav>
                 </div>
               </SheetContent>
@@ -109,18 +175,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
             <Link href="/dashboard" className="flex items-center gap-2">
               <Image 
-                src="/logo-sintoniamed-full.png" 
+                src={theme === 'light' ? "/logo-sintoniamed-light.png" : "/logo-sintoniamed-dark.png"} 
                 alt="SintoniaMed" 
                 width={200}
                 height={50}
-                className="hidden h-12 w-auto sm:block"
+                className="hidden h-16 w-auto sm:block"
               />
               <Image 
-                src="/logo-sintoniamed.png" 
+                src={theme === 'light' ? "/logo-sintoniamed-light.png" : "/logo-sintoniamed-dark.png"} 
                 alt="SintoniaMed" 
                 width={120}
                 height={50}
-                className="block h-12 w-auto sm:hidden"
+                className="block h-14 w-auto sm:hidden"
               />
             </Link>
 
@@ -204,7 +270,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="flex-1">
-        <div className="container px-4 py-8">{children}</div>
+        <div className="w-full px-6 py-8 lg:px-8">
+          {isAdminRoute ? (
+            <RoleGuard allowedRoles={['admin_master', 'admin_questoes']}>
+              {children}
+            </RoleGuard>
+          ) : (
+            children
+          )}
+        </div>
       </main>
     </div>
   )

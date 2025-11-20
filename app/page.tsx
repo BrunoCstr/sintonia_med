@@ -8,9 +8,11 @@ import { ArrowRight, Target, Zap, CheckCircle, TrendingUp, Award, Clock, BookOpe
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
+import { useTheme } from '@/lib/theme-provider'
 
 export default function WelcomePage() {
   const { user, loading } = useAuth()
+  const { theme } = useTheme()
   const router = useRouter()
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export default function WelcomePage() {
                 className="mb-4"
               >
                 <Image 
-                  src="/logo-sintoniamed-full.png" 
+                  src={theme === 'light' ? "/logo-sintoniamed-light.png" : "/logo-sintoniamed-dark.png"} 
                   alt="SintoniaMed" 
                   width={320}
                   height={96}
@@ -326,7 +328,7 @@ export default function WelcomePage() {
           <div className="grid gap-8 md:grid-cols-4">
             <div className="space-y-4">
               <Image 
-                src="/logo-sintoniamed-full.png" 
+                src={theme === 'light' ? "/logo-sintoniamed-light.png" : "/logo-sintoniamed-dark.png"} 
                 alt="SintoniaMed" 
                 width={200}
                 height={50}

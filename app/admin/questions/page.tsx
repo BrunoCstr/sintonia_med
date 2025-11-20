@@ -1,6 +1,5 @@
 'use client'
 
-import { AdminLayout } from '@/components/admin/admin-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -88,8 +87,7 @@ export default function QuestionsListPage() {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -164,7 +162,7 @@ export default function QuestionsListPage() {
 
         {/* Questions Table */}
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="px-6 py-0">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -235,6 +233,5 @@ export default function QuestionsListPage() {
           </CardContent>
         </Card>
       </div>
-    </AdminLayout>
   )
 }

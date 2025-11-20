@@ -22,16 +22,21 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'SintoniaMed - Banco de Questões Médicas',
   description: 'O banco de questões do estudante de Medicina. Partiu Sintonizar?',
-  generator: 'v0.app',
+  authors: [{ name: 'BRNDev', url: 'https://brunocastrodev.com.br' }],
   manifest: '/manifest.json',
   keywords: ['medicina', 'questões', 'simulado', 'estudo', 'concurso médico', 'revalida', 'residência médica'],
   authors: [{ name: 'SintoniaMed' }],
   icons: {
     icon: [
-      { url: '/icon-192.jpg', sizes: '192x192', type: 'image/jpeg' },
-      { url: '/icon-512.jpg', sizes: '512x512', type: 'image/jpeg' },
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: '/apple-icon.jpg',
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
+    ],
   },
 }
 
@@ -44,6 +49,10 @@ export default function RootLayout({
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="SintoniaMed" />

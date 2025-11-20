@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useTheme } from '@/lib/theme-provider'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
@@ -18,6 +19,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { signIn } = useAuth()
+  const { theme } = useTheme()
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/dashboard'
@@ -52,7 +54,7 @@ function LoginForm() {
           <CardHeader className="space-y-1 text-center">
             <div className="mx-auto mb-4">
               <Image 
-                src="/logo-sintoniamed-full.png" 
+                src={theme === 'light' ? "/logo-sintoniamed-light.png" : "/logo-sintoniamed-dark.png"} 
                 alt="SintoniaMed" 
                 width={280}
                 height={70}

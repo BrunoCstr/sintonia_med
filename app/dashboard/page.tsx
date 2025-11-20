@@ -46,14 +46,10 @@ export default function DashboardPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/auth/login')
-      } else if (userRole && (isAdminMaster || isAdminQuestoes)) {
-        router.push('/admin')
-      }
+    if (!loading && !user) {
+      router.push('/auth/login')
     }
-  }, [user, loading, userRole, isAdminMaster, isAdminQuestoes, router])
+  }, [user, loading, router])
 
   if (loading || !user || !userProfile) {
     return (
@@ -61,10 +57,6 @@ export default function DashboardPage() {
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     )
-  }
-
-  if (isAdminMaster || isAdminQuestoes) {
-    return null
   }
 
   return (

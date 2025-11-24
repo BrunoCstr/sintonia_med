@@ -1,0 +1,204 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             (getUserRole() == 'admin_master' || getUserRole() == 'admin_questoes');
+    }
+    
+    function isAdminMaster() {
+      return isAuthenticated() && getUserRole() == 'admin_master';
+    }
+    
+    function isValidRole(role) {
+      return role == 'aluno' || role == 'admin_master' || role == 'admin_questoes';
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Leitura: usuário pode ler seu próprio perfil, admins podem ler todos
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      
+      // Criação: apenas durante registro (usuário criando seu próprio perfil)
+      allow create: if isAuthenticated() && 
+                       isOwner(userId) && 
+                       // Validar que está criando com role padrão 'aluno'
+                       (!('role' in request.resource.data) || 
+                        request.resource.data.role == 'aluno') &&
+                       // Validar campos obrigatórios
+                       'email' in request.resource.data &&
+                       'name' in request.resource.data &&
+                       'createdAt' in request.resource.data;
+      
+      // Atualização: usuário pode atualizar seus próprios dados (exceto role), 
+      // admin_master pode atualizar qualquer coisa
+      allow update: if isAuthenticated() && (
+        // Usuário atualizando seu próprio perfil
+        (isOwner(userId) && 
+         // Não pode alterar role (apenas admin_master pode)
+         (!('role' in request.resource.data) || 
+          request.resource.data.role == resource.data.role) &&
+         // Não pode alterar email
+         (!('email' in request.resource.data) || 
+          request.resource.data.email == resource.data.email)) ||
+        // Admin master pode atualizar qualquer coisa
+        (isAdminMaster() && isValidRole(request.resource.data.get('role', 'aluno')))
+      );
+      
+      // Exclusão: apenas admin_master pode excluir usuários
+      allow delete: if isAdminMaster();
+    }
+    
+    // Questions collection
+    match /questions/{questionId} {
+      // Leitura: todos autenticados podem ler questões ativas
+      // Admins podem ler todas (ativas e inativas)
+      allow read: if isAuthenticated() && (
+        resource.data.ativo == true || isAdmin()
+      );
+      
+      // Criação: apenas admins podem criar questões
+      allow create: if isAdmin() &&
+                       // Validar campos obrigatórios
+                       'enunciado' in request.resource.data &&
+                       'alternativaA' in request.resource.data &&
+                       'alternativaB' in request.resource.data &&
+                       'alternativaC' in request.resource.data &&
+                       'alternativaD' in request.resource.data &&
+                       'alternativaE' in request.resource.data &&
+                       'alternativaCorreta' in request.resource.data &&
+                       'area' in request.resource.data &&
+                       'dificuldade' in request.resource.data &&
+                       'tipo' in request.resource.data &&
+                       'ativo' in request.resource.data &&
+                       'createdAt' in request.resource.data &&
+                       'updatedAt' in request.resource.data;
+      
+      // Atualização: apenas admins podem atualizar questões
+      allow update: if isAdmin() &&
+                       // Validar que campos obrigatórios não foram removidos
+                       'enunciado' in request.resource.data &&
+                       'alternativaCorreta' in request.resource.data &&
+                       'ativo' in request.resource.data &&
+                       'updatedAt' in request.resource.data;
+      
+      // Exclusão: apenas admin_master pode excluir questões (soft delete recomendado)
+      allow delete: if isAdminMaster();
+    }
+    
+    // Reports collection
+    match /reports/{reportId} {
+      // Leitura: usuário pode ler seus próprios reports, admins podem ler todos
+      allow read: if isAuthenticated() && (
+        isOwner(resource.data.userId) || isAdmin()
+      );
+      
+      // Criação: qualquer usuário autenticado pode criar um report
+      allow create: if isAuthenticated() &&
+                       // Validar que está criando report para si mesmo
+                       request.resource.data.userId == request.auth.uid &&
+                       // Validar campos obrigatórios
+                       'questionId' in request.resource.data &&
+                       'userId' in request.resource.data &&
+                       'userName' in request.resource.data &&
+                       'userEmail' in request.resource.data &&
+                       'texto' in request.resource.data &&
+                       'status' in request.resource.data &&
+                       request.resource.data.status == 'pendente' &&
+                       'createdAt' in request.resource.data;
+      
+      // Atualização: 
+      // - Usuário pode atualizar apenas seus próprios reports (antes de serem resolvidos)
+      // - Admin_master pode atualizar qualquer report (para resolver)
+      allow update: if isAuthenticated() && (
+        // Usuário atualizando seu próprio report pendente
+        (isOwner(resource.data.userId) && 
+         resource.data.status == 'pendente' &&
+         request.resource.data.status == 'pendente') ||
+        // Admin master resolvendo report
+        (isAdminMaster() && 
+         'status' in request.resource.data &&
+         'resolvedAt' in request.resource.data &&
+         'resolvedBy' in request.resource.data)
+      );
+      
+      // Exclusão: apenas admin_master pode excluir reports
+      allow delete: if isAdminMaster();
+    }
+    
+    // History collection (histórico de questões respondidas)
+    match /history/{historyId} {
+      // Leitura: usuário pode ler apenas seu próprio histórico
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      // Criação: usuário pode criar apenas seu próprio histórico
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Atualização: usuário pode atualizar apenas seu próprio histórico
+      allow update: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      // Exclusão: usuário pode excluir apenas seu próprio histórico
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+    
+    // Results collection (resultados de quizzes)
+    match /results/{resultId} {
+      // Leitura: usuário pode ler apenas seus próprios resultados
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      // Criação: usuário pode criar apenas seus próprios resultados
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Atualização: usuário pode atualizar apenas seus próprios resultados
+      allow update: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      // Exclusão: usuário pode excluir apenas seus próprios resultados
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+    
+    // Subscriptions collection (assinaturas)
+    match /subscriptions/{subscriptionId} {
+      // Leitura: usuário pode ler apenas sua própria assinatura, admins podem ler todas
+      allow read: if isAuthenticated() && (
+        isOwner(resource.data.userId) || isAdmin()
+      );
+      
+      // Criação: apenas admin_master pode criar assinaturas
+      allow create: if isAdminMaster() &&
+                       'userId' in request.resource.data &&
+                       'plan' in request.resource.data &&
+                       'status' in request.resource.data &&
+                       'startDate' in request.resource.data &&
+                       'expiresAt' in request.resource.data;
+      
+      // Atualização: apenas admin_master pode atualizar assinaturas
+      allow update: if isAdminMaster();
+      
+      // Exclusão: apenas admin_master pode excluir assinaturas
+      allow delete: if isAdminMaster();
+    }
+    
+    // Deny all other collections by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

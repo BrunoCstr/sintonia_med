@@ -6,6 +6,7 @@ export interface UserProfile {
   name: string
   email: string
   period: string
+  institution: string
   plan: 'monthly' | 'semester' | null
   planExpiresAt: Date | null
   createdAt: Date
@@ -16,13 +17,14 @@ export interface UserProfile {
 export interface Question {
   id: string
   enunciado: string
+  imagemUrl?: string // URL da imagem associada ao enunciado
   alternativaA: string
   alternativaB: string
   alternativaC: string
   alternativaD: string
   alternativaE: string
   alternativaCorreta: 'A' | 'B' | 'C' | 'D' | 'E'
-  comentarioGabarito: string
+  comentarioGabarito: string // Gabarito comentado (premium)
   area: string
   subarea: string
   dificuldade: 'facil' | 'medio' | 'dificil'

@@ -13,16 +13,20 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, Upload, X } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export default function NewQuestionPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     enunciado: '',
+    imagemUrl: '',
     alternativaA: '',
     alternativaB: '',
     alternativaC: '',
@@ -36,18 +40,142 @@ export default function NewQuestionPage() {
     tipo: '',
   })
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione uma imagem válida')
+      return
+    }
+
+    // Validar tamanho (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 5MB')
+      return
+    }
+
+    setUploadingImage(true)
+
+    try {
+      // Criar preview
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+
+      // Fazer upload
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+
+      const response = await fetch('/api/admin/questions/upload-image', {
+        method: 'POST',
+        body: uploadFormData,
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Erro ao fazer upload da imagem')
+      }
+
+      const data = await response.json()
+      setFormData({ ...formData, imagemUrl: data.url })
+    } catch (error: any) {
+      console.error('Erro ao fazer upload:', error)
+      alert(error.message || 'Erro ao fazer upload da imagem')
+      setImagePreview(null)
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const handleRemoveImage = () => {
+    setImagePreview(null)
+    setFormData({ ...formData, imagemUrl: '' })
+  }
+
+  const validateForm = (): string | null => {
+    // Validar enunciado
+    if (!formData.enunciado.trim()) {
+      return 'O enunciado é obrigatório'
+    }
+
+    // Validar alternativas
+    const alternativas = ['alternativaA', 'alternativaB', 'alternativaC', 'alternativaD', 'alternativaE']
+    for (const alt of alternativas) {
+      if (!formData[alt as keyof typeof formData]?.toString().trim()) {
+        return `A alternativa ${alt.replace('alternativa', '')} é obrigatória`
+      }
+    }
+
+    // Validar alternativa correta
+    if (!formData.alternativaCorreta || !['A', 'B', 'C', 'D', 'E'].includes(formData.alternativaCorreta)) {
+      return 'Selecione a alternativa correta'
+    }
+
+    // Validar comentário do gabarito
+    if (!formData.comentarioGabarito.trim()) {
+      return 'O comentário do gabarito é obrigatório'
+    }
+
+    // Validar área
+    if (!formData.area.trim()) {
+      return 'A área é obrigatória'
+    }
+
+    // Validar subárea
+    if (!formData.subarea.trim()) {
+      return 'A subárea é obrigatória'
+    }
+
+    // Validar dificuldade
+    if (!formData.dificuldade || !['facil', 'medio', 'dificil'].includes(formData.dificuldade)) {
+      return 'A dificuldade é obrigatória'
+    }
+
+    // Validar tipo
+    if (!formData.tipo.trim()) {
+      return 'O tipo de prova é obrigatório'
+    }
+
+    return null
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validar formulário
+    const validationError = validateForm()
+    if (validationError) {
+      alert(validationError)
+      return
+    }
+
     setLoading(true)
 
-    // TODO: Add Firestore logic to create question
-    console.log('Creating question:', formData)
+    try {
+      const response = await fetch('/api/admin/questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      })
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Erro ao criar questão')
+      }
 
-    setLoading(false)
-    router.push('/admin/questions')
+      router.push('/admin/questions')
+    } catch (error: any) {
+      console.error('Erro ao criar questão:', error)
+      alert(error.message || 'Erro ao criar questão')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -71,12 +199,12 @@ export default function NewQuestionPage() {
           {/* Question Statement */}
           <Card>
             <CardHeader>
-              <CardTitle>Enunciado</CardTitle>
+              <CardTitle>Enunciado <span className="text-destructive">*</span></CardTitle>
               <CardDescription>
                 Digite o texto completo da questão
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <Textarea
                 placeholder="Ex: Paciente de 45 anos, hipertenso, apresenta dor torácica..."
                 value={formData.enunciado}
@@ -86,13 +214,64 @@ export default function NewQuestionPage() {
                 rows={6}
                 required
               />
+              
+              {/* Image Upload */}
+              <div className="space-y-2">
+                <Label htmlFor="imagem">Imagem (opcional)</Label>
+                {imagePreview || formData.imagemUrl ? (
+                  <div className="relative">
+                    <div className="relative h-64 w-full overflow-hidden rounded-lg border">
+                      <Image
+                        src={imagePreview || formData.imagemUrl}
+                        alt="Preview"
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleRemoveImage}
+                      className="mt-2"
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Remover Imagem
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <Label
+                      htmlFor="imagem"
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed p-4 hover:bg-accent"
+                    >
+                      <Upload className="h-5 w-5" />
+                      <span>Fazer upload de imagem</span>
+                    </Label>
+                    <input
+                      id="imagem"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploadingImage}
+                      className="hidden"
+                    />
+                    {uploadingImage && (
+                      <span className="text-sm text-muted-foreground">Enviando...</span>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Formatos aceitos: JPG, PNG, GIF. Tamanho máximo: 5MB
+                </p>
+              </div>
             </CardContent>
           </Card>
 
           {/* Alternatives */}
           <Card>
             <CardHeader>
-              <CardTitle>Alternativas</CardTitle>
+              <CardTitle>Alternativas <span className="text-destructive">*</span></CardTitle>
               <CardDescription>
                 Digite as cinco alternativas da questão
               </CardDescription>
@@ -101,7 +280,7 @@ export default function NewQuestionPage() {
               {['A', 'B', 'C', 'D', 'E'].map((letter) => (
                 <div key={letter} className="space-y-2">
                   <Label htmlFor={`alternativa${letter}`}>
-                    Alternativa {letter}
+                    Alternativa {letter} <span className="text-destructive">*</span>
                   </Label>
                   <Textarea
                     id={`alternativa${letter}`}
@@ -124,7 +303,7 @@ export default function NewQuestionPage() {
           {/* Correct Answer */}
           <Card>
             <CardHeader>
-              <CardTitle>Alternativa Correta</CardTitle>
+              <CardTitle>Alternativa Correta <span className="text-destructive">*</span></CardTitle>
               <CardDescription>
                 Selecione qual é a alternativa correta
               </CardDescription>
@@ -152,7 +331,7 @@ export default function NewQuestionPage() {
           {/* Commentary */}
           <Card>
             <CardHeader>
-              <CardTitle>Comentário do Gabarito</CardTitle>
+              <CardTitle>Comentário do Gabarito <span className="text-destructive">*</span></CardTitle>
               <CardDescription>
                 Explique o raciocínio da resposta correta
               </CardDescription>
@@ -180,7 +359,7 @@ export default function NewQuestionPage() {
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="area">Área</Label>
+                <Label htmlFor="area">Área <span className="text-destructive">*</span></Label>
                 <Select
                   value={formData.area}
                   onValueChange={(value) =>
@@ -205,7 +384,7 @@ export default function NewQuestionPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="subarea">Subárea</Label>
+                <Label htmlFor="subarea">Subárea <span className="text-destructive">*</span></Label>
                 <Input
                   id="subarea"
                   placeholder="Ex: Síndrome Coronariana Aguda"
@@ -218,7 +397,7 @@ export default function NewQuestionPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="dificuldade">Dificuldade</Label>
+                <Label htmlFor="dificuldade">Dificuldade <span className="text-destructive">*</span></Label>
                 <Select
                   value={formData.dificuldade}
                   onValueChange={(value) =>
@@ -238,7 +417,7 @@ export default function NewQuestionPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="tipo">Tipo de Prova</Label>
+                <Label htmlFor="tipo">Tipo de Prova <span className="text-destructive">*</span></Label>
                 <Select
                   value={formData.tipo}
                   onValueChange={(value) =>

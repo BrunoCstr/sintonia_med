@@ -21,44 +21,16 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Plus, Search, Pencil, Archive, Eye } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
-
-// Mock data - replace with real Firestore queries
-const mockQuestions = [
-  {
-    id: '1',
-    enunciado: 'Paciente de 45 anos, hipertenso, apresenta dor torácica...',
-    area: 'Cardiologia',
-    subarea: 'Síndrome Coronariana Aguda',
-    dificuldade: 'medio',
-    tipo: 'REVALIDA',
-    ativo: true,
-  },
-  {
-    id: '2',
-    enunciado: 'Criança de 3 anos com febre alta e manchas vermelhas...',
-    area: 'Pediatria',
-    subarea: 'Doenças Exantemáticas',
-    dificuldade: 'facil',
-    tipo: 'Residência',
-    ativo: true,
-  },
-  {
-    id: '3',
-    enunciado: 'Gestante de 32 semanas com pressão arterial elevada...',
-    area: 'Ginecologia e Obstetrícia',
-    subarea: 'Pré-eclâmpsia',
-    dificuldade: 'dificil',
-    tipo: 'ENARE',
-    ativo: false,
-  },
-]
+import { useState, useEffect } from 'react'
+import type { Question } from '@/lib/types'
 
 export default function QuestionsListPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [areaFilter, setAreaFilter] = useState('all')
   const [dificuldadeFilter, setDificuldadeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [loading, setLoading] = useState(true)
 
   const getDifficultyColor = (dificuldade: string) => {
     switch (dificuldade) {
@@ -85,6 +57,83 @@ export default function QuestionsListPage() {
         return dificuldade
     }
   }
+
+  useEffect(() => {
+    const loadQuestions = async () => {
+      try {
+        const response = await fetch('/api/admin/questions')
+        if (!response.ok) {
+          throw new Error('Erro ao carregar questões')
+        }
+
+        const data = await response.json()
+        setQuestions(data.questions || [])
+      } catch (error) {
+        console.error('Erro ao carregar questões:', error)
+        alert('Erro ao carregar questões')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadQuestions()
+  }, [])
+
+  const handleArchive = async (id: string, currentStatus: boolean) => {
+    if (!confirm(`Deseja ${currentStatus ? 'arquivar' : 'ativar'} esta questão?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/questions/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ativo: !currentStatus }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar questão')
+      }
+
+      // Atualizar lista local
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === id ? { ...q, ativo: !currentStatus } : q))
+      )
+    } catch (error) {
+      console.error('Erro ao arquivar questão:', error)
+      alert('Erro ao arquivar questão')
+    }
+  }
+
+  // Filtrar questões
+  const filteredQuestions = questions.filter((question) => {
+    // Filtro de busca
+    if (searchTerm && !question.enunciado.toLowerCase().includes(searchTerm.toLowerCase())) {
+      return false
+    }
+
+    // Filtro de área
+    if (areaFilter !== 'all' && question.area !== areaFilter) {
+      return false
+    }
+
+    // Filtro de dificuldade
+    if (dificuldadeFilter !== 'all' && question.dificuldade !== dificuldadeFilter) {
+      return false
+    }
+
+    // Filtro de status
+    if (statusFilter === 'ativo' && !question.ativo) {
+      return false
+    }
+    if (statusFilter === 'inativo' && question.ativo) {
+      return false
+    }
+
+    return true
+  })
 
   return (
     <div className="space-y-6">
@@ -176,14 +225,29 @@ export default function QuestionsListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockQuestions.map((question) => (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex items-center justify-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredQuestions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      Nenhuma questão encontrada
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredQuestions.map((question) => (
                   <TableRow key={question.id}>
                     <TableCell className="max-w-md">
                       <p className="truncate font-medium">
                         {question.enunciado}
                       </p>
                     </TableCell>
-                    <TableCell>{question.area}</TableCell>
+                    <TableCell className="capitalize">{question.area}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {question.subarea}
                     </TableCell>
@@ -221,13 +285,19 @@ export default function QuestionsListPage() {
                             <Pencil className="h-4 w-4" />
                           </Link>
                         </Button>
-                        <Button variant="ghost" size="icon">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleArchive(question.id, question.ativo)}
+                          title={question.ativo ? 'Arquivar' : 'Ativar'}
+                        >
                           <Archive className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>

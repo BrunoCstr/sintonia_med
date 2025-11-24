@@ -25,15 +25,53 @@ const periods = [
   'Formado',
 ]
 
+const institutions = [
+  'UNIGRANRIO – Duque de Caxias, RJ',
+  'UNIGRANRIO – Barra da Tijuca, RJ',
+  'AFYA – Itaperuna, RJ (UNIREDENTOR)',
+  'AFYA – Contagem, MG',
+  'AFYA – Ipatinga, MG (UNIVAÇO)',
+  'AFYA – Itajubá, MG (FMIT)',
+  'AFYA – Montes Claros, MG (UNIFIPMOC)',
+  'AFYA – São João del-Rei, MG (UNIPTAN)',
+  'AFYA – Paraíba, PB',
+  'AFYA – Teresina, PI',
+  'AFYA – Parnaíba, PI (IESVAP)',
+  'AFYA – Abaetetuba, PA',
+  'AFYA – Marabá, PA (FACIMPA)',
+  'AFYA – Redenção, PA (FESAR)',
+  'AFYA – Bragança, PA',
+  'AFYA – Guanambi, BA',
+  'AFYA – Itabuna, BA',
+  'AFYA – Salvador (UNIDOM), BA',
+  'AFYA – Jaboatão dos Guararapes, PE',
+  'AFYA – Garanhuns, PE',
+  'AFYA – Maceió, AL',
+  'AFYA – Itacoatiara, AM',
+  'AFYA – Manacapuru, AM',
+  'AFYA – Ji-Paraná, RO',
+  'AFYA – Porto Velho, RO',
+  'AFYA – Palmas, TO',
+  'AFYA – Porto Nacional, TO',
+  'AFYA – Santa Inês, MA',
+  'AFYA – Vitória da Conquista, BA',
+  'AFYA – Cruzeiro do Sul, AC',
+  'AFYA – Araguaína, TO (UNITPAC)',
+  'AFYA – Pato Branco, PR',
+  'Nenhuma das opções listada',
+]
+
 export default function RegisterPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [period, setPeriod] = useState('')
+  const [institution, setInstitution] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [touched, setTouched] = useState({ period: false, institution: false })
   const { signUp } = useAuth()
   const { theme } = useTheme()
   const router = useRouter()
@@ -41,6 +79,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setTouched({ period: true, institution: true })
 
     if (password !== confirmPassword) {
       setError('As senhas não coincidem')
@@ -57,10 +96,15 @@ export default function RegisterPage() {
       return
     }
 
+    if (!institution) {
+      setError('Selecione sua instituição')
+      return
+    }
+
     setLoading(true)
 
     try {
-      await signUp(email, password, name, period)
+      await signUp(email, password, name, period, institution)
       router.push('/plans')
     } catch (err: any) {
       if (err.code === 'auth/email-already-in-use') {
@@ -110,7 +154,9 @@ export default function RegisterPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="name">Nome completo</Label>
+                <Label htmlFor="name">
+                  Nome completo <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="name"
                   type="text"
@@ -123,7 +169,9 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">
+                  Email <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -136,9 +184,54 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="period">Período</Label>
-                <Select value={period} onValueChange={setPeriod} disabled={loading}>
-                  <SelectTrigger id="period">
+                <Label htmlFor="institution">
+                  Onde você estuda? <span className="text-destructive">*</span>
+                </Label>
+                <Select 
+                  value={institution} 
+                  onValueChange={(value) => {
+                    setInstitution(value)
+                    setTouched(prev => ({ ...prev, institution: true }))
+                  }} 
+                  disabled={loading}
+                  required
+                >
+                  <SelectTrigger 
+                    id="institution"
+                    className={touched.institution && !institution ? 'border-destructive focus:ring-destructive' : ''}
+                  >
+                    <SelectValue placeholder="Selecione sua instituição" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {institutions.map((inst) => (
+                      <SelectItem key={inst} value={inst}>
+                        {inst}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {touched.institution && !institution && (
+                  <p className="text-sm text-destructive">Selecione sua instituição</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="period">
+                  Período <span className="text-destructive">*</span>
+                </Label>
+                <Select 
+                  value={period} 
+                  onValueChange={(value) => {
+                    setPeriod(value)
+                    setTouched(prev => ({ ...prev, period: true }))
+                  }} 
+                  disabled={loading}
+                  required
+                >
+                  <SelectTrigger 
+                    id="period"
+                    className={touched.period && !period ? 'border-destructive focus:ring-destructive' : ''}
+                  >
                     <SelectValue placeholder="Selecione seu período" />
                   </SelectTrigger>
                   <SelectContent>
@@ -149,10 +242,15 @@ export default function RegisterPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {touched.period && !period && (
+                  <p className="text-sm text-destructive">Selecione seu período</p>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
+                <Label htmlFor="password">
+                  Senha <span className="text-destructive">*</span>
+                </Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -175,7 +273,9 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirmar senha</Label>
+                <Label htmlFor="confirmPassword">
+                  Confirmar senha <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -188,7 +288,7 @@ export default function RegisterPage() {
               </div>
             </CardContent>
 
-            <CardFooter className="flex flex-col gap-4">
+            <CardFooter className="flex flex-col gap-4 mt-4">
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Criando conta...' : 'Criar conta'}
               </Button>

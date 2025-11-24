@@ -18,6 +18,7 @@ import {
 import { Clock, ChevronLeft, ChevronRight, Flag } from 'lucide-react'
 import { generateQuiz, type Question } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
+import Image from 'next/image'
 
 export default function QuizPage() {
   const [questions, setQuestions] = useState<Question[]>([])
@@ -146,6 +147,17 @@ export default function QuizPage() {
           </CardHeader>
 
           <CardContent className="space-y-3">
+            {/* Image if exists */}
+            {(currentQuestion as any).imagemUrl && (
+              <div className="relative h-64 w-full overflow-hidden rounded-lg border">
+                <Image
+                  src={(currentQuestion as any).imagemUrl}
+                  alt="Questão"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+            )}
             {currentQuestion.alternatives.map((alt, index) => {
               const isSelected = answers[currentQuestion.id] === index
               const letter = String.fromCharCode(65 + index) // A, B, C, D, E

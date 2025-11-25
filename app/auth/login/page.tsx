@@ -33,7 +33,18 @@ function LoginForm() {
       await signIn(email, password)
       router.push(redirect)
     } catch (err: any) {
-      setError('Email ou senha incorretos. Tente novamente.')
+      // Tratar erro específico de usuário desativado
+      if (err.code === 'auth/user-disabled') {
+        setError('Sua conta foi desativada. Entre em contato com o administrador para mais informações.')
+      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('Email ou senha incorretos. Tente novamente.')
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Muitas tentativas de login. Aguarde alguns minutos e tente novamente.')
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Email inválido. Verifique e tente novamente.')
+      } else {
+        setError('Erro ao fazer login. Tente novamente.')
+      }
       console.error(err)
     } finally {
       setLoading(false)

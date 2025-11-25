@@ -8,6 +8,7 @@ export interface UserProfile {
   period: string
   institution: string
   photoURL?: string
+  theme?: 'light' | 'dark'
   plan: 'monthly' | 'semester' | null
   planExpiresAt: Date | null
   createdAt: Date

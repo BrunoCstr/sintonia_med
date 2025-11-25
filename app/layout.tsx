@@ -58,11 +58,11 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="SintoniaMed" />
       </head>
       <body className={`${geist.className} ${inter.variable} font-sans antialiased`}>
-        <ThemeProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <ThemeProvider>
             {children}
-          </AuthProvider>
-        </ThemeProvider>
+          </ThemeProvider>
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

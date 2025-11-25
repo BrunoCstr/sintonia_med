@@ -9,10 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useTheme } from '@/lib/theme-provider'
 import { useAuth } from '@/lib/auth-context'
-import { Moon, Sun, Bell, Eye, EyeOff, Shield, Trash2, RotateCcw } from 'lucide-react'
-import { updatePassword } from 'firebase/auth'
-import { doc, deleteDoc } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase'
+import { Moon, Sun, Eye, EyeOff, Shield, Trash2, RotateCcw } from 'lucide-react'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,12 +36,17 @@ export default function SettingsPage() {
   const [resetting, setResetting] = useState(false)
 
   // Mock notification settings
-  const [emailNotifications, setEmailNotifications] = useState(true)
-  const [quizReminders, setQuizReminders] = useState(true)
-  const [performanceReports, setPerformanceReports] = useState(false)
+  // const [emailNotifications, setEmailNotifications] = useState(true)
+  // const [quizReminders, setQuizReminders] = useState(true)
+  // const [performanceReports, setPerformanceReports] = useState(false)
 
   const handleChangePassword = async () => {
     if (!user) return
+
+    if (!currentPassword) {
+      alert('Por favor, informe sua senha atual')
+      return
+    }
 
     if (newPassword !== confirmPassword) {
       alert('As senhas não coincidem')
@@ -56,38 +60,68 @@ export default function SettingsPage() {
 
     setLoading(true)
     try {
-      await updatePassword(user, newPassword)
+      // Primeiro, reautenticar o usuário com a senha atual
+      await signInWithEmailAndPassword(auth, user.email || '', currentPassword)
+      
+      // Depois, alterar a senha usando a API com Firebase Admin
+      const response = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao alterar senha')
+      }
+
       alert('Senha alterada com sucesso!')
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
     } catch (error: any) {
       console.error('Error changing password:', error)
-      if (error.code === 'auth/requires-recent-login') {
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        alert('Senha atual incorreta')
+      } else if (error.code === 'auth/requires-recent-login') {
         alert('Por segurança, faça login novamente antes de alterar a senha')
       } else {
-        alert('Erro ao alterar senha')
+        alert(error.message || 'Erro ao alterar senha')
       }
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDeleteAccount = async () => {
+  const handleDeactivateAccount = async () => {
     if (!user) return
 
     try {
-      await deleteDoc(doc(db, 'users', user.uid))
-      await user.delete()
-      alert('Conta excluída com sucesso')
+      const response = await fetch('/api/user/deactivate-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao inativar conta')
+      }
+
+      alert('Conta inativada com sucesso! Você será desconectado.')
+      await logout()
       window.location.href = '/'
     } catch (error: any) {
-      console.error('Error deleting account:', error)
-      if (error.code === 'auth/requires-recent-login') {
-        alert('Por segurança, faça login novamente antes de excluir a conta')
-      } else {
-        alert('Erro ao excluir conta')
-      }
+      console.error('Error deactivating account:', error)
+      alert(error.message || 'Erro ao inativar conta')
     }
   }
 
@@ -147,7 +181,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* Notifications */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
@@ -181,7 +215,8 @@ export default function SettingsPage() {
               <Switch checked={performanceReports} onCheckedChange={setPerformanceReports} />
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
+        
 
         {/* Security */}
         <Card>
@@ -286,15 +321,15 @@ export default function SettingsPage() {
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="w-full sm:w-auto">
-                  Excluir Conta
+                  Inativar Conta
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Esta ação não pode ser desfeita. Isso excluirá permanentemente sua conta e
-                    removerá todos os seus dados de nossos servidores, incluindo:
+                    Esta ação não pode ser desfeita. Isso inativará permanentemente sua conta e
+                    inativará todos os seus dados de nossos servidores, incluindo:
                     <ul className="mt-2 list-inside list-disc space-y-1">
                       <li>Todas as questões respondidas</li>
                       <li>Histórico de simulados</li>
@@ -306,10 +341,10 @@ export default function SettingsPage() {
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={handleDeleteAccount}
+                    onClick={handleDeactivateAccount}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Sim, excluir minha conta
+                    Sim, inativar minha conta
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

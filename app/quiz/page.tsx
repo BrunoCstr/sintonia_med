@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,40 +16,161 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Clock, ChevronLeft, ChevronRight, Flag } from 'lucide-react'
-import { generateQuiz, type Question } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
+import type { Question as QuestionDB } from '@/lib/types'
+import { useAuth } from '@/lib/auth-context'
+
+// Interface para questões no formato do quiz
+interface QuizQuestion {
+  id: string
+  text: string
+  alternatives: string[]
+  correctAnswer: number
+  explanation: string
+  subject: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  period: string
+  isOfficial: boolean
+  imagemUrl?: string
+}
+
+// Converter questão do banco para formato do quiz
+function convertQuestionToQuiz(question: QuestionDB, period: string): QuizQuestion {
+  const alternatives = [
+    question.alternativaA,
+    question.alternativaB,
+    question.alternativaC,
+    question.alternativaD,
+    question.alternativaE,
+  ]
+
+  const correctAnswerIndex = question.alternativaCorreta.charCodeAt(0) - 65 // A=0, B=1, etc.
+
+  // Mapear dificuldade do banco para o formato do quiz
+  const difficultyMap: Record<string, 'easy' | 'medium' | 'hard'> = {
+    facil: 'easy',
+    medio: 'medium',
+    dificil: 'hard',
+  }
+
+  return {
+    id: question.id,
+    text: question.enunciado,
+    alternatives,
+    correctAnswer: correctAnswerIndex,
+    explanation: question.comentarioGabarito,
+    subject: question.area,
+    difficulty: difficultyMap[question.dificuldade] || 'medium',
+    period,
+    isOfficial: question.tipo === 'oficial' || question.tipo.toLowerCase().includes('oficial'),
+    imagemUrl: question.imagemUrl,
+  }
+}
 
 export default function QuizPage() {
-  const [questions, setQuestions] = useState<Question[]>([])
+  const { user } = useAuth()
+  const [questions, setQuestions] = useState<QuizQuestion[]>([])
+  const [loading, setLoading] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, number>>({})
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [showFinishDialog, setShowFinishDialog] = useState(false)
+  const [showNoQuestionsDialog, setShowNoQuestionsDialog] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    const filtersStr = localStorage.getItem('quizFilters')
-    if (!filtersStr) {
-      router.push('/generator')
-      return
+    const loadQuestions = async () => {
+      try {
+        setLoading(true)
+        const filtersStr = localStorage.getItem('quizFilters')
+        if (!filtersStr) {
+          router.push('/generator')
+          return
+        }
+
+        const filters = JSON.parse(filtersStr)
+
+        // Construir query string para a API
+        const params = new URLSearchParams()
+        if (filters.areas && filters.areas.length > 0) {
+          params.append('areas', filters.areas.join(','))
+        }
+        if (filters.difficulty) {
+          params.append('dificuldade', filters.difficulty)
+        }
+        if (filters.officialOnly) {
+          params.append('officialOnly', 'true')
+        }
+        if (filters.tipo) {
+          params.append('tipo', filters.tipo)
+        }
+        params.append('limit', filters.count.toString())
+        params.append('excludeAnswered', 'true') // Excluir questões já respondidas por padrão
+
+        const response = await fetch(`/api/questions?${params.toString()}`)
+        if (!response.ok) {
+          throw new Error('Erro ao buscar questões')
+        }
+
+        const data = await response.json()
+        const quizQuestions = (data.questions || []).map((q: QuestionDB) =>
+          convertQuestionToQuiz(q, filters.period || '')
+        )
+
+        if (quizQuestions.length === 0) {
+          setLoading(false)
+          setShowNoQuestionsDialog(true)
+          return
+        }
+
+        setQuestions(quizQuestions)
+
+        if (filters.timed && filters.timeLimit) {
+          setTimeLeft(filters.timeLimit * 60) // Convert to seconds
+        }
+        
+        setLoading(false)
+      } catch (error) {
+        console.error('Erro ao carregar questões:', error)
+        setLoading(false)
+        setShowNoQuestionsDialog(true)
+      }
     }
 
-    const filters = JSON.parse(filtersStr)
-    const quiz = generateQuiz(filters)
-
-    if (quiz.length === 0) {
-      alert('Nenhuma questão encontrada com os filtros selecionados')
-      router.push('/generator')
-      return
-    }
-
-    setQuestions(quiz)
-
-    if (filters.timed && filters.timeLimit) {
-      setTimeLeft(filters.timeLimit * 60) // Convert to seconds
-    }
+    loadQuestions()
   }, [router])
+
+  const handleAnswer = (questionId: string, answerIndex: number) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: answerIndex }))
+  }
+
+  const handleFinish = useCallback(async () => {
+    // Salvar resultados no localStorage
+    localStorage.setItem('quizResults', JSON.stringify({ questions, answers }))
+    
+    // Salvar questões respondidas no histórico do Firestore
+    if (user) {
+      try {
+        const answeredQuestionIds = Object.keys(answers)
+        if (answeredQuestionIds.length > 0) {
+          await fetch('/api/user/question-history', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ questionIds: answeredQuestionIds }),
+          })
+        }
+      } catch (error) {
+        console.error('Erro ao salvar histórico:', error)
+        // Não bloquear o fluxo se houver erro ao salvar histórico
+      }
+    }
+    
+    router.push('/results')
+  }, [questions, answers, user, router])
 
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return
@@ -57,6 +178,7 @@ export default function QuizPage() {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev === null || prev <= 1) {
+          // Finalizar quando o tempo acabar
           handleFinish()
           return 0
         }
@@ -65,16 +187,7 @@ export default function QuizPage() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [timeLeft])
-
-  const handleAnswer = (questionId: string, answerIndex: number) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: answerIndex }))
-  }
-
-  const handleFinish = () => {
-    localStorage.setItem('quizResults', JSON.stringify({ questions, answers }))
-    router.push('/results')
-  }
+  }, [timeLeft, handleFinish])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -82,11 +195,47 @@ export default function QuizPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  if (questions.length === 0) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
+    )
+  }
+
+  // Se não há questões e não está mostrando o dialog, ainda está carregando
+  if (questions.length === 0 && !showNoQuestionsDialog) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  // Se não há questões mas o dialog está aberto, renderizar apenas o dialog
+  if (questions.length === 0) {
+    return (
+      <>
+        {/* No Questions Dialog */}
+        <AlertDialog open={showNoQuestionsDialog} onOpenChange={setShowNoQuestionsDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Nenhuma questão encontrada</AlertDialogTitle>
+              <AlertDialogDescription>
+                Não foram encontradas questões com os filtros selecionados.
+                <br />
+                <br />
+                Tente ajustar os filtros ou resete o histórico de questões respondidas.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => router.push('/generator')}>
+                Voltar ao Gerador
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     )
   }
 
@@ -148,10 +297,10 @@ export default function QuizPage() {
 
           <CardContent className="space-y-3">
             {/* Image if exists */}
-            {(currentQuestion as any).imagemUrl && (
+            {currentQuestion.imagemUrl && (
               <div className="relative h-64 w-full overflow-hidden rounded-lg border">
                 <Image
-                  src={(currentQuestion as any).imagemUrl}
+                  src={currentQuestion.imagemUrl}
                   alt="Questão"
                   fill
                   className="object-contain"
@@ -258,6 +407,26 @@ export default function QuizPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Continuar</AlertDialogCancel>
             <AlertDialogAction onClick={handleFinish}>Finalizar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* No Questions Dialog */}
+      <AlertDialog open={showNoQuestionsDialog} onOpenChange={setShowNoQuestionsDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Nenhuma questão encontrada</AlertDialogTitle>
+            <AlertDialogDescription>
+              Não foram encontradas questões com os filtros selecionados.
+              <br />
+              <br />
+              Tente ajustar os filtros ou resetar o histórico de questões respondidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => router.push('/generator')}>
+              Voltar ao Gerador
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

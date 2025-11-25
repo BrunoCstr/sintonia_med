@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Switch } from '@/components/ui/switch'
 import { ArrowLeft, Save, Upload, X } from 'lucide-react'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
@@ -44,6 +45,7 @@ export default function EditQuestionPage() {
     subarea: '',
     dificuldade: '',
     tipo: '',
+    oficial: false,
   })
 
   useEffect(() => {
@@ -71,6 +73,7 @@ export default function EditQuestionPage() {
           subarea: question.subarea || '',
           dificuldade: question.dificuldade || '',
           tipo: question.tipo || '',
+          oficial: question.oficial || false,
         })
 
         if (question.imagemUrl) {
@@ -508,6 +511,22 @@ export default function EditQuestionPage() {
                     <SelectItem value="Concurso">Concurso Público</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="oficial">Questão Oficial</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Marque se esta é uma questão de prova oficial
+                  </p>
+                </div>
+                <Switch
+                  id="oficial"
+                  checked={formData.oficial}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, oficial: checked })
+                  }
+                />
               </div>
             </CardContent>
           </Card>

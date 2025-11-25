@@ -29,6 +29,7 @@ export interface Question {
   subarea: string
   dificuldade: 'facil' | 'medio' | 'dificil'
   tipo: string
+  oficial: boolean
   ativo: boolean
   createdAt: Date
   updatedAt: Date

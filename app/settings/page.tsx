@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useTheme } from '@/lib/theme-provider'
 import { useAuth } from '@/lib/auth-context'
-import { Moon, Sun, Bell, Eye, EyeOff, Shield, Trash2 } from 'lucide-react'
+import { Moon, Sun, Bell, Eye, EyeOff, Shield, Trash2, RotateCcw } from 'lucide-react'
 import { updatePassword } from 'firebase/auth'
 import { doc, deleteDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
@@ -33,6 +33,8 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPasswords, setShowPasswords] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [showResetDialog, setShowResetDialog] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   // Mock notification settings
   const [emailNotifications, setEmailNotifications] = useState(true)
@@ -86,6 +88,28 @@ export default function SettingsPage() {
       } else {
         alert('Erro ao excluir conta')
       }
+    }
+  }
+
+  const handleResetHistory = async () => {
+    try {
+      setResetting(true)
+      const response = await fetch('/api/user/question-history', {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao resetar histórico')
+      }
+
+      alert('Histórico de questões respondidas resetado com sucesso!')
+      setShowResetDialog(false)
+    } catch (error) {
+      console.error('Erro ao resetar histórico:', error)
+      alert('Erro ao resetar histórico. Tente novamente.')
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -222,6 +246,32 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Reset History */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5" />
+              Histórico de Questões
+            </CardTitle>
+            <CardDescription>Gerencie seu histórico de questões respondidas</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Ao resetar o histórico, todas as questões que você já respondeu poderão aparecer novamente nos seus simulados.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setShowResetDialog(true)}
+                className="flex items-center gap-2"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Resetar Histórico de Questões
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Danger Zone */}
         <Card className="border-destructive/50">
           <CardHeader>
@@ -267,6 +317,32 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Reset History Dialog */}
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetar Histórico de Questões?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá resetar todas as questões que você já respondeu. Após o reset,
+              todas as questões poderão aparecer novamente nos seus simulados.
+              <br />
+              <br />
+              <strong>Esta ação não pode ser desfeita.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetHistory}
+              disabled={resetting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {resetting ? 'Resetando...' : 'Sim, Resetar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   )
 }

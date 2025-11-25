@@ -18,43 +18,13 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, XCircle, Circle, ChevronDown, MessageSquare, ThumbsUp, Flag, BarChart3, Home, RefreshCw, Lock, Crown } from 'lucide-react'
+import { CheckCircle2, XCircle, Circle, ChevronDown, Flag, BarChart3, Home, RefreshCw, Lock, Crown } from 'lucide-react'
 import { type Question } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
 import { usePremium } from '@/lib/hooks/use-premium'
 import Image from 'next/image'
 import Link from 'next/link'
-
-interface Comment {
-  id: string
-  userId: string
-  userName: string
-  text: string
-  likes: number
-  createdAt: Date
-}
-
-const mockComments: Record<string, Comment[]> = {
-  q1: [
-    {
-      id: 'c1',
-      userId: 'user1',
-      userName: 'Dr. João Silva',
-      text: 'Excelente questão! É importante lembrar que o IAM é uma emergência médica. O tempo porta-balão deve ser inferior a 90 minutos.',
-      likes: 12,
-      createdAt: new Date('2025-01-10'),
-    },
-    {
-      id: 'c2',
-      userId: 'user2',
-      userName: 'Maria Santos',
-      text: 'Fiquei na dúvida entre IAM e dissecção. Mas a duração de 30 min e o tipo da dor ajudam a diferenciar.',
-      likes: 5,
-      createdAt: new Date('2025-01-11'),
-    },
-  ],
-}
 
 export default function ResultsPage() {
   const [results, setResults] = useState<{ questions: Question[]; answers: Record<string, number> } | null>(null)
@@ -63,7 +33,6 @@ export default function ResultsPage() {
   const [reportQuestionId, setReportQuestionId] = useState<string | null>(null)
   const [reportTypes, setReportTypes] = useState<string[]>([])
   const [reportDescription, setReportDescription] = useState('')
-  const [newComment, setNewComment] = useState<Record<string, string>>({})
   const router = useRouter()
   const { userProfile } = useAuth()
   const { isPremium } = usePremium()
@@ -124,20 +93,6 @@ export default function ResultsPage() {
     })
     setShowReportDialog(false)
     alert('Relatório enviado com sucesso! Agradecemos sua contribuição.')
-  }
-
-  const handleAddComment = (questionId: string) => {
-    if (!newComment[questionId]?.trim()) return
-
-    console.log('[v0] Comment added:', {
-      questionId,
-      comment: newComment[questionId],
-      user: userProfile?.name,
-      date: new Date(),
-    })
-
-    setNewComment((prev) => ({ ...prev, [questionId]: '' }))
-    alert('Comentário adicionado!')
   }
 
   return (
@@ -385,45 +340,6 @@ export default function ResultsPage() {
                         <Flag className="mr-2 h-4 w-4" />
                         Relatar Erro
                       </Button>
-
-                      {/* Comments Section */}
-                      <div className="space-y-4 border-t pt-4">
-                        <h4 className="flex items-center gap-2 font-semibold">
-                          <MessageSquare className="h-4 w-4" />
-                          Comentários ({mockComments[question.id]?.length || 0})
-                        </h4>
-
-                        {mockComments[question.id]?.map((comment) => (
-                          <div key={comment.id} className="rounded-lg border p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">{comment.userName}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {comment.createdAt.toLocaleDateString('pt-BR')}
-                              </span>
-                            </div>
-                            <p className="text-sm text-muted-foreground">{comment.text}</p>
-                            <Button variant="ghost" size="sm" className="h-8 gap-1">
-                              <ThumbsUp className="h-3 w-3" />
-                              {comment.likes}
-                            </Button>
-                          </div>
-                        ))}
-
-                        {/* Add Comment */}
-                        <div className="flex gap-2">
-                          <Textarea
-                            placeholder="Adicione seu comentário..."
-                            value={newComment[question.id] || ''}
-                            onChange={(e) =>
-                              setNewComment((prev) => ({ ...prev, [question.id]: e.target.value }))
-                            }
-                            className="min-h-[80px] resize-none"
-                          />
-                        </div>
-                        <Button onClick={() => handleAddComment(question.id)} className="w-full sm:w-auto">
-                          Comentar
-                        </Button>
-                      </div>
                     </CardContent>
                   </CollapsibleContent>
                 </Collapsible>

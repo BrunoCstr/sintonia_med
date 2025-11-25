@@ -19,7 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Search, Pencil, Archive, Eye } from 'lucide-react'
+import { Plus, Search, Pencil, Archive, Eye, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import type { Question, MedicalArea } from '@/lib/types'
@@ -122,6 +122,33 @@ export default function QuestionsListPage() {
     } catch (error) {
       console.error('Erro ao arquivar questão:', error)
       alert('Erro ao arquivar questão')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta questão permanentemente?\n\nEsta ação também excluirá a questão do histórico de todos os usuários e não pode ser desfeita.')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/questions/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Erro ao excluir questão')
+      }
+
+      const data = await response.json()
+      
+      // Remover da lista local
+      setQuestions((prev) => prev.filter((q) => q.id !== id))
+      
+      alert(`Questão excluída com sucesso!\n\n${data.deletedFromHistory || 0} registro(s) removido(s) do histórico de usuários.`)
+    } catch (error: any) {
+      console.error('Erro ao excluir questão:', error)
+      alert(error.message || 'Erro ao excluir questão')
     }
   }
 
@@ -311,6 +338,15 @@ export default function QuestionsListPage() {
                           title={question.ativo ? 'Arquivar' : 'Ativar'}
                         >
                           <Archive className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(question.id)}
+                          title="Excluir permanentemente"
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>

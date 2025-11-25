@@ -13,33 +13,21 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Brain, Clock, Filter } from 'lucide-react'
-
-const subjects = [
-  'Anatomia',
-  'Fisiologia',
-  'Bioquímica',
-  'Patologia',
-  'Farmacologia',
-  'Microbiologia',
-  'Parasitologia',
-  'Imunologia',
-  'Cardiologia',
-  'Pneumologia',
-  'Gastroenterologia',
-  'Nefrologia',
-  'Endocrinologia',
-  'Neurologia',
-  'Psiquiatria',
-]
+import type { MedicalArea } from '@/lib/types'
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 export default function GeneratorPage() {
   const { user, userProfile, loading } = useAuth()
   const { isAdminMaster, isAdminQuestoes } = useRole()
   const router = useRouter()
+  const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([])
+  const [loadingAreas, setLoadingAreas] = useState(true)
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([])
   const [difficulty, setDifficulty] = useState('')
   const [officialOnly, setOfficialOnly] = useState(false)
-  const [questionCount, setQuestionCount] = useState('10')
+  const [tipoProva, setTipoProva] = useState<string>('all')
+  const [questionCount, setQuestionCount] = useState('5')
   const [timed, setTimed] = useState(false)
   const [timeLimit, setTimeLimit] = useState('30')
   const [errors, setErrors] = useState<{ subjects?: string; difficulty?: string }>({})
@@ -49,6 +37,60 @@ export default function GeneratorPage() {
       router.push('/auth/login')
     }
   }, [user, loading, router])
+
+  useEffect(() => {
+    const loadMedicalAreas = async () => {
+      try {
+        setLoadingAreas(true)
+        
+        // Buscar diretamente do Firestore usando Firebase Client SDK
+        const areasQuery = query(
+          collection(db, 'medical_areas'),
+          where('ativo', '==', true),
+          orderBy('nome', 'asc')
+        )
+        
+        const querySnapshot = await getDocs(areasQuery)
+        const areas: MedicalArea[] = []
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          areas.push({
+            id: doc.id,
+            nome: data.nome,
+            descricao: data.descricao,
+            ativo: data.ativo,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.updatedAt?.toDate() || new Date(),
+            createdBy: data.createdBy || '',
+          })
+        })
+        
+        console.log('Áreas médicas carregadas:', areas.length)
+        setMedicalAreas(areas)
+      } catch (error) {
+        console.error('Erro ao carregar áreas médicas:', error)
+        // Tentar via API como fallback
+        try {
+          const response = await fetch('/api/medical-areas', {
+            credentials: 'include',
+          })
+          if (response.ok) {
+            const data = await response.json()
+            setMedicalAreas(data.areas || [])
+          }
+        } catch (apiError) {
+          console.error('Erro ao carregar via API:', apiError)
+        }
+      } finally {
+        setLoadingAreas(false)
+      }
+    }
+
+    if (user) {
+      loadMedicalAreas()
+    }
+  }, [user])
 
   const toggleSubject = (subject: string) => {
     setSelectedSubjects((prev) =>
@@ -75,11 +117,19 @@ export default function GeneratorPage() {
       return
     }
 
+    // Mapear dificuldade para o formato do banco
+    const difficultyMap: Record<string, string> = {
+      easy: 'facil',
+      medium: 'medio',
+      hard: 'dificil',
+    }
+
     const filters = {
       period: userProfile?.period || '',
-      subjects: selectedSubjects,
-      difficulty,
-      official: officialOnly,
+      areas: selectedSubjects, // Usar áreas ao invés de subjects
+      difficulty: difficultyMap[difficulty] || difficulty,
+      officialOnly, // Flag para filtrar questões oficiais
+      tipo: tipoProva && tipoProva !== 'all' ? tipoProva : undefined, // Tipo de prova selecionado (undefined = todos)
       count: parseInt(questionCount),
       timed,
       timeLimit: timed ? parseInt(timeLimit) : undefined,
@@ -127,31 +177,43 @@ export default function GeneratorPage() {
               <Label>
                 Matérias <span className="text-destructive">*</span>
               </Label>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {subjects.map((subject) => (
-                  <div key={subject} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={subject}
-                      checked={selectedSubjects.includes(subject)}
-                      onCheckedChange={() => {
-                        toggleSubject(subject)
-                        // Clear error when subject is selected
-                        if (errors.subjects && selectedSubjects.length === 0) {
-                          setErrors((prev) => ({ ...prev, subjects: undefined }))
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor={subject}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {subject}
-                    </label>
+              {loadingAreas ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : medicalAreas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma área médica disponível no momento.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {medicalAreas.map((area) => (
+                      <div key={area.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={area.id}
+                          checked={selectedSubjects.includes(area.nome)}
+                          onCheckedChange={() => {
+                            toggleSubject(area.nome)
+                            // Clear error when subject is selected
+                            if (errors.subjects && selectedSubjects.length === 0) {
+                              setErrors((prev) => ({ ...prev, subjects: undefined }))
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={area.id}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {area.nome}
+                        </label>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              {errors.subjects && (
-                <p className="text-sm text-destructive">{errors.subjects}</p>
+                  {errors.subjects && (
+                    <p className="text-sm text-destructive">{errors.subjects}</p>
+                  )}
+                </>
               )}
             </div>
 
@@ -191,6 +253,22 @@ export default function GeneratorPage() {
                 </p>
               </div>
               <Switch checked={officialOnly} onCheckedChange={setOfficialOnly} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de Prova</Label>
+              <Select value={tipoProva} onValueChange={setTipoProva}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os tipos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os tipos</SelectItem>
+                  <SelectItem value="REVALIDA">REVALIDA</SelectItem>
+                  <SelectItem value="ENARE">ENARE</SelectItem>
+                  <SelectItem value="Residência">Residência Médica</SelectItem>
+                  <SelectItem value="Concurso">Concurso Público</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

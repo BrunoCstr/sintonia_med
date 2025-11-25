@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
       subarea,
       dificuldade,
       tipo,
+      oficial = false,
       ativo = true,
     } = body
 
@@ -159,6 +160,7 @@ export async function POST(request: NextRequest) {
       subarea,
       dificuldade,
       tipo,
+      oficial: oficial === true || oficial === 'true',
       ativo,
       createdAt: new Date(),
       updatedAt: new Date(),

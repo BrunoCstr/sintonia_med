@@ -89,6 +89,7 @@ export async function PUT(
       subarea,
       dificuldade,
       tipo,
+      oficial,
       ativo,
     } = body
 
@@ -296,6 +297,11 @@ export async function PUT(
       updateData.ativo = Boolean(ativo)
     }
 
+    // Atualizar campo oficial
+    if (oficial !== undefined) {
+      updateData.oficial = oficial === true || oficial === 'true'
+    }
+
     await docRef.update(updateData)
 
     // Buscar questão atualizada
@@ -353,9 +359,45 @@ export async function DELETE(
       return NextResponse.json({ error: 'Questão não encontrada' }, { status: 404 })
     }
 
+    // Excluir questão do histórico de todos os usuários
+    let totalDeleted = 0
+    let hasMore = true
+
+    while (hasMore) {
+      // Buscar até 500 registros de histórico por vez
+      const historySnapshot = await db
+        .collection('history')
+        .where('questionId', '==', id)
+        .limit(500)
+        .get()
+
+      if (historySnapshot.empty) {
+        hasMore = false
+        break
+      }
+
+      // Deletar em batch
+      const batch = db.batch()
+      historySnapshot.forEach((doc) => {
+        batch.delete(doc.ref)
+      })
+
+      await batch.commit()
+      totalDeleted += historySnapshot.size
+
+      // Se retornou menos de 500, não há mais documentos
+      if (historySnapshot.size < 500) {
+        hasMore = false
+      }
+    }
+
+    // Excluir a questão
     await docRef.delete()
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true,
+      deletedFromHistory: totalDeleted 
+    })
   } catch (error: any) {
     console.error('Erro ao deletar questão:', error)
     return NextResponse.json(

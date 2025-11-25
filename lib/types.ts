@@ -7,6 +7,7 @@ export interface UserProfile {
   email: string
   period: string
   institution: string
+  photoURL?: string
   plan: 'monthly' | 'semester' | null
   planExpiresAt: Date | null
   createdAt: Date

@@ -22,6 +22,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string, period: string, institution: string) => Promise<void>
   logout: () => Promise<void>
   refreshUserRole: () => Promise<void>
+  refreshUserProfile: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
 }
 
@@ -57,6 +58,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUserRole(role)
       // Sincronizar token após refresh
       await syncTokenWithServer(auth.currentUser)
+    }
+  }
+
+  const refreshUserProfile = async () => {
+    if (auth.currentUser) {
+      const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid))
+      if (userDoc.exists()) {
+        const profile = userDoc.data() as UserProfile
+        setUserProfile(profile)
+      }
     }
   }
 
@@ -140,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, userRole, loading, signIn, signUp, logout, refreshUserRole, resetPassword }}>
+    <AuthContext.Provider value={{ user, userProfile, userRole, loading, signIn, signUp, logout, refreshUserRole, refreshUserProfile, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )

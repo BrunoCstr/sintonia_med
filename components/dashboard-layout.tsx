@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
@@ -222,6 +222,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 gap-2 rounded-full">
                   <Avatar className="h-8 w-8">
+                    {userProfile?.photoURL && (
+                      <AvatarImage
+                        src={userProfile.photoURL}
+                        alt={userProfile.name || 'Avatar'}
+                        className="object-cover"
+                      />
+                    )}
                     <AvatarFallback className="bg-primary text-xs text-primary-foreground">
                       {userProfile ? getInitials(userProfile.name) : 'US'}
                     </AvatarFallback>

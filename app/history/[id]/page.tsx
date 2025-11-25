@@ -367,14 +367,17 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
                             </div>
                             {/* Show basic explanation for free users - truncated and blurred */}
                             {(question.explanation || question.comentarioGabarito) && (
-                              <div className="rounded-lg border p-3 relative">
+                              <div className="rounded-lg border p-3 relative max-h-32 overflow-hidden">
                                 <p className="text-xs font-medium text-muted-foreground mb-1">
                                   Resposta Correta: {String.fromCharCode(65 + question.correctAnswer)}
                                 </p>
                                 <p className={cn(
-                                  "text-xs text-muted-foreground/70 blur-sm select-none pointer-events-none"
+                                  "text-xs text-muted-foreground/70 blur-sm select-none pointer-events-none line-clamp-3 break-words whitespace-normal"
                                 )}>
-                                  {question.explanation || question.comentarioGabarito}
+                                  {(() => {
+                                    const text = question.explanation || question.comentarioGabarito || ''
+                                    return text.length > 150 ? text.substring(0, 150) + '...' : text
+                                  })()}
                                 </p>
                                 <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-lg">
                                   <Lock className="h-6 w-6 text-muted-foreground/50" />

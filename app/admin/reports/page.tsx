@@ -12,14 +12,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -27,18 +19,17 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Search, Eye, CheckCircle, Clock, ExternalLink, Loader2 } from 'lucide-react'
+import { Search, Eye, CheckCircle, Clock, Loader2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Report } from '@/lib/types'
 
 export default function ReportsPage() {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [selectedReport, setSelectedReport] = useState<any>(null)
-  const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [reports, setReports] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [updatingStatus, setUpdatingStatus] = useState(false)
   const [stats, setStats] = useState({
     total: 0,
     pendentes: 0,
@@ -76,56 +67,7 @@ export default function ReportsPage() {
   }
 
   const handleViewReport = (report: any) => {
-    setSelectedReport(report)
-    setShowDetailsDialog(true)
-  }
-
-  const handleMarkAsResolved = async () => {
-    if (!selectedReport) return
-
-    setUpdatingStatus(true)
-
-    try {
-      const newStatus = selectedReport.status === 'pendente' ? 'resolvido' : 'pendente'
-
-      const response = await fetch(`/api/admin/reports/${selectedReport.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ status: newStatus }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao atualizar status')
-      }
-
-      const data = await response.json()
-      
-      // Atualizar report na lista
-      setReports((prev) =>
-        prev.map((r) => (r.id === selectedReport.id ? data.report : r))
-      )
-
-      // Atualizar report selecionado
-      setSelectedReport(data.report)
-
-      // Atualizar estatísticas
-      await loadReports()
-
-      if (newStatus === 'resolvido') {
-        alert('Report marcado como resolvido!')
-      } else {
-        alert('Report marcado como pendente!')
-      }
-    } catch (error: any) {
-      console.error('Erro ao atualizar status:', error)
-      alert(error.message || 'Erro ao atualizar status. Tente novamente.')
-    } finally {
-      setUpdatingStatus(false)
-    }
+    router.push(`/admin/reports/${report.id}`)
   }
 
   const getStatusBadge = (status: string) => {
@@ -324,157 +266,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Report Details Dialog */}
-      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Detalhes do Report</DialogTitle>
-            <DialogDescription>
-              Informações completas sobre o erro reportado
-            </DialogDescription>
-          </DialogHeader>
-          {selectedReport && (
-            <div className="space-y-6">
-              {/* Report Info */}
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Status do Report
-                  </p>
-                  <div className="mt-1">{getStatusBadge(selectedReport.status)}</div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Data do Report
-                  </p>
-                  <p className="mt-1 text-sm">{formatDate(selectedReport.createdAt)}</p>
-                </div>
-
-                {selectedReport.resolvedAt && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Resolvido em
-                    </p>
-                    <p className="mt-1 text-sm">
-                      {formatDate(selectedReport.resolvedAt)} por{' '}
-                      {selectedReport.resolvedBy || 'Admin'}
-                    </p>
-                  </div>
-                )}
-
-                {selectedReport.tipos && selectedReport.tipos.length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Tipos de Problema
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {selectedReport.tipos.map((tipo: string, index: number) => (
-                        <Badge key={index} variant="outline">
-                          {tipo}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="mb-2 font-semibold">Informações do Usuário</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Nome</p>
-                    <p className="text-sm">{selectedReport.userName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Email</p>
-                    <p className="text-sm">{selectedReport.userEmail}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="mb-2 font-semibold">Questão Reportada</h4>
-                <div className="rounded-lg bg-muted p-4">
-                  <p className="mb-2 text-sm text-muted-foreground">
-                    ID: {selectedReport.questionId}
-                  </p>
-                  <p className="text-sm">{selectedReport.questionText}</p>
-                  <Button variant="link" size="sm" className="mt-2 h-auto p-0" asChild>
-                    <a
-                      href={`/admin/questions/${selectedReport.questionId}/edit`}
-                      target="_blank"
-                    >
-                      Editar Questão
-                      <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </Button>
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="mb-2 font-semibold">Descrição do Problema</h4>
-                <div className="rounded-lg bg-muted p-4">
-                  <p className="text-sm">{selectedReport.texto}</p>
-                </div>
-              </div>
-
-              {selectedReport.imagemUrl && (
-                <div className="border-t pt-4">
-                  <h4 className="mb-2 font-semibold">Anexo</h4>
-                  <div className="space-y-2">
-                    <div className="rounded-lg border bg-muted p-2">
-                      <img
-                        src={selectedReport.imagemUrl}
-                        alt="Anexo do report"
-                        className="max-h-64 w-full rounded object-contain"
-                      />
-                    </div>
-                    <a
-                      href={selectedReport.imagemUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-primary hover:underline"
-                    >
-                      Abrir imagem em nova aba
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
-              Fechar
-            </Button>
-            {selectedReport && (
-              <Button
-                onClick={handleMarkAsResolved}
-                disabled={updatingStatus}
-              >
-                {updatingStatus ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Atualizando...
-                  </>
-                ) : selectedReport.status === 'pendente' ? (
-                  <>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Marcar como Resolvido
-                  </>
-                ) : (
-                  <>
-                    <Clock className="mr-2 h-4 w-4" />
-                    Marcar como Pendente
-                  </>
-                )}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

@@ -3,12 +3,12 @@ import { getAdminApp } from '@/lib/firebase-admin'
 import { verifyFirebaseToken } from '@/lib/middleware-auth'
 
 /**
- * PUT /api/admin/reports/[id]
- * Atualiza o status de um report (apenas admin_master)
+ * GET /api/admin/reports/[id]
+ * Busca um report específico (apenas admin_master)
  */
-export async function PUT(
+export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verificar autenticação
@@ -22,7 +22,142 @@ export async function PUT(
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
 
-    const { id } = params
+    const { id } = await params
+    const app = getAdminApp()
+    const db = app.firestore()
+
+    // Buscar report
+    const reportDoc = await db.collection('reports').doc(id).get()
+
+    if (!reportDoc.exists) {
+      return NextResponse.json(
+        { error: 'Report não encontrado' },
+        { status: 404 }
+      )
+    }
+
+    const data = reportDoc.data()!
+
+    // Buscar texto da questão
+    let questionText = 'Questão não encontrada'
+    try {
+      const questionDoc = await db.collection('questions').doc(data.questionId).get()
+      if (questionDoc.exists) {
+        const questionData = questionDoc.data()!
+        questionText = questionData.texto || questionData.enunciado || questionText
+      }
+    } catch (error) {
+      console.error('Erro ao buscar questão:', error)
+    }
+
+    // Converter datas
+    let createdAt: Date
+    let updatedAt: Date
+    let resolvedAt: Date | undefined = undefined
+
+    try {
+      if (data.createdAt?.toDate) {
+        createdAt = data.createdAt.toDate()
+      } else if (data.createdAt?.seconds) {
+        createdAt = new Date(data.createdAt.seconds * 1000)
+      } else if (data.createdAt) {
+        createdAt = new Date(data.createdAt)
+      } else {
+        createdAt = new Date()
+      }
+
+      if (isNaN(createdAt.getTime())) {
+        createdAt = new Date()
+      }
+    } catch (error) {
+      createdAt = new Date()
+    }
+
+    try {
+      if (data.updatedAt?.toDate) {
+        updatedAt = data.updatedAt.toDate()
+      } else if (data.updatedAt?.seconds) {
+        updatedAt = new Date(data.updatedAt.seconds * 1000)
+      } else if (data.updatedAt) {
+        updatedAt = new Date(data.updatedAt)
+      } else {
+        updatedAt = createdAt
+      }
+
+      if (isNaN(updatedAt.getTime())) {
+        updatedAt = createdAt
+      }
+    } catch (error) {
+      updatedAt = createdAt
+    }
+
+    if (data.resolvedAt) {
+      try {
+        if (data.resolvedAt.toDate) {
+          resolvedAt = data.resolvedAt.toDate()
+        } else if (data.resolvedAt.seconds) {
+          resolvedAt = new Date(data.resolvedAt.seconds * 1000)
+        } else {
+          resolvedAt = new Date(data.resolvedAt)
+        }
+
+        if (isNaN(resolvedAt.getTime())) {
+          resolvedAt = undefined
+        }
+      } catch (error) {
+        // Ignorar erro
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      report: {
+        id: reportDoc.id,
+        questionId: data.questionId,
+        questionText,
+        userId: data.userId,
+        userName: data.userName || '',
+        userEmail: data.userEmail || '',
+        texto: data.texto || '',
+        tipos: data.tipos || [],
+        imagemUrl: data.imagemUrl || null,
+        status: data.status || 'pendente',
+        resolvedAt: resolvedAt ? resolvedAt.toISOString() : undefined,
+        resolvedBy: data.resolvedBy || undefined,
+        createdAt: createdAt.toISOString(),
+        updatedAt: updatedAt.toISOString(),
+      },
+    })
+  } catch (error: any) {
+    console.error('Erro ao buscar report:', error)
+    return NextResponse.json(
+      { error: error.message || 'Erro ao buscar report' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * PUT /api/admin/reports/[id]
+ * Atualiza o status de um report (apenas admin_master)
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Verificar autenticação
+    const token = request.cookies.get('firebase-token')?.value
+    if (!token) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    }
+
+    const authUser = await verifyFirebaseToken(token)
+    if (!authUser || authUser.role !== 'admin_master') {
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+    }
+
+    const { id } = await params
     const body = await request.json()
     const { status } = body
 

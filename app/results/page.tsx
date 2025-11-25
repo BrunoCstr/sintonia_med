@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Input } from '@/components/ui/input'
+import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   Dialog,
   DialogContent,
@@ -33,6 +35,9 @@ export default function ResultsPage() {
   const [reportQuestionId, setReportQuestionId] = useState<string | null>(null)
   const [reportTypes, setReportTypes] = useState<string[]>([])
   const [reportDescription, setReportDescription] = useState('')
+  const [reportFile, setReportFile] = useState<File | null>(null)
+  const [reportFilePreview, setReportFilePreview] = useState<string | null>(null)
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false)
   const router = useRouter()
   const { userProfile } = useAuth()
   const { isPremium } = usePremium()
@@ -80,24 +85,93 @@ export default function ResultsPage() {
     setReportQuestionId(questionId)
     setReportTypes([])
     setReportDescription('')
+    setReportFile(null)
+    setReportFilePreview(null)
     setShowReportDialog(true)
   }
 
-  const submitReport = () => {
-    console.log('[v0] Report submitted:', {
-      questionId: reportQuestionId,
-      types: reportTypes,
-      description: reportDescription,
-      user: userProfile?.email,
-      date: new Date(),
-    })
-    setShowReportDialog(false)
-    alert('Relatório enviado com sucesso! Agradecemos sua contribuição.')
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione uma imagem válida')
+      return
+    }
+
+    // Validar tamanho (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 5MB')
+      return
+    }
+
+    setReportFile(file)
+
+    // Criar preview
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setReportFilePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const removeFile = () => {
+    setReportFile(null)
+    setReportFilePreview(null)
+  }
+
+  const submitReport = async () => {
+    if (!reportQuestionId || reportTypes.length === 0 || !reportDescription.trim()) {
+      alert('Por favor, preencha todos os campos obrigatórios')
+      return
+    }
+
+    setIsSubmittingReport(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('questionId', reportQuestionId)
+      formData.append('texto', reportDescription)
+      formData.append('tipos', JSON.stringify(reportTypes))
+
+      if (reportFile) {
+        formData.append('file', reportFile)
+      }
+
+      const response = await fetch('/api/reports', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao enviar relatório')
+      }
+
+      const data = await response.json()
+      console.log('Report enviado com sucesso:', data)
+
+      // Limpar formulário
+      setReportTypes([])
+      setReportDescription('')
+      setReportFile(null)
+      setReportFilePreview(null)
+      setShowReportDialog(false)
+
+      alert('Relatório enviado com sucesso! Agradecemos sua contribuição.')
+    } catch (error: any) {
+      console.error('Erro ao enviar report:', error)
+      alert(error.message || 'Erro ao enviar relatório. Tente novamente.')
+    } finally {
+      setIsSubmittingReport(false)
+    }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 py-8">
-      <div className="container mx-auto max-w-4xl px-4">
+      <div className="container mx-auto max-w-4xl px-4 w-full overflow-hidden">
         {/* Results Summary */}
         <Card className="mb-8">
           <CardHeader className="text-center">
@@ -170,7 +244,7 @@ export default function ResultsPage() {
               <Card
                 key={question.id}
                 className={cn(
-                  'border-l-4',
+                  'w-full max-w-full overflow-hidden border-l-4',
                   isCorrect && 'border-l-success',
                   !isCorrect && !isUnanswered && 'border-l-destructive',
                   isUnanswered && 'border-l-muted-foreground'
@@ -178,9 +252,9 @@ export default function ResultsPage() {
               >
                 <Collapsible open={isExpanded} onOpenChange={() => toggleQuestion(question.id)}>
                   <CollapsibleTrigger asChild>
-                    <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1">
+                    <CardHeader className="w-full max-w-full overflow-hidden">
+                      <div className="flex items-start justify-between gap-4 w-full max-w-full">
+                        <div className="flex items-start gap-3 flex-1 min-w-0 w-full max-w-full overflow-hidden">
                           <div
                             className={cn(
                               'flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-semibold',
@@ -191,8 +265,11 @@ export default function ResultsPage() {
                           >
                             {index + 1}
                           </div>
-                          <div className="flex-1">
-                            <CardTitle className="text-base leading-relaxed">
+                          <div className="flex-1 min-w-0 w-full max-w-full overflow-hidden">
+                            <CardTitle 
+                              className="break-words whitespace-normal text-base leading-relaxed w-full max-w-full overflow-wrap-anywhere"
+                              style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                            >
                               {question.text}
                             </CardTitle>
                             {/* Image if exists */}
@@ -238,8 +315,16 @@ export default function ResultsPage() {
                     </CardHeader>
                   </CollapsibleTrigger>
 
-                  <CollapsibleContent>
-                    <CardContent className="space-y-4 pt-0">
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <CardContent className="space-y-4 pt-0">
                       {/* Alternatives */}
                       <div className="space-y-2">
                         {question.alternatives.map((alt, altIndex) => {
@@ -273,8 +358,13 @@ export default function ResultsPage() {
                                 >
                                   {letter}
                                 </div>
-                                <div className="flex-1">
-                                  <p className="text-sm">{alt}</p>
+                                <div className="min-w-0 flex-1 w-full max-w-full overflow-hidden">
+                                  <p 
+                                    className="break-words whitespace-normal text-sm overflow-wrap-anywhere"
+                                    style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                                  >
+                                    {alt}
+                                  </p>
                                   {isUserAnswer && !isCorrectAnswer && (
                                     <p className="mt-1 text-xs text-destructive">Sua resposta</p>
                                   )}
@@ -301,7 +391,7 @@ export default function ResultsPage() {
                             )}
                           </h4>
                           {isPremium ? (
-                            <p className="text-sm leading-relaxed text-muted-foreground">
+                            <p className="break-words whitespace-normal text-sm leading-relaxed text-muted-foreground">
                               {(question as any).comentarioGabarito || question.explanation}
                             </p>
                           ) : (
@@ -319,15 +409,20 @@ export default function ResultsPage() {
                                   </Link>
                                 </Button>
                               </div>
-                              {/* Show basic explanation for free users */}
+                              {/* Show basic explanation for free users - truncated and blurred */}
                               {question.explanation && (
-                                <div className="rounded-lg border p-3">
+                                <div className="rounded-lg border p-3 relative">
                                   <p className="text-xs font-medium text-muted-foreground mb-1">
                                     Resposta Correta: {String.fromCharCode(65 + question.correctAnswer)}
                                   </p>
-                                  <p className="text-xs text-muted-foreground/70">
-                                    {question.explanation.substring(0, 100)}...
+                                  <p className={cn(
+                                    "break-words whitespace-normal text-xs text-muted-foreground/70 blur-sm select-none pointer-events-none"
+                                  )}>
+                                    {question.explanation}
                                   </p>
+                                  <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-lg">
+                                    <Lock className="h-6 w-6 text-muted-foreground/50" />
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -356,8 +451,10 @@ export default function ResultsPage() {
                         <Flag className="mr-2 h-4 w-4" />
                         Relatar Erro
                       </Button>
-                    </CardContent>
-                  </CollapsibleContent>
+                        </CardContent>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </Collapsible>
               </Card>
             )
@@ -413,14 +510,51 @@ export default function ResultsPage() {
                 className="min-h-[100px]"
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="file">Anexar imagem (opcional)</Label>
+              <div className="space-y-2">
+                {reportFilePreview ? (
+                  <div className="relative rounded-lg border p-2">
+                    <img
+                      src={reportFilePreview}
+                      alt="Preview"
+                      className="max-h-32 w-full object-contain"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={removeFile}
+                      className="absolute right-2 top-2"
+                    >
+                      Remover
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="file"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="cursor-pointer"
+                    />
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Formatos aceitos: JPG, PNG, GIF (máximo 5MB)
+                </p>
+              </div>
+            </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowReportDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={submitReport} disabled={reportTypes.length === 0}>
-              Enviar Relatório
+            <Button onClick={submitReport} disabled={reportTypes.length === 0 || !reportDescription.trim() || isSubmittingReport}>
+              {isSubmittingReport ? 'Enviando...' : 'Enviar Relatório'}
             </Button>
           </DialogFooter>
         </DialogContent>

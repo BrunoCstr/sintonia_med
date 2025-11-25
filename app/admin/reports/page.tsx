@@ -27,56 +27,53 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Search, Eye, CheckCircle, Clock, ExternalLink } from 'lucide-react'
-import { useState } from 'react'
-
-// Mock data - replace with real Firestore queries
-const mockReports = [
-  {
-    id: '1',
-    questionId: 'q123',
-    questionText: 'Paciente de 45 anos, hipertenso...',
-    userId: 'u456',
-    userName: 'João Silva',
-    userEmail: 'joao@exemplo.com',
-    texto: 'A alternativa marcada como correta não condiz com o gabarito oficial da prova REVALIDA 2023.',
-    imagemUrl: null,
-    status: 'pendente',
-    createdAt: new Date('2025-01-15T10:30:00'),
-  },
-  {
-    id: '2',
-    questionId: 'q789',
-    questionText: 'Criança de 3 anos com febre alta...',
-    userId: 'u789',
-    userName: 'Maria Santos',
-    userEmail: 'maria@exemplo.com',
-    texto: 'O comentário do gabarito está incompleto e não explica adequadamente o raciocínio clínico.',
-    imagemUrl: 'https://example.com/screenshot.jpg',
-    status: 'pendente',
-    createdAt: new Date('2025-01-14T15:45:00'),
-  },
-  {
-    id: '3',
-    questionId: 'q456',
-    questionText: 'Gestante de 32 semanas com pressão...',
-    userId: 'u123',
-    userName: 'Carlos Oliveira',
-    userEmail: 'carlos@exemplo.com',
-    texto: 'Erro de digitação na alternativa C: "hipotensão" deveria ser "hipertensão".',
-    imagemUrl: null,
-    status: 'resolvido',
-    createdAt: new Date('2025-01-10T09:20:00'),
-    resolvedAt: new Date('2025-01-12T14:00:00'),
-    resolvedBy: 'Admin Master',
-  },
-]
+import { Search, Eye, CheckCircle, Clock, ExternalLink, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import type { Report } from '@/lib/types'
 
 export default function ReportsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedReport, setSelectedReport] = useState<any>(null)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
+  const [reports, setReports] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [stats, setStats] = useState({
+    total: 0,
+    pendentes: 0,
+    resolvidos: 0,
+  })
+
+  useEffect(() => {
+    loadReports()
+  }, [])
+
+  const loadReports = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/admin/reports', {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar reports')
+      }
+
+      const data = await response.json()
+      setReports(data.reports || [])
+      setStats({
+        total: data.total || 0,
+        pendentes: data.pendentes || 0,
+        resolvidos: data.resolvidos || 0,
+      })
+    } catch (error) {
+      console.error('Erro ao carregar reports:', error)
+      alert('Erro ao carregar reports. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleViewReport = (report: any) => {
     setSelectedReport(report)
@@ -84,9 +81,51 @@ export default function ReportsPage() {
   }
 
   const handleMarkAsResolved = async () => {
-    // TODO: Update report status in Firestore
-    console.log('Marking as resolved:', selectedReport.id)
-    setShowDetailsDialog(false)
+    if (!selectedReport) return
+
+    setUpdatingStatus(true)
+
+    try {
+      const newStatus = selectedReport.status === 'pendente' ? 'resolvido' : 'pendente'
+
+      const response = await fetch(`/api/admin/reports/${selectedReport.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao atualizar status')
+      }
+
+      const data = await response.json()
+      
+      // Atualizar report na lista
+      setReports((prev) =>
+        prev.map((r) => (r.id === selectedReport.id ? data.report : r))
+      )
+
+      // Atualizar report selecionado
+      setSelectedReport(data.report)
+
+      // Atualizar estatísticas
+      await loadReports()
+
+      if (newStatus === 'resolvido') {
+        alert('Report marcado como resolvido!')
+      } else {
+        alert('Report marcado como pendente!')
+      }
+    } catch (error: any) {
+      console.error('Erro ao atualizar status:', error)
+      alert(error.message || 'Erro ao atualizar status. Tente novamente.')
+    } finally {
+      setUpdatingStatus(false)
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -110,17 +149,22 @@ export default function ReportsPage() {
     }
   }
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date)
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(date)
+    } catch (error) {
+      return dateString
+    }
   }
 
-  const filteredReports = mockReports.filter((report) => {
+  const filteredReports = reports.filter((report) => {
     const matchesSearch =
       report.texto.toLowerCase().includes(searchTerm.toLowerCase()) ||
       report.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -147,10 +191,10 @@ export default function ReportsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total de Reports</CardTitle>
-              <Badge variant="outline">{mockReports.length}</Badge>
+              <Badge variant="outline">{stats.total}</Badge>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockReports.length}</div>
+              <div className="text-2xl font-bold">{stats.total}</div>
             </CardContent>
           </Card>
 
@@ -161,7 +205,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-warning">
-                {mockReports.filter((r) => r.status === 'pendente').length}
+                {stats.pendentes}
               </div>
             </CardContent>
           </Card>
@@ -173,7 +217,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-success">
-                {mockReports.filter((r) => r.status === 'resolvido').length}
+                {stats.resolvidos}
               </div>
             </CardContent>
           </Card>
@@ -213,19 +257,28 @@ export default function ReportsPage() {
         {/* Reports Table */}
         <Card>
           <CardContent className="px-6 py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Questão</TableHead>
-                  <TableHead>Reportado por</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredReports.map((report) => (
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredReports.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                Nenhum report encontrado
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Questão</TableHead>
+                    <TableHead>Reportado por</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredReports.map((report) => (
                   <TableRow key={report.id}>
                     <TableCell className="max-w-xs">
                       <p className="truncate text-sm font-medium">
@@ -264,9 +317,10 @@ export default function ReportsPage() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -305,8 +359,23 @@ export default function ReportsPage() {
                     </p>
                     <p className="mt-1 text-sm">
                       {formatDate(selectedReport.resolvedAt)} por{' '}
-                      {selectedReport.resolvedBy}
+                      {selectedReport.resolvedBy || 'Admin'}
                     </p>
+                  </div>
+                )}
+
+                {selectedReport.tipos && selectedReport.tipos.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Tipos de Problema
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {selectedReport.tipos.map((tipo: string, index: number) => (
+                        <Badge key={index} variant="outline">
+                          {tipo}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -354,14 +423,21 @@ export default function ReportsPage() {
               {selectedReport.imagemUrl && (
                 <div className="border-t pt-4">
                   <h4 className="mb-2 font-semibold">Anexo</h4>
-                  <div className="rounded-lg border bg-muted p-4">
+                  <div className="space-y-2">
+                    <div className="rounded-lg border bg-muted p-2">
+                      <img
+                        src={selectedReport.imagemUrl}
+                        alt="Anexo do report"
+                        className="max-h-64 w-full rounded object-contain"
+                      />
+                    </div>
                     <a
                       href={selectedReport.imagemUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 text-sm text-primary hover:underline"
                     >
-                      Ver imagem anexada
+                      Abrir imagem em nova aba
                       <ExternalLink className="h-4 w-4" />
                     </a>
                   </div>
@@ -373,10 +449,27 @@ export default function ReportsPage() {
             <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
               Fechar
             </Button>
-            {selectedReport?.status === 'pendente' && (
-              <Button onClick={handleMarkAsResolved}>
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Marcar como Resolvido
+            {selectedReport && (
+              <Button
+                onClick={handleMarkAsResolved}
+                disabled={updatingStatus}
+              >
+                {updatingStatus ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Atualizando...
+                  </>
+                ) : selectedReport.status === 'pendente' ? (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Marcar como Resolvido
+                  </>
+                ) : (
+                  <>
+                    <Clock className="mr-2 h-4 w-4" />
+                    Marcar como Pendente
+                  </>
+                )}
               </Button>
             )}
           </DialogFooter>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminApp } from '@/lib/firebase-admin'
+import { getAdminApp, isUserPremium } from '@/lib/firebase-admin'
 import { verifyFirebaseToken } from '@/lib/middleware-auth'
 
 /**
@@ -33,37 +33,89 @@ export async function POST(request: NextRequest) {
     const app = getAdminApp()
     const db = app.firestore()
 
+    // Verificar se o usuário é premium
+    const userIsPremium = await isUserPremium(authUser.uid)
+
+    // Função helper para remover campos undefined de um objeto
+    const removeUndefinedFields = (obj: any): any => {
+      if (obj === null || typeof obj !== 'object') {
+        return obj
+      }
+      // Preservar objetos Date
+      if (obj instanceof Date) {
+        return obj
+      }
+      if (Array.isArray(obj)) {
+        return obj.map(removeUndefinedFields)
+      }
+      const cleaned: any = {}
+      for (const key in obj) {
+        if (obj[key] !== undefined) {
+          // Preservar objetos Date
+          if (obj[key] instanceof Date) {
+            cleaned[key] = obj[key]
+          } else if (typeof obj[key] === 'object') {
+            cleaned[key] = removeUndefinedFields(obj[key])
+          } else {
+            cleaned[key] = obj[key]
+          }
+        }
+      }
+      return cleaned
+    }
+
+    // Processar questões - truncar comentarioGabarito se não for premium
+    const processedQuestions = questions.map((q: any) => {
+      const processed: any = { ...q }
+      
+      if (!userIsPremium) {
+        // Se não for premium, truncar comentarioGabarito e explanation
+        if (q.comentarioGabarito) {
+          processed.comentarioGabarito = q.comentarioGabarito.substring(0, 100) + '...'
+        }
+        if (q.explanation) {
+          processed.explanation = q.explanation.substring(0, 100) + '...'
+        }
+        // Remover campos undefined
+        return removeUndefinedFields(processed)
+      }
+      
+      // Remover campos undefined mesmo para premium
+      return removeUndefinedFields(processed)
+    })
+
     // Calcular estatísticas
-    const correctCount = questions.filter(
+    const correctCount = processedQuestions.filter(
       (q: any) => answers[q.id] !== undefined && answers[q.id] === q.correctAnswer
     ).length
-    const incorrectCount = questions.filter(
+    const incorrectCount = processedQuestions.filter(
       (q: any) => answers[q.id] !== undefined && answers[q.id] !== q.correctAnswer
     ).length
-    const unansweredCount = questions.filter(
+    const unansweredCount = processedQuestions.filter(
       (q: any) => answers[q.id] === undefined
     ).length
-    const percentage = questions.length > 0 
-      ? Math.round((correctCount / questions.length) * 100)
+    const percentage = processedQuestions.length > 0 
+      ? Math.round((correctCount / processedQuestions.length) * 100)
       : 0
 
     // Extrair áreas/matérias únicas
-    const subjects = Array.from(new Set(questions.map((q: any) => q.subject || q.area).filter(Boolean)))
+    const subjects = Array.from(new Set(processedQuestions.map((q: any) => q.subject || q.area).filter(Boolean)))
     
     console.log('Salvando resultado:', {
       userId: authUser.uid,
-      questionsCount: questions.length,
+      questionsCount: processedQuestions.length,
       correctCount,
       incorrectCount,
       percentage,
       subjects,
+      isPremium: userIsPremium,
     })
 
     // Criar documento de resultado
     const now = new Date()
-    const resultData = {
+    const resultData = removeUndefinedFields({
       userId: authUser.uid,
-      questions,
+      questions: processedQuestions,
       answers,
       filters: filters || {},
       timeSpent: timeSpent || null,
@@ -75,11 +127,19 @@ export async function POST(request: NextRequest) {
       subjects,
       createdAt: now,
       updatedAt: now,
-    }
+    })
 
     const docRef = await db.collection('results').add(resultData)
     
     console.log('Resultado salvo com sucesso:', docRef.id)
+
+    // Garantir que createdAt e updatedAt sejam objetos Date válidos
+    const createdAtDate = resultData.createdAt instanceof Date 
+      ? resultData.createdAt 
+      : new Date(resultData.createdAt)
+    const updatedAtDate = resultData.updatedAt instanceof Date 
+      ? resultData.updatedAt 
+      : new Date(resultData.updatedAt)
 
     return NextResponse.json({ 
       success: true, 
@@ -87,8 +147,8 @@ export async function POST(request: NextRequest) {
       result: {
         id: docRef.id,
         ...resultData,
-        createdAt: resultData.createdAt.toISOString(),
-        updatedAt: resultData.updatedAt.toISOString(),
+        createdAt: createdAtDate.toISOString(),
+        updatedAt: updatedAtDate.toISOString(),
       }
     })
   } catch (error: any) {
@@ -134,26 +194,48 @@ export async function GET(request: NextRequest) {
       let createdAt: Date
       let updatedAt: Date
       
-      if (data.createdAt?.toDate) {
-        // Firestore Timestamp
-        createdAt = data.createdAt.toDate()
-      } else if (data.createdAt?.seconds) {
-        // Timestamp em segundos
-        createdAt = new Date(data.createdAt.seconds * 1000)
-      } else if (data.createdAt) {
-        // String ISO ou Date
-        createdAt = new Date(data.createdAt)
-      } else {
+      try {
+        if (data.createdAt?.toDate) {
+          // Firestore Timestamp
+          createdAt = data.createdAt.toDate()
+        } else if (data.createdAt?.seconds) {
+          // Timestamp em segundos
+          createdAt = new Date(data.createdAt.seconds * 1000)
+        } else if (data.createdAt) {
+          // String ISO ou Date
+          createdAt = new Date(data.createdAt)
+        } else {
+          createdAt = new Date()
+        }
+        
+        // Validar se a data é válida
+        if (isNaN(createdAt.getTime())) {
+          console.warn('Data createdAt inválida para resultado', doc.id, data.createdAt)
+          createdAt = new Date()
+        }
+      } catch (error) {
+        console.error('Erro ao converter createdAt:', error, data.createdAt)
         createdAt = new Date()
       }
       
-      if (data.updatedAt?.toDate) {
-        updatedAt = data.updatedAt.toDate()
-      } else if (data.updatedAt?.seconds) {
-        updatedAt = new Date(data.updatedAt.seconds * 1000)
-      } else if (data.updatedAt) {
-        updatedAt = new Date(data.updatedAt)
-      } else {
+      try {
+        if (data.updatedAt?.toDate) {
+          updatedAt = data.updatedAt.toDate()
+        } else if (data.updatedAt?.seconds) {
+          updatedAt = new Date(data.updatedAt.seconds * 1000)
+        } else if (data.updatedAt) {
+          updatedAt = new Date(data.updatedAt)
+        } else {
+          updatedAt = new Date()
+        }
+        
+        // Validar se a data é válida
+        if (isNaN(updatedAt.getTime())) {
+          console.warn('Data updatedAt inválida para resultado', doc.id, data.updatedAt)
+          updatedAt = new Date()
+        }
+      } catch (error) {
+        console.error('Erro ao converter updatedAt:', error, data.updatedAt)
         updatedAt = new Date()
       }
       

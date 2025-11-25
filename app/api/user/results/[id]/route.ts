@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminApp } from '@/lib/firebase-admin'
+import { getAdminApp, isUserPremium } from '@/lib/firebase-admin'
 import { verifyFirebaseToken } from '@/lib/middleware-auth'
 
 /**
@@ -42,33 +42,95 @@ export async function GET(
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
 
+    // Verificar se o usuário é premium
+    const userIsPremium = await isUserPremium(authUser.uid)
+
     // Converter Timestamp do Firestore para Date
     let createdAt: Date
     let updatedAt: Date
     
-    if (data.createdAt?.toDate) {
-      createdAt = data.createdAt.toDate()
-    } else if (data.createdAt?.seconds) {
-      createdAt = new Date(data.createdAt.seconds * 1000)
-    } else if (data.createdAt) {
-      createdAt = new Date(data.createdAt)
-    } else {
+    try {
+      if (data.createdAt?.toDate) {
+        createdAt = data.createdAt.toDate()
+      } else if (data.createdAt?.seconds) {
+        createdAt = new Date(data.createdAt.seconds * 1000)
+      } else if (data.createdAt) {
+        createdAt = new Date(data.createdAt)
+      } else {
+        createdAt = new Date()
+      }
+      
+      // Validar se a data é válida
+      if (isNaN(createdAt.getTime())) {
+        console.warn('Data createdAt inválida para resultado', id, data.createdAt)
+        createdAt = new Date()
+      }
+    } catch (error) {
+      console.error('Erro ao converter createdAt:', error, data.createdAt)
       createdAt = new Date()
     }
     
-    if (data.updatedAt?.toDate) {
-      updatedAt = data.updatedAt.toDate()
-    } else if (data.updatedAt?.seconds) {
-      updatedAt = new Date(data.updatedAt.seconds * 1000)
-    } else if (data.updatedAt) {
-      updatedAt = new Date(data.updatedAt)
-    } else {
+    try {
+      if (data.updatedAt?.toDate) {
+        updatedAt = data.updatedAt.toDate()
+      } else if (data.updatedAt?.seconds) {
+        updatedAt = new Date(data.updatedAt.seconds * 1000)
+      } else if (data.updatedAt) {
+        updatedAt = new Date(data.updatedAt)
+      } else {
+        updatedAt = new Date()
+      }
+      
+      // Validar se a data é válida
+      if (isNaN(updatedAt.getTime())) {
+        console.warn('Data updatedAt inválida para resultado', id, data.updatedAt)
+        updatedAt = new Date()
+      }
+    } catch (error) {
+      console.error('Erro ao converter updatedAt:', error, data.updatedAt)
       updatedAt = new Date()
     }
 
+    // Função helper para remover campos undefined de um objeto
+    const removeUndefinedFields = (obj: any): any => {
+      if (obj === null || typeof obj !== 'object') {
+        return obj
+      }
+      if (Array.isArray(obj)) {
+        return obj.map(removeUndefinedFields)
+      }
+      const cleaned: any = {}
+      for (const key in obj) {
+        if (obj[key] !== undefined) {
+          cleaned[key] = typeof obj[key] === 'object' ? removeUndefinedFields(obj[key]) : obj[key]
+        }
+      }
+      return cleaned
+    }
+
+    // Processar questões - truncar comentarioGabarito se não for premium
+    const questions = (data.questions || []).map((q: any) => {
+      const processed: any = { ...q }
+      
+      if (!userIsPremium) {
+        // Se não for premium, truncar comentarioGabarito e explanation
+        if (q.comentarioGabarito) {
+          processed.comentarioGabarito = q.comentarioGabarito.substring(0, 100) + '...'
+        }
+        if (q.explanation) {
+          processed.explanation = q.explanation.substring(0, 100) + '...'
+        }
+        // Remover campos undefined
+        return removeUndefinedFields(processed)
+      }
+      
+      // Remover campos undefined mesmo para premium
+      return removeUndefinedFields(processed)
+    })
+
     const result = {
       id: doc.id,
-      questions: data.questions || [],
+      questions,
       answers: data.answers || {},
       filters: data.filters || {},
       timeSpent: data.timeSpent || null,

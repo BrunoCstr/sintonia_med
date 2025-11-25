@@ -43,11 +43,14 @@ export interface Report {
   userName: string
   userEmail: string
   texto: string
+  tipos?: string[]
   imagemUrl?: string
   status: 'pendente' | 'resolvido'
   createdAt: Date
+  updatedAt?: Date
   resolvedAt?: Date
   resolvedBy?: string
+  questionText?: string // Para exibição na lista
 }
 
 // Subscription types

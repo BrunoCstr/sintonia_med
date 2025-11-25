@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import type { Question as QuestionDB } from '@/lib/types'
 import { useAuth } from '@/lib/auth-context'
+import { usePremium } from '@/lib/hooks/use-premium'
 
 // Interface para questões no formato do quiz
 interface QuizQuestion {
@@ -70,6 +71,7 @@ function convertQuestionToQuiz(question: QuestionDB, period: string): QuizQuesti
 
 export default function QuizPage() {
   const { user } = useAuth()
+  const { isPremium } = usePremium()
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [loading, setLoading] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -160,7 +162,19 @@ export default function QuizPage() {
       const filtersStr = localStorage.getItem('quizFilters')
       const filters = filtersStr ? JSON.parse(filtersStr) : {}
       
-      localStorage.setItem('quizResults', JSON.stringify({ questions, answers }))
+      // Processar questões para localStorage - truncar comentarioGabarito se não for premium
+      const questionsForStorage = questions.map((q) => {
+        if (!isPremium && (q as any).comentarioGabarito) {
+          return {
+            ...q,
+            comentarioGabarito: (q as any).comentarioGabarito.substring(0, 100) + '...',
+            explanation: q.explanation ? q.explanation.substring(0, 100) + '...' : q.explanation,
+          }
+        }
+        return q
+      })
+      
+      localStorage.setItem('quizResults', JSON.stringify({ questions: questionsForStorage, answers }))
       
       // Salvar resultados no Firestore e questões respondidas no histórico
       if (user) {
@@ -170,6 +184,26 @@ export default function QuizPage() {
           ? filters.timeLimit * 60 - timeLeft 
           : null
 
+        // Função helper para remover campos undefined antes de enviar
+        const removeUndefinedFields = (obj: any): any => {
+          if (obj === null || typeof obj !== 'object') {
+            return obj
+          }
+          if (Array.isArray(obj)) {
+            return obj.map(removeUndefinedFields)
+          }
+          const cleaned: any = {}
+          for (const key in obj) {
+            if (obj[key] !== undefined) {
+              cleaned[key] = typeof obj[key] === 'object' ? removeUndefinedFields(obj[key]) : obj[key]
+            }
+          }
+          return cleaned
+        }
+
+        // Limpar questões antes de enviar
+        const cleanedQuestions = removeUndefinedFields(questions)
+
         // Salvar resultado completo no Firestore
         const resultsResponse = await fetch('/api/user/results', {
           method: 'POST',
@@ -178,7 +212,7 @@ export default function QuizPage() {
           },
           credentials: 'include',
           body: JSON.stringify({
-            questions,
+            questions: cleanedQuestions,
             answers,
             filters,
             timeSpent,
@@ -303,7 +337,7 @@ export default function QuizPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 py-8">
-      <div className="container mx-auto max-w-4xl px-4">
+      <div className="container mx-auto max-w-4xl px-4 w-full overflow-hidden">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -335,8 +369,8 @@ export default function QuizPage() {
         </div>
 
         {/* Question Card */}
-        <Card className="mb-6">
-          <CardHeader>
+        <Card className="mb-6 w-full max-w-full overflow-hidden">
+          <CardHeader className="w-full max-w-full">
             <div className="mb-2 flex flex-wrap gap-2">
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
                 {currentQuestion.subject}
@@ -350,7 +384,12 @@ export default function QuizPage() {
                 </span>
               )}
             </div>
-            <CardTitle className="text-lg leading-relaxed">{currentQuestion.text}</CardTitle>
+            <CardTitle 
+              className="break-words whitespace-normal text-lg leading-relaxed w-full max-w-full overflow-wrap-anywhere"
+              style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+            >
+              {currentQuestion.text}
+            </CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-3">
@@ -374,13 +413,13 @@ export default function QuizPage() {
                   key={index}
                   onClick={() => handleAnswer(currentQuestion.id, index)}
                   className={cn(
-                    'w-full rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
+                    'w-full max-w-full rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50 overflow-hidden',
                     isSelected
                       ? 'border-primary bg-primary/5'
                       : 'border-border bg-card hover:bg-accent'
                   )}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 w-full max-w-full">
                     <div
                       className={cn(
                         'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 font-semibold',
@@ -391,7 +430,12 @@ export default function QuizPage() {
                     >
                       {letter}
                     </div>
-                    <span className="flex-1 pt-1">{alt}</span>
+                    <span 
+                      className="min-w-0 flex-1 break-words whitespace-normal pt-1 overflow-wrap-anywhere"
+                      style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                    >
+                      {alt}
+                    </span>
                   </div>
                 </button>
               )

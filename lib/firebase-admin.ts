@@ -219,6 +219,40 @@ export async function listUsers(maxResults: number = 1000, nextPageToken?: strin
 /**
  * Obtém informações do usuário incluindo custom claims
  */
+/**
+ * Verifica se o usuário tem plano premium ativo
+ */
+export async function isUserPremium(uid: string): Promise<boolean> {
+  try {
+    const app = getAdminApp()
+    const db = app.firestore()
+    
+    const userDoc = await db.collection('users').doc(uid).get()
+    // No Admin SDK, exists é uma propriedade, não uma função
+    if (!userDoc.exists) {
+      return false
+    }
+    
+    const userData = userDoc.data()
+    if (!userData?.plan) {
+      return false
+    }
+    
+    // Verificar se o plano não expirou
+    if (userData.planExpiresAt) {
+      const expiresAt = userData.planExpiresAt.toDate ? userData.planExpiresAt.toDate() : new Date(userData.planExpiresAt)
+      const now = new Date()
+      return expiresAt > now
+    }
+    
+    // Se não tem data de expiração, considerar como ativo
+    return true
+  } catch (error) {
+    console.error('Erro ao verificar status premium:', error)
+    return false
+  }
+}
+
 export async function getUserWithClaims(uid: string) {
   const app = getAdminApp()
   const user = await app.auth().getUser(uid)

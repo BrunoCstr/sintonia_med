@@ -7,10 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Calendar, Clock, CheckCircle2, XCircle, ArrowLeft, TrendingUp, Target, Award, Circle } from 'lucide-react'
+import { Calendar, Clock, CheckCircle2, XCircle, ArrowLeft, TrendingUp, Target, Award, Circle, Lock, Crown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
+import { usePremium } from '@/lib/hooks/use-premium'
 import Image from 'next/image'
+import Link from 'next/link'
 
 interface QuizDetail {
   id: string
@@ -32,6 +34,7 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
   const { id } = use(params)
   const router = useRouter()
   const { user } = useAuth()
+  const { isPremium } = usePremium()
   const [quiz, setQuiz] = useState<QuizDetail | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -336,10 +339,50 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
                         <h5 className="mb-2 flex items-center gap-2 font-semibold">
                           <TrendingUp className="h-4 w-4 text-primary" />
                           Explicação
+                          {!isPremium && (
+                            <Badge variant="secondary" className="ml-auto">
+                              <Lock className="mr-1 h-3 w-3" />
+                              Premium
+                            </Badge>
+                          )}
                         </h5>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {question.explanation || question.comentarioGabarito || 'Sem explicação disponível'}
-                        </p>
+                        {isPremium ? (
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {question.explanation || question.comentarioGabarito || 'Sem explicação disponível'}
+                          </p>
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 bg-background/50 p-6 text-center">
+                              <Lock className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
+                              <h5 className="mb-2 font-semibold">Gabarito Comentado Premium</h5>
+                              <p className="mb-4 text-sm text-muted-foreground">
+                                Assine um plano premium para ter acesso ao gabarito comentado completo de todas as questões!
+                              </p>
+                              <Button asChild className="w-full sm:w-auto">
+                                <Link href="/plans">
+                                  <Crown className="mr-2 h-4 w-4" />
+                                  Assinar Agora
+                                </Link>
+                              </Button>
+                            </div>
+                            {/* Show basic explanation for free users - truncated and blurred */}
+                            {(question.explanation || question.comentarioGabarito) && (
+                              <div className="rounded-lg border p-3 relative">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">
+                                  Resposta Correta: {String.fromCharCode(65 + question.correctAnswer)}
+                                </p>
+                                <p className={cn(
+                                  "text-xs text-muted-foreground/70 blur-sm select-none pointer-events-none"
+                                )}>
+                                  {question.explanation || question.comentarioGabarito}
+                                </p>
+                                <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-lg">
+                                  <Lock className="h-6 w-6 text-muted-foreground/50" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 

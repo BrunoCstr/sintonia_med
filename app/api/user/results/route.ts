@@ -195,14 +195,19 @@ export async function GET(request: NextRequest) {
       let updatedAt: Date
       
       try {
-        if (data.createdAt?.toDate) {
+        // Verificar se createdAt existe e não é um objeto vazio
+        if (!data.createdAt || (typeof data.createdAt === 'object' && Object.keys(data.createdAt).length === 0)) {
+          createdAt = new Date()
+        } else if (data.createdAt?.toDate && typeof data.createdAt.toDate === 'function') {
           // Firestore Timestamp
           createdAt = data.createdAt.toDate()
         } else if (data.createdAt?.seconds) {
           // Timestamp em segundos
           createdAt = new Date(data.createdAt.seconds * 1000)
-        } else if (data.createdAt) {
-          // String ISO ou Date
+        } else if (data.createdAt instanceof Date) {
+          createdAt = data.createdAt
+        } else if (typeof data.createdAt === 'string' || typeof data.createdAt === 'number') {
+          // String ISO ou número
           createdAt = new Date(data.createdAt)
         } else {
           createdAt = new Date()
@@ -210,20 +215,23 @@ export async function GET(request: NextRequest) {
         
         // Validar se a data é válida
         if (isNaN(createdAt.getTime())) {
-          console.warn('Data createdAt inválida para resultado', doc.id, data.createdAt)
           createdAt = new Date()
         }
       } catch (error) {
-        console.error('Erro ao converter createdAt:', error, data.createdAt)
         createdAt = new Date()
       }
       
       try {
-        if (data.updatedAt?.toDate) {
+        // Verificar se updatedAt existe e não é um objeto vazio
+        if (!data.updatedAt || (typeof data.updatedAt === 'object' && Object.keys(data.updatedAt).length === 0)) {
+          updatedAt = new Date()
+        } else if (data.updatedAt?.toDate && typeof data.updatedAt.toDate === 'function') {
           updatedAt = data.updatedAt.toDate()
         } else if (data.updatedAt?.seconds) {
           updatedAt = new Date(data.updatedAt.seconds * 1000)
-        } else if (data.updatedAt) {
+        } else if (data.updatedAt instanceof Date) {
+          updatedAt = data.updatedAt
+        } else if (typeof data.updatedAt === 'string' || typeof data.updatedAt === 'number') {
           updatedAt = new Date(data.updatedAt)
         } else {
           updatedAt = new Date()
@@ -231,11 +239,9 @@ export async function GET(request: NextRequest) {
         
         // Validar se a data é válida
         if (isNaN(updatedAt.getTime())) {
-          console.warn('Data updatedAt inválida para resultado', doc.id, data.updatedAt)
           updatedAt = new Date()
         }
       } catch (error) {
-        console.error('Erro ao converter updatedAt:', error, data.updatedAt)
         updatedAt = new Date()
       }
       
@@ -255,16 +261,19 @@ export async function GET(request: NextRequest) {
     // Calcular estatísticas gerais
     const totalQuizzes = results.length
     // Somar apenas questões respondidas (não incluir não respondidas)
-    const totalQuestions = results.reduce((sum, r) => sum + (r.correctCount + r.incorrectCount), 0)
-    const averagePercentage = totalQuizzes > 0
-      ? Math.round(results.reduce((sum, r) => sum + r.percentage, 0) / totalQuizzes)
+    const totalQuestionsAnswered = results.reduce((sum, r) => sum + (r.correctCount + r.incorrectCount), 0)
+    const totalCorrect = results.reduce((sum, r) => sum + r.correctCount, 0)
+    
+    // Calcular média de acertos baseada em questões respondidas (não na média de percentages)
+    const averagePercentage = totalQuestionsAnswered > 0
+      ? Math.round((totalCorrect / totalQuestionsAnswered) * 100)
       : 0
 
     return NextResponse.json({
       results,
       stats: {
         totalQuizzes,
-        totalQuestions,
+        totalQuestions: totalQuestionsAnswered,
         averagePercentage,
       },
     })

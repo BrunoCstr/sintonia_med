@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useRole } from '@/lib/hooks/use-role'
@@ -9,47 +9,72 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { Brain, TrendingUp, Calendar, Target, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { Brain, TrendingUp, Calendar, Target, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react'
 
-// Mock data for charts
-const performanceData = [
-  { name: 'Seg', acertos: 65 },
-  { name: 'Ter', acertos: 72 },
-  { name: 'Qua', acertos: 68 },
-  { name: 'Qui', acertos: 78 },
-  { name: 'Sex', acertos: 85 },
-  { name: 'Sáb', acertos: 80 },
-  { name: 'Dom', acertos: 75 },
+// Cor vermelha da paleta (#90091C - Deep crimson)
+const CHART_COLOR = '#90091C'
+
+const COLORS = [
+  '#90091C', // Vermelho principal da paleta
+  '#700712', // Vermelho mais escuro
+  '#B00B24', // Vermelho um pouco mais claro
+  '#50040A', // Vermelho muito escuro
+  '#D00D2C', // Vermelho mais claro
 ]
-
-const subjectData = [
-  { subject: 'Anatomia', correct: 85, total: 100 },
-  { subject: 'Fisiologia', correct: 72, total: 100 },
-  { subject: 'Patologia', correct: 68, total: 100 },
-  { subject: 'Farmacologia', correct: 78, total: 100 },
-  { subject: 'Clínica Médica', correct: 90, total: 100 },
-]
-
-const errorsBySubject = [
-  { name: 'Cardiologia', value: 18 },
-  { name: 'Neurologia', value: 15 },
-  { name: 'Gastro', value: 12 },
-  { name: 'Respiratório', value: 10 },
-  { name: 'Outros', value: 8 },
-]
-
-const COLORS = ['#4A5FCC', '#5B7ED8', '#7C9FE5', '#9DBFF1', '#BEDFFE']
 
 export default function DashboardPage() {
   const { user, userProfile, loading } = useAuth()
   const { userRole, isAdminMaster, isAdminQuestoes } = useRole()
   const router = useRouter()
+  const [dashboardData, setDashboardData] = useState<any>(null)
+  const [loadingStats, setLoadingStats] = useState(true)
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/auth/login')
     }
   }, [user, loading, router])
+
+  useEffect(() => {
+    if (user) {
+      loadDashboardStats()
+    }
+  }, [user])
+
+  const loadDashboardStats = async () => {
+    try {
+      setLoadingStats(true)
+      const response = await fetch('/api/user/dashboard-stats', {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar estatísticas')
+      }
+
+      const data = await response.json()
+      setDashboardData(data)
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas do dashboard:', error)
+      // Usar dados padrão em caso de erro
+      setDashboardData({
+        stats: {
+          today: 0,
+          week: 0,
+          month: 0,
+          total: 0,
+          accuracyRate: 0,
+          totalCorrect: 0,
+          totalIncorrect: 0,
+        },
+        weeklyData: [],
+        subjectData: [],
+        errorsBySubject: [],
+      })
+    } finally {
+      setLoadingStats(false)
+    }
+  }
 
   if (loading || !user || !userProfile) {
     return (
@@ -58,6 +83,20 @@ export default function DashboardPage() {
       </div>
     )
   }
+
+  const stats = dashboardData?.stats || {
+    today: 0,
+    week: 0,
+    month: 0,
+    total: 0,
+    accuracyRate: 0,
+    totalCorrect: 0,
+    totalIncorrect: 0,
+  }
+
+  const weeklyData = dashboardData?.weeklyData || []
+  const subjectData = dashboardData?.subjectData || []
+  const errorsBySubject = dashboardData?.errorsBySubject || []
 
   return (
     <DashboardLayout>
@@ -78,8 +117,14 @@ export default function DashboardPage() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">15</div>
-              <p className="text-xs text-muted-foreground">questões respondidas</p>
+              {loadingStats ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stats.today}</div>
+                  <p className="text-xs text-muted-foreground">questões respondidas</p>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -89,8 +134,14 @@ export default function DashboardPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">127</div>
-              <p className="text-xs text-muted-foreground">questões respondidas</p>
+              {loadingStats ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stats.week}</div>
+                  <p className="text-xs text-muted-foreground">questões respondidas</p>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -100,8 +151,14 @@ export default function DashboardPage() {
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">543</div>
-              <p className="text-xs text-muted-foreground">questões respondidas</p>
+              {loadingStats ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stats.month}</div>
+                  <p className="text-xs text-muted-foreground">questões respondidas</p>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -111,8 +168,14 @@ export default function DashboardPage() {
               <Brain className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">1.247</div>
-              <p className="text-xs text-muted-foreground">questões respondidas</p>
+              {loadingStats ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stats.total.toLocaleString('pt-BR')}</div>
+                  <p className="text-xs text-muted-foreground">questões respondidas</p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -124,18 +187,26 @@ export default function DashboardPage() {
             <CardDescription>Seu percentual de acertos</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <CheckCircle2 className="h-5 w-5 text-success" />
-                <span className="text-sm">Acertos</span>
+            {loadingStats ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-              <span className="text-2xl font-bold text-success">76%</span>
-            </div>
-            <Progress value={76} className="h-2" />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>948 acertos</span>
-              <span>299 erros</span>
-            </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                    <span className="text-sm">Acertos</span>
+                  </div>
+                  <span className="text-2xl font-bold text-success">{stats.accuracyRate}%</span>
+                </div>
+                <Progress value={stats.accuracyRate} className="h-2" />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{stats.totalCorrect.toLocaleString('pt-BR')} acertos</span>
+                  <span>{stats.totalIncorrect.toLocaleString('pt-BR')} erros</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -148,27 +219,37 @@ export default function DashboardPage() {
               <CardDescription>Percentual de acertos por dia</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={performanceData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="acertos"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {loadingStats ? (
+                <div className="flex items-center justify-center h-[300px]">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : weeklyData.length === 0 ? (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  <p>Nenhum dado disponível ainda</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={weeklyData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="name" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="acertos"
+                      stroke={CHART_COLOR}
+                      strokeWidth={2}
+                      dot={{ fill: CHART_COLOR }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -179,31 +260,41 @@ export default function DashboardPage() {
               <CardDescription>Top 5 áreas para revisar</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={errorsBySubject}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, value }) => `${name}: ${value}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {errorsBySubject.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {loadingStats ? (
+                <div className="flex items-center justify-center h-[300px]">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : errorsBySubject.length === 0 ? (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  <p>Nenhum dado disponível ainda</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={errorsBySubject}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, value }) => `${name}: ${value}%`}
+                      outerRadius={80}
+                      fill={CHART_COLOR}
+                      dataKey="value"
+                    >
+                      {errorsBySubject.map((entry: { name: string; value: number }, index: number) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -215,21 +306,31 @@ export default function DashboardPage() {
             <CardDescription>Percentual de acertos em cada disciplina</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={subjectData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="subject" className="text-xs" />
-                <YAxis className="text-xs" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Bar dataKey="correct" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {loadingStats ? (
+              <div className="flex items-center justify-center h-[350px]">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : subjectData.length === 0 ? (
+              <div className="flex items-center justify-center h-[350px] text-muted-foreground">
+                <p>Nenhum dado disponível ainda</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={subjectData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="subject" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Bar dataKey="correct" fill={CHART_COLOR} radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 

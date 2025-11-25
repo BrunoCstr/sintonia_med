@@ -37,8 +37,9 @@ export async function GET(request: NextRequest) {
     resultsSnapshot.forEach((doc) => {
       const data = doc.data()
       totalQuizzes++
-      totalQuestionsAnswered += data.correctCount || 0
-      totalQuestionsAnswered += data.incorrectCount || 0
+      // Somar questões respondidas (acertos + erros, excluindo não respondidas)
+      const questionsAnswered = (data.correctCount || 0) + (data.incorrectCount || 0)
+      totalQuestionsAnswered += questionsAnswered
       totalCorrect += data.correctCount || 0
       totalIncorrect += data.incorrectCount || 0
     })
@@ -49,24 +50,10 @@ export async function GET(request: NextRequest) {
         ? Math.round((totalCorrect / totalQuestionsAnswered) * 100)
         : 0
 
-    // Buscar questões respondidas no histórico
-    const historySnapshot = await db
-      .collection('history')
-      .where('userId', '==', authUser.uid)
-      .get()
-
-    const uniqueQuestionsAnswered = new Set<string>()
-    historySnapshot.forEach((doc) => {
-      const data = doc.data()
-      if (data.questionId) {
-        uniqueQuestionsAnswered.add(data.questionId)
-      }
-    })
-
     return NextResponse.json({
       success: true,
       stats: {
-        questionsAnswered: uniqueQuestionsAnswered.size,
+        questionsAnswered: totalQuestionsAnswered,
         accuracyRate,
         quizzesCompleted: totalQuizzes,
       },

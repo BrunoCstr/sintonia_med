@@ -54,10 +54,27 @@ export function getAdminApp(): admin.app.App {
     // Ignorar erro de leitura de diretório
   }
 
+  // Obter storageBucket das variáveis de ambiente ou do service account
+  let storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
+                     process.env.FIREBASE_STORAGE_BUCKET ||
+                     serviceAccount?.storageBucket
+
+  // Se não houver bucket configurado, usar o padrão do projeto
+  if (!storageBucket) {
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
+                     process.env.FIREBASE_PROJECT_ID ||
+                     serviceAccount?.project_id
+    if (projectId) {
+      // Bucket padrão do Firebase: {project-id}.appspot.com
+      storageBucket = `${projectId}.appspot.com`
+    }
+  }
+
   // Inicializar com service account ou variáveis de ambiente
   if (serviceAccount) {
     adminApp = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
+      storageBucket: storageBucket || serviceAccount.storageBucket || `${serviceAccount.project_id}.appspot.com`,
     })
   } else if (process.env.FIREBASE_PROJECT_ID) {
     adminApp = admin.initializeApp({
@@ -66,6 +83,7 @@ export function getAdminApp(): admin.app.App {
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       }),
+      storageBucket: storageBucket || `${process.env.FIREBASE_PROJECT_ID}.appspot.com`,
     })
   } else {
     throw new Error(

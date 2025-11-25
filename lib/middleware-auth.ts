@@ -45,7 +45,8 @@ export async function syncRoleWithFirestore(uid: string, claimRole: UserRole): P
     const userRef = db.collection('users').doc(uid)
     const userDoc = await userRef.get()
     
-    if (userDoc.exists()) {
+    // No Firebase Admin SDK, exists é uma propriedade, não uma função
+    if (userDoc.exists) {
       const firestoreRole = userDoc.data()?.role as UserRole
       
       // Se a role do Firestore for diferente da role dos Claims, sincronizar

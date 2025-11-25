@@ -18,6 +18,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
+import type { MedicalArea } from '@/lib/types'
 
 export default function EditQuestionPage() {
   const router = useRouter()
@@ -26,6 +27,9 @@ export default function EditQuestionPage() {
   const [loadingData, setLoadingData] = useState(true)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
+  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null)
+  const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([])
   const [formData, setFormData] = useState({
     enunciado: '',
     imagemUrl: '',
@@ -71,6 +75,7 @@ export default function EditQuestionPage() {
 
         if (question.imagemUrl) {
           setImagePreview(question.imagemUrl)
+          setOriginalImageUrl(question.imagemUrl)
         }
       } catch (error) {
         console.error('Erro ao carregar questão:', error)
@@ -81,10 +86,27 @@ export default function EditQuestionPage() {
       }
     }
 
+    const loadMedicalAreas = async () => {
+      try {
+        const response = await fetch('/api/admin/medical-areas')
+        if (!response.ok) {
+          throw new Error('Erro ao carregar áreas médicas')
+        }
+
+        const data = await response.json()
+        // Filtrar apenas áreas ativas
+        const activeAreas = (data.areas || []).filter((area: MedicalArea) => area.ativo)
+        setMedicalAreas(activeAreas)
+      } catch (error) {
+        console.error('Erro ao carregar áreas médicas:', error)
+      }
+    }
+
     loadQuestion()
+    loadMedicalAreas()
   }, [params.id, router])
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -100,44 +122,22 @@ export default function EditQuestionPage() {
       return
     }
 
-    setUploadingImage(true)
+    // Armazenar arquivo para upload posterior (ao salvar)
+    setSelectedImageFile(file)
 
-    try {
-      // Criar preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-
-      // Fazer upload
-      const uploadFormData = new FormData()
-      uploadFormData.append('file', file)
-
-      const response = await fetch('/api/admin/questions/upload-image', {
-        method: 'POST',
-        body: uploadFormData,
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Erro ao fazer upload da imagem')
-      }
-
-      const data = await response.json()
-      setFormData({ ...formData, imagemUrl: data.url })
-    } catch (error: any) {
-      console.error('Erro ao fazer upload:', error)
-      alert(error.message || 'Erro ao fazer upload da imagem')
-      setImagePreview(null)
-    } finally {
-      setUploadingImage(false)
+    // Criar preview local
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
     }
+    reader.readAsDataURL(file)
   }
 
   const handleRemoveImage = () => {
     setImagePreview(null)
+    setSelectedImageFile(null)
     setFormData({ ...formData, imagemUrl: '' })
+    // Não limpar originalImageUrl aqui - será usado para deletar do Storage ao salvar
   }
 
   const validateForm = (): string | null => {
@@ -200,12 +200,49 @@ export default function EditQuestionPage() {
     setLoading(true)
 
     try {
+      // Se houver nova imagem selecionada, fazer upload primeiro com o ID da questão
+      let imagemUrl = formData.imagemUrl
+      
+      if (selectedImageFile && params.id) {
+        setUploadingImage(true)
+        try {
+          const uploadFormData = new FormData()
+          uploadFormData.append('file', selectedImageFile)
+          uploadFormData.append('questionId', params.id as string)
+
+          const uploadResponse = await fetch('/api/admin/questions/upload-image', {
+            method: 'POST',
+            body: uploadFormData,
+          })
+
+          if (!uploadResponse.ok) {
+            const error = await uploadResponse.json()
+            throw new Error(error.error || 'Erro ao fazer upload da imagem')
+          }
+
+          const uploadData = await uploadResponse.json()
+          imagemUrl = uploadData.url
+        } catch (error: any) {
+          console.error('Erro ao fazer upload:', error)
+          alert(error.message || 'Erro ao fazer upload da imagem')
+          setLoading(false)
+          setUploadingImage(false)
+          return
+        } finally {
+          setUploadingImage(false)
+        }
+      }
+
+      // Atualizar questão com a URL da imagem
       const response = await fetch(`/api/admin/questions/${params.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          imagemUrl,
+        }),
       })
 
       if (!response.ok) {
@@ -405,14 +442,17 @@ export default function EditQuestionPage() {
                     <SelectValue placeholder="Selecione a área" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cardiologia">Cardiologia</SelectItem>
-                    <SelectItem value="pediatria">Pediatria</SelectItem>
-                    <SelectItem value="ginecologia">
-                      Ginecologia e Obstetrícia
-                    </SelectItem>
-                    <SelectItem value="clinica">Clínica Médica</SelectItem>
-                    <SelectItem value="cirurgia">Cirurgia</SelectItem>
-                    <SelectItem value="psiquiatria">Psiquiatria</SelectItem>
+                    {medicalAreas.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        Nenhuma área disponível
+                      </div>
+                    ) : (
+                      medicalAreas.map((area) => (
+                        <SelectItem key={area.id} value={area.nome}>
+                          {area.nome}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>

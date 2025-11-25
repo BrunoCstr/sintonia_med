@@ -15,8 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag } from 'lucide-react'
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
+import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -42,6 +42,12 @@ const adminNavigation = [
     name: 'Questões',
     href: '/admin/questions',
     icon: FileQuestion,
+    roles: ['admin_master', 'admin_questoes'],
+  },
+  {
+    name: 'Áreas Médicas',
+    href: '/admin/medical-areas',
+    icon: Stethoscope,
     roles: ['admin_master', 'admin_questoes'],
   },
   {
@@ -105,6 +111,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-72 p-0">
+                <SheetTitle className="sr-only">Menu de Navegação</SheetTitle>
                 <div className="flex h-full flex-col">
                   <div className="flex h-20 items-center justify-center gap-2 border-b px-6">
                     <Image 

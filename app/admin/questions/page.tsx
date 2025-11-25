@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Search, Pencil, Archive, Eye } from 'lucide-react'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import type { Question } from '@/lib/types'
+import type { Question, MedicalArea } from '@/lib/types'
 
 export default function QuestionsListPage() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -30,6 +30,7 @@ export default function QuestionsListPage() {
   const [dificuldadeFilter, setDificuldadeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [questions, setQuestions] = useState<Question[]>([])
+  const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([])
   const [loading, setLoading] = useState(true)
 
   const getDifficultyColor = (dificuldade: string) => {
@@ -76,7 +77,24 @@ export default function QuestionsListPage() {
       }
     }
 
+    const loadMedicalAreas = async () => {
+      try {
+        const response = await fetch('/api/admin/medical-areas')
+        if (!response.ok) {
+          throw new Error('Erro ao carregar áreas médicas')
+        }
+
+        const data = await response.json()
+        // Filtrar apenas áreas ativas
+        const activeAreas = (data.areas || []).filter((area: MedicalArea) => area.ativo)
+        setMedicalAreas(activeAreas)
+      } catch (error) {
+        console.error('Erro ao carregar áreas médicas:', error)
+      }
+    }
+
     loadQuestions()
+    loadMedicalAreas()
   }, [])
 
   const handleArchive = async (id: string, currentStatus: boolean) => {
@@ -176,10 +194,11 @@ export default function QuestionsListPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as áreas</SelectItem>
-                  <SelectItem value="cardiologia">Cardiologia</SelectItem>
-                  <SelectItem value="pediatria">Pediatria</SelectItem>
-                  <SelectItem value="ginecologia">Ginecologia e Obstetrícia</SelectItem>
-                  <SelectItem value="clinica">Clínica Médica</SelectItem>
+                  {medicalAreas.map((area) => (
+                    <SelectItem key={area.id} value={area.nome}>
+                      {area.nome}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 

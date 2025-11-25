@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const file = formData.get('file') as File
+    const questionId = formData.get('questionId') as string | null
 
     if (!file) {
       return NextResponse.json({ error: 'Arquivo não fornecido' }, { status: 400 })
@@ -40,18 +41,61 @@ export async function POST(request: NextRequest) {
     const app = getAdminApp()
     const storage = app.storage()
 
-    // Gerar nome único para o arquivo
-    const timestamp = Date.now()
-    const randomString = Math.random().toString(36).substring(2, 15)
+    // Obter bucket name das variáveis de ambiente, do app ou usar o padrão do projeto
+    let bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
+                     process.env.FIREBASE_STORAGE_BUCKET
+
+    // Se não houver bucket configurado, usar o padrão do projeto
+    if (!bucketName) {
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
+                       process.env.FIREBASE_PROJECT_ID
+      if (projectId) {
+        // Bucket padrão do Firebase: {project-id}.appspot.com
+        bucketName = `${projectId}.appspot.com`
+      } else {
+        return NextResponse.json(
+          { error: 'Bucket name não configurado. Configure NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ou NEXT_PUBLIC_FIREBASE_PROJECT_ID' },
+          { status: 500 }
+        )
+      }
+    }
+
+    // Gerar nome do arquivo usando o ID da questão se fornecido
     const fileExtension = file.name.split('.').pop()
-    const fileName = `questions/${timestamp}_${randomString}.${fileExtension}`
+    let fileName: string
+    
+    if (questionId) {
+      // Usar o ID da questão: questions/{questionId}/image.{ext}
+      fileName = `questions/${questionId}/image.${fileExtension}`
+    } else {
+      // Fallback para quando não há ID (criação inicial)
+      const timestamp = Date.now()
+      const randomString = Math.random().toString(36).substring(2, 15)
+      fileName = `questions/${timestamp}_${randomString}.${fileExtension}`
+    }
 
     // Converter File para Buffer
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // Fazer upload para Firebase Storage
-    const bucket = storage.bucket()
+    // Fazer upload para Firebase Storage (especificar bucket explicitamente)
+    const bucket = storage.bucket(bucketName)
+    
+    // Verificar se o bucket existe (tentar acessar)
+    try {
+      await bucket.exists()
+    } catch (checkError: any) {
+      console.error('Erro ao verificar bucket:', checkError)
+      return NextResponse.json(
+        { 
+          error: `Bucket "${bucketName}" não encontrado. Verifique se o Firebase Storage está habilitado no seu projeto e se o bucket existe.`,
+          bucketName,
+          hint: 'O bucket padrão geralmente é: {project-id}.appspot.com'
+        },
+        { status: 404 }
+      )
+    }
+
     const fileRef = bucket.file(fileName)
 
     await fileRef.save(buffer, {
@@ -72,10 +116,24 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('Erro ao fazer upload da imagem:', error)
+    
+    // Tratar erro específico de bucket não encontrado
+    if (error.code === 404 || error.message?.includes('does not exist')) {
+      return NextResponse.json(
+        { 
+          error: `Bucket não encontrado. Verifique se o Firebase Storage está habilitado no seu projeto Firebase.`,
+          details: error.message
+        },
+        { status: 404 }
+      )
+    }
+    
     return NextResponse.json(
       { error: error.message || 'Erro ao fazer upload da imagem' },
       { status: 500 }
     )
   }
 }
+
+
 

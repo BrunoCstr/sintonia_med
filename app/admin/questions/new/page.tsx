@@ -15,15 +15,18 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ArrowLeft, Save, Upload, X } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import type { MedicalArea } from '@/lib/types'
 
 export default function NewQuestionPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
+  const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([])
   const [formData, setFormData] = useState({
     enunciado: '',
     imagemUrl: '',
@@ -40,7 +43,27 @@ export default function NewQuestionPage() {
     tipo: '',
   })
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    const loadMedicalAreas = async () => {
+      try {
+        const response = await fetch('/api/admin/medical-areas')
+        if (!response.ok) {
+          throw new Error('Erro ao carregar áreas médicas')
+        }
+
+        const data = await response.json()
+        // Filtrar apenas áreas ativas
+        const activeAreas = (data.areas || []).filter((area: MedicalArea) => area.ativo)
+        setMedicalAreas(activeAreas)
+      } catch (error) {
+        console.error('Erro ao carregar áreas médicas:', error)
+      }
+    }
+
+    loadMedicalAreas()
+  }, [])
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -56,43 +79,20 @@ export default function NewQuestionPage() {
       return
     }
 
-    setUploadingImage(true)
+    // Armazenar arquivo para upload posterior (ao salvar)
+    setSelectedImageFile(file)
 
-    try {
-      // Criar preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-
-      // Fazer upload
-      const uploadFormData = new FormData()
-      uploadFormData.append('file', file)
-
-      const response = await fetch('/api/admin/questions/upload-image', {
-        method: 'POST',
-        body: uploadFormData,
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Erro ao fazer upload da imagem')
-      }
-
-      const data = await response.json()
-      setFormData({ ...formData, imagemUrl: data.url })
-    } catch (error: any) {
-      console.error('Erro ao fazer upload:', error)
-      alert(error.message || 'Erro ao fazer upload da imagem')
-      setImagePreview(null)
-    } finally {
-      setUploadingImage(false)
+    // Criar preview local
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
     }
+    reader.readAsDataURL(file)
   }
 
   const handleRemoveImage = () => {
     setImagePreview(null)
+    setSelectedImageFile(null)
     setFormData({ ...formData, imagemUrl: '' })
   }
 
@@ -156,17 +156,73 @@ export default function NewQuestionPage() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/admin/questions', {
+      // Criar questão primeiro para obter o ID
+      const createResponse = await fetch('/api/admin/questions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          imagemUrl: '', // Criar sem imagem primeiro
+        }),
       })
 
-      if (!response.ok) {
-        const error = await response.json()
+      if (!createResponse.ok) {
+        const error = await createResponse.json()
         throw new Error(error.error || 'Erro ao criar questão')
+      }
+
+      const createData = await createResponse.json()
+      const questionId = createData.id || createData.question?.id
+
+      // Se houver imagem selecionada, fazer upload com o ID da questão
+      let imagemUrl = ''
+      
+      if (selectedImageFile && questionId) {
+        setUploadingImage(true)
+        try {
+          const uploadFormData = new FormData()
+          uploadFormData.append('file', selectedImageFile)
+          uploadFormData.append('questionId', questionId)
+
+          const uploadResponse = await fetch('/api/admin/questions/upload-image', {
+            method: 'POST',
+            body: uploadFormData,
+          })
+
+          if (!uploadResponse.ok) {
+            const error = await uploadResponse.json()
+            throw new Error(error.error || 'Erro ao fazer upload da imagem')
+          }
+
+          const uploadData = await uploadResponse.json()
+          imagemUrl = uploadData.url
+
+          // Atualizar questão com a URL da imagem
+          const updateResponse = await fetch(`/api/admin/questions/${questionId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              imagemUrl,
+            }),
+          })
+
+          if (!updateResponse.ok) {
+            const error = await updateResponse.json()
+            throw new Error(error.error || 'Erro ao atualizar questão com imagem')
+          }
+        } catch (error: any) {
+          console.error('Erro ao fazer upload:', error)
+          alert(error.message || 'Erro ao fazer upload da imagem')
+          setLoading(false)
+          setUploadingImage(false)
+          return
+        } finally {
+          setUploadingImage(false)
+        }
       }
 
       router.push('/admin/questions')
@@ -371,14 +427,17 @@ export default function NewQuestionPage() {
                     <SelectValue placeholder="Selecione a área" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cardiologia">Cardiologia</SelectItem>
-                    <SelectItem value="pediatria">Pediatria</SelectItem>
-                    <SelectItem value="ginecologia">
-                      Ginecologia e Obstetrícia
-                    </SelectItem>
-                    <SelectItem value="clinica">Clínica Médica</SelectItem>
-                    <SelectItem value="cirurgia">Cirurgia</SelectItem>
-                    <SelectItem value="psiquiatria">Psiquiatria</SelectItem>
+                    {medicalAreas.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        Nenhuma área disponível
+                      </div>
+                    ) : (
+                      medicalAreas.map((area) => (
+                        <SelectItem key={area.id} value={area.nome}>
+                          {area.nome}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>

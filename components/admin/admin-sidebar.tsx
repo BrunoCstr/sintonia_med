@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useRole } from '@/lib/hooks/use-role'
-import { LayoutDashboard, FileQuestion, Users, Flag, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, FileQuestion, Users, Flag, LogOut, Menu, X, Stethoscope } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
 import { useState } from 'react'
@@ -22,6 +22,12 @@ const navigation = [
     name: 'Questões',
     href: '/admin/questions',
     icon: FileQuestion,
+    roles: ['admin_master', 'admin_questoes'],
+  },
+  {
+    name: 'Áreas Médicas',
+    href: '/admin/medical-areas',
+    icon: Stethoscope,
     roles: ['admin_master', 'admin_questoes'],
   },
   {

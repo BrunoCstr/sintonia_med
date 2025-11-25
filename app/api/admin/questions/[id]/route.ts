@@ -94,6 +94,7 @@ export async function PUT(
 
     const app = getAdminApp()
     const db = app.firestore()
+    const storage = app.storage()
 
     // Verificar se a questão existe
     const docRef = db.collection('questions').doc(id)
@@ -102,6 +103,9 @@ export async function PUT(
     if (!doc.exists) {
       return NextResponse.json({ error: 'Questão não encontrada' }, { status: 404 })
     }
+
+    const currentData = doc.data()!
+    const oldImageUrl = currentData.imagemUrl
 
     // Preparar dados de atualização com validações
     const updateData: any = {
@@ -121,7 +125,83 @@ export async function PUT(
 
     // Validar e atualizar imagem (opcional)
     if (imagemUrl !== undefined) {
-      updateData.imagemUrl = imagemUrl && imagemUrl.trim() ? imagemUrl.trim() : null
+      const newImageUrl = imagemUrl && imagemUrl.trim() ? imagemUrl.trim() : null
+      updateData.imagemUrl = newImageUrl
+
+      // Se a imagem foi removida ou substituída, deletar a imagem antiga do Storage
+      if (oldImageUrl && oldImageUrl !== newImageUrl && oldImageUrl.includes('storage.googleapis.com')) {
+        try {
+          // Obter bucket name
+          let bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
+                          process.env.FIREBASE_STORAGE_BUCKET
+
+          if (!bucketName) {
+            const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
+                             process.env.FIREBASE_PROJECT_ID
+            if (projectId) {
+              bucketName = `${projectId}.appspot.com`
+            }
+          }
+
+          if (bucketName) {
+            const bucket = storage.bucket(bucketName)
+            let deleted = false
+
+            // Tentar extrair o nome do arquivo da URL antiga
+            try {
+              const url = new URL(oldImageUrl)
+              const pathParts = url.pathname.split('/').filter(Boolean)
+              
+              // O primeiro elemento é o bucket, o resto é o caminho do arquivo
+              if (pathParts.length >= 2) {
+                const fileName = pathParts.slice(1).join('/') // Remove o bucket e pega o resto
+                const fileRef = bucket.file(fileName)
+                
+                const [exists] = await fileRef.exists()
+                if (exists) {
+                  await fileRef.delete()
+                  console.log(`✅ Imagem deletada do Storage (formato antigo): ${fileName}`)
+                  deleted = true
+                }
+              }
+            } catch (urlError) {
+              // Se não conseguir parsear a URL, continuar para tentar o formato novo
+              console.log('Tentando deletar usando formato novo baseado no ID')
+            }
+
+            // Se não deletou com o formato antigo, tentar o formato novo baseado no ID
+            if (!deleted) {
+              const extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+              
+              for (const ext of extensions) {
+                const filePath = `questions/${id}/image.${ext}`
+                const fileRef = bucket.file(filePath)
+                
+                try {
+                  const [exists] = await fileRef.exists()
+                  if (exists) {
+                    await fileRef.delete()
+                    console.log(`✅ Imagem deletada do Storage (formato novo): ${filePath}`)
+                    deleted = true
+                    break
+                  }
+                } catch (err) {
+                  // Continuar tentando outras extensões
+                }
+              }
+            }
+            
+            if (!deleted) {
+              console.log(`⚠️ Arquivo não encontrado no Storage para questão ${id}`)
+            }
+          } else {
+            console.log('⚠️ Bucket name não configurado, pulando deleção de imagem')
+          }
+        } catch (deleteError: any) {
+          // Log do erro mas não falha a atualização da questão
+          console.error('Erro ao deletar imagem antiga do Storage:', deleteError)
+        }
+      }
     }
 
     // Validar e atualizar alternativas

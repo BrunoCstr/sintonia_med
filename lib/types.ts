@@ -58,3 +58,14 @@ export interface Subscription {
   expiresAt: Date
   manuallyGranted: boolean
 }
+
+// Medical Area types
+export interface MedicalArea {
+  id: string
+  nome: string
+  descricao?: string
+  ativo: boolean
+  createdAt: Date
+  updatedAt: Date
+  createdBy: string
+}

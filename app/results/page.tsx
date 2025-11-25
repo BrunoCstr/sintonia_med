@@ -247,25 +247,28 @@ export default function ResultsPage() {
                           const isCorrectAnswer = altIndex === question.correctAnswer
                           const letter = String.fromCharCode(65 + altIndex)
 
+                          // Se não foi respondida, não mostrar qual é a correta
+                          const showCorrectAnswer = !isUnanswered
+
                           return (
                             <div
                               key={altIndex}
                               className={cn(
                                 'rounded-lg border-2 p-3',
-                                isCorrectAnswer && 'border-success bg-success/5',
+                                showCorrectAnswer && isCorrectAnswer && 'border-success bg-success/5',
                                 isUserAnswer && !isCorrectAnswer && 'border-destructive bg-destructive/5',
-                                !isUserAnswer && !isCorrectAnswer && 'border-border'
+                                !isUserAnswer && (!showCorrectAnswer || !isCorrectAnswer) && 'border-border'
                               )}
                             >
                               <div className="flex items-start gap-3">
                                 <div
                                   className={cn(
                                     'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold',
-                                    isCorrectAnswer && 'border-success bg-success text-success-foreground',
+                                    showCorrectAnswer && isCorrectAnswer && 'border-success bg-success text-success-foreground',
                                     isUserAnswer &&
                                       !isCorrectAnswer &&
                                       'border-destructive bg-destructive text-destructive-foreground',
-                                    !isUserAnswer && !isCorrectAnswer && 'border-muted-foreground/30'
+                                    (!showCorrectAnswer || (!isUserAnswer && !isCorrectAnswer)) && 'border-muted-foreground/30'
                                   )}
                                 >
                                   {letter}
@@ -275,7 +278,7 @@ export default function ResultsPage() {
                                   {isUserAnswer && !isCorrectAnswer && (
                                     <p className="mt-1 text-xs text-destructive">Sua resposta</p>
                                   )}
-                                  {isCorrectAnswer && (
+                                  {showCorrectAnswer && isCorrectAnswer && (
                                     <p className="mt-1 text-xs text-success">Resposta correta</p>
                                   )}
                                 </div>
@@ -285,50 +288,63 @@ export default function ResultsPage() {
                         })}
                       </div>
 
-                      {/* Explanation */}
-                      <div className="rounded-lg bg-muted/50 p-4">
-                        <h4 className="mb-2 flex items-center gap-2 font-semibold">
-                          Gabarito Comentado
-                          {!isPremium && (
-                            <Badge variant="secondary" className="ml-auto">
-                              <Lock className="mr-1 h-3 w-3" />
-                              Premium
-                            </Badge>
-                          )}
-                        </h4>
-                        {isPremium ? (
-                          <p className="text-sm leading-relaxed text-muted-foreground">
-                            {(question as any).comentarioGabarito || question.explanation}
-                          </p>
-                        ) : (
-                          <div className="space-y-4">
-                            <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 bg-background/50 p-6 text-center">
-                              <Lock className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
-                              <h5 className="mb-2 font-semibold">Gabarito Comentado Premium</h5>
-                              <p className="mb-4 text-sm text-muted-foreground">
-                                Assine um plano premium para ter acesso ao gabarito comentado completo de todas as questões!
-                              </p>
-                              <Button asChild className="w-full sm:w-auto">
-                                <Link href="/plans">
-                                  <Crown className="mr-2 h-4 w-4" />
-                                  Assinar Agora
-                                </Link>
-                              </Button>
-                            </div>
-                            {/* Show basic explanation for free users */}
-                            {question.explanation && (
-                              <div className="rounded-lg border p-3">
-                                <p className="text-xs font-medium text-muted-foreground mb-1">
-                                  Resposta Correta: {String.fromCharCode(65 + question.correctAnswer)}
-                                </p>
-                                <p className="text-xs text-muted-foreground/70">
-                                  {question.explanation.substring(0, 100)}...
-                                </p>
-                              </div>
+                      {/* Explanation - Só mostra se a questão foi respondida */}
+                      {!isUnanswered && (
+                        <div className="rounded-lg bg-muted/50 p-4">
+                          <h4 className="mb-2 flex items-center gap-2 font-semibold">
+                            Gabarito Comentado
+                            {!isPremium && (
+                              <Badge variant="secondary" className="ml-auto">
+                                <Lock className="mr-1 h-3 w-3" />
+                                Premium
+                              </Badge>
                             )}
-                          </div>
-                        )}
-                      </div>
+                          </h4>
+                          {isPremium ? (
+                            <p className="text-sm leading-relaxed text-muted-foreground">
+                              {(question as any).comentarioGabarito || question.explanation}
+                            </p>
+                          ) : (
+                            <div className="space-y-4">
+                              <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 bg-background/50 p-6 text-center">
+                                <Lock className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
+                                <h5 className="mb-2 font-semibold">Gabarito Comentado Premium</h5>
+                                <p className="mb-4 text-sm text-muted-foreground">
+                                  Assine um plano premium para ter acesso ao gabarito comentado completo de todas as questões!
+                                </p>
+                                <Button asChild className="w-full sm:w-auto">
+                                  <Link href="/plans">
+                                    <Crown className="mr-2 h-4 w-4" />
+                                    Assinar Agora
+                                  </Link>
+                                </Button>
+                              </div>
+                              {/* Show basic explanation for free users */}
+                              {question.explanation && (
+                                <div className="rounded-lg border p-3">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                                    Resposta Correta: {String.fromCharCode(65 + question.correctAnswer)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground/70">
+                                    {question.explanation.substring(0, 100)}...
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Mensagem para questões não respondidas */}
+                      {isUnanswered && (
+                        <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center">
+                          <Circle className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
+                          <h5 className="mb-2 font-semibold">Questão não respondida</h5>
+                          <p className="text-sm text-muted-foreground">
+                            Como você não respondeu esta questão, o gabarito não será revelado.
+                          </p>
+                        </div>
+                      )}
 
                       {/* Report Button */}
                       <Button

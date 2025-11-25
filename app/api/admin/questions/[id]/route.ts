@@ -351,12 +351,92 @@ export async function DELETE(
 
     const app = getAdminApp()
     const db = app.firestore()
+    const storage = app.storage()
 
     const docRef = db.collection('questions').doc(id)
     const doc = await docRef.get()
 
     if (!doc.exists) {
       return NextResponse.json({ error: 'Questão não encontrada' }, { status: 404 })
+    }
+
+    const questionData = doc.data()!
+    const imagemUrl = questionData.imagemUrl
+
+    // Excluir imagem do Storage se existir
+    if (imagemUrl && typeof imagemUrl === 'string' && imagemUrl.trim()) {
+      try {
+        // Obter bucket name
+        let bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
+                        process.env.FIREBASE_STORAGE_BUCKET
+
+        if (!bucketName) {
+          const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
+                           process.env.FIREBASE_PROJECT_ID
+          if (projectId) {
+            bucketName = `${projectId}.appspot.com`
+          }
+        }
+
+        if (bucketName) {
+          const bucket = storage.bucket(bucketName)
+          let deleted = false
+
+          // Tentar extrair o nome do arquivo da URL
+          if (imagemUrl.includes('storage.googleapis.com')) {
+            try {
+              const url = new URL(imagemUrl)
+              const pathParts = url.pathname.split('/').filter(Boolean)
+              
+              // O primeiro elemento é o bucket, o resto é o caminho do arquivo
+              if (pathParts.length >= 2) {
+                const fileName = pathParts.slice(1).join('/') // Remove o bucket e pega o resto
+                const fileRef = bucket.file(fileName)
+                
+                const [exists] = await fileRef.exists()
+                if (exists) {
+                  await fileRef.delete()
+                  console.log(`✅ Imagem deletada do Storage (formato antigo): ${fileName}`)
+                  deleted = true
+                }
+              }
+            } catch (urlError) {
+              console.log('Tentando deletar usando formato novo baseado no ID')
+            }
+          }
+
+          // Se não deletou com o formato antigo, tentar o formato novo baseado no ID
+          if (!deleted) {
+            const extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+            
+            for (const ext of extensions) {
+              const filePath = `questions/${id}/image.${ext}`
+              const fileRef = bucket.file(filePath)
+              
+              try {
+                const [exists] = await fileRef.exists()
+                if (exists) {
+                  await fileRef.delete()
+                  console.log(`✅ Imagem deletada do Storage (formato novo): ${filePath}`)
+                  deleted = true
+                  break
+                }
+              } catch (err) {
+                // Continuar tentando outras extensões
+              }
+            }
+          }
+          
+          if (!deleted) {
+            console.log(`⚠️ Arquivo não encontrado no Storage para questão ${id}`)
+          }
+        } else {
+          console.log('⚠️ Bucket name não configurado, pulando deleção de imagem')
+        }
+      } catch (deleteError: any) {
+        // Log do erro mas não falha a exclusão da questão
+        console.error('Erro ao deletar imagem do Storage:', deleteError)
+      }
     }
 
     // Excluir questão do histórico de todos os usuários

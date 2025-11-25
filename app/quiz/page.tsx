@@ -77,6 +77,7 @@ export default function QuizPage() {
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [showNoQuestionsDialog, setShowNoQuestionsDialog] = useState(false)
+  const [isFinishing, setIsFinishing] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -146,15 +147,57 @@ export default function QuizPage() {
   }
 
   const handleFinish = useCallback(async () => {
-    // Salvar resultados no localStorage
-    localStorage.setItem('quizResults', JSON.stringify({ questions, answers }))
+    // Prevenir múltiplas chamadas simultâneas
+    if (isFinishing) {
+      console.log('Já está finalizando, ignorando chamada duplicada')
+      return
+    }
+
+    setIsFinishing(true)
     
-    // Salvar questões respondidas no histórico do Firestore
-    if (user) {
-      try {
+    try {
+      // Salvar resultados no localStorage (para compatibilidade com a página de resultados)
+      const filtersStr = localStorage.getItem('quizFilters')
+      const filters = filtersStr ? JSON.parse(filtersStr) : {}
+      
+      localStorage.setItem('quizResults', JSON.stringify({ questions, answers }))
+      
+      // Salvar resultados no Firestore e questões respondidas no histórico
+      if (user) {
+        try {
+        // Calcular tempo gasto (se houver timer)
+        const timeSpent = timeLeft !== null && filters.timeLimit 
+          ? filters.timeLimit * 60 - timeLeft 
+          : null
+
+        // Salvar resultado completo no Firestore
+        const resultsResponse = await fetch('/api/user/results', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            questions,
+            answers,
+            filters,
+            timeSpent,
+          }),
+        })
+
+        if (!resultsResponse.ok) {
+          const errorData = await resultsResponse.json()
+          console.error('Erro ao salvar resultado:', errorData)
+          throw new Error(errorData.error || 'Erro ao salvar resultado')
+        }
+
+        const resultsData = await resultsResponse.json()
+        console.log('Resultado salvo com sucesso:', resultsData.id)
+
+        // Salvar questões respondidas no histórico do Firestore
         const answeredQuestionIds = Object.keys(answers)
         if (answeredQuestionIds.length > 0) {
-          await fetch('/api/user/question-history', {
+          const historyResponse = await fetch('/api/user/question-history', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -162,15 +205,30 @@ export default function QuizPage() {
             credentials: 'include',
             body: JSON.stringify({ questionIds: answeredQuestionIds }),
           })
+
+          if (!historyResponse.ok) {
+            const errorData = await historyResponse.json()
+            console.error('Erro ao salvar histórico de questões:', errorData)
+            // Não bloquear o fluxo se houver erro ao salvar histórico
+          } else {
+            const historyData = await historyResponse.json()
+            console.log('Histórico de questões salvo:', historyData.saved, 'questões')
+          }
         }
-      } catch (error) {
-        console.error('Erro ao salvar histórico:', error)
-        // Não bloquear o fluxo se houver erro ao salvar histórico
+        } catch (error) {
+          console.error('Erro ao salvar resultado:', error)
+          // Não bloquear o fluxo se houver erro ao salvar
+        }
       }
+      
+      router.push('/results')
+    } catch (error) {
+      console.error('Erro ao finalizar simulado:', error)
+      setIsFinishing(false)
+      // Ainda redireciona para results mesmo se houver erro
+      router.push('/results')
     }
-    
-    router.push('/results')
-  }, [questions, answers, user, router])
+  }, [questions, answers, user, router, timeLeft, isFinishing])
 
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return

@@ -1,85 +1,90 @@
 'use client'
 
-import { use } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Calendar, Clock, CheckCircle2, XCircle, ArrowLeft, TrendingUp, Target, Award } from 'lucide-react'
+import { Calendar, Clock, CheckCircle2, XCircle, ArrowLeft, TrendingUp, Target, Award, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/lib/auth-context'
+import Image from 'next/image'
 
-// Mock data - in production this would come from Firebase
-const mockQuizDetails = {
-  '1': {
-    id: '1',
-    date: new Date('2025-01-15'),
-    questionsCount: 20,
-    correct: 16,
-    incorrect: 4,
-    percentage: 80,
-    duration: '25 min',
-    subjects: ['Cardiologia', 'Anatomia'],
-    questions: [
-      {
-        id: 'q1',
-        text: 'Qual é a principal função do ventrículo esquerdo?',
-        alternatives: [
-          'Receber sangue oxigenado dos pulmões',
-          'Bombear sangue para a circulação sistêmica',
-          'Bombear sangue para os pulmões',
-          'Receber sangue venoso do corpo',
-        ],
-        correctAnswer: 1,
-        userAnswer: 1,
-        subject: 'Cardiologia',
-        explanation: 'O ventrículo esquerdo é responsável por bombear sangue oxigenado para todo o corpo através da aorta.'
-      },
-      {
-        id: 'q2',
-        text: 'Qual osso do crânio articula-se com a mandíbula?',
-        alternatives: [
-          'Osso temporal',
-          'Osso frontal',
-          'Osso parietal',
-          'Osso occipital',
-        ],
-        correctAnswer: 0,
-        userAnswer: 2,
-        subject: 'Anatomia',
-        explanation: 'O osso temporal possui a fossa mandibular, que forma a articulação temporomandibular (ATM) com o côndilo da mandíbula.'
-      },
-    ],
-  },
-  '2': {
-    id: '2',
-    date: new Date('2025-01-14'),
-    questionsCount: 10,
-    correct: 7,
-    incorrect: 3,
-    percentage: 70,
-    duration: '12 min',
-    subjects: ['Fisiologia'],
-    questions: [],
-  },
-  '3': {
-    id: '3',
-    date: new Date('2025-01-13'),
-    questionsCount: 30,
-    correct: 24,
-    incorrect: 6,
-    percentage: 80,
-    duration: '42 min',
-    subjects: ['Patologia', 'Farmacologia', 'Clínica Médica'],
-    questions: [],
-  },
+interface QuizDetail {
+  id: string
+  questions: any[]
+  answers: Record<string, number>
+  filters: any
+  timeSpent: number | null
+  questionsCount: number
+  correctCount: number
+  incorrectCount: number
+  unansweredCount: number
+  percentage: number
+  subjects: string[]
+  createdAt: string
+  updatedAt: string
 }
 
 export default function HistoryDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const quiz = mockQuizDetails[id as keyof typeof mockQuizDetails]
+  const { user } = useAuth()
+  const [quiz, setQuiz] = useState<QuizDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadQuiz = async () => {
+      if (!user) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/user/results/${id}`, {
+          credentials: 'include',
+        })
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            setQuiz(null)
+            setLoading(false)
+            return
+          }
+          throw new Error('Erro ao carregar simulado')
+        }
+
+        const data = await response.json()
+        setQuiz(data.result)
+      } catch (error) {
+        console.error('Erro ao carregar simulado:', error)
+        setQuiz(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadQuiz()
+  }, [id, user])
+
+  const formatDuration = (seconds: number | null): string => {
+    if (!seconds) return 'N/A'
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins} min${secs > 0 ? ` ${secs}s` : ''}`
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[400px] items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   if (!quiz) {
     return (
@@ -105,7 +110,7 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
           <div>
             <h1 className="text-3xl font-bold">Detalhes do Simulado</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {quiz.date.toLocaleDateString('pt-BR', {
+              {new Date(quiz.createdAt).toLocaleDateString('pt-BR', {
                 day: '2-digit',
                 month: 'long',
                 year: 'numeric',
@@ -137,7 +142,7 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-success">{quiz.correct}</div>
+              <div className="text-3xl font-bold text-success">{quiz.correctCount}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 de {quiz.questionsCount} questões
               </p>
@@ -152,9 +157,9 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-destructive">{quiz.incorrect}</div>
+              <div className="text-3xl font-bold text-destructive">{quiz.incorrectCount}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {((quiz.incorrect / quiz.questionsCount) * 100).toFixed(0)}% das questões
+                {quiz.questionsCount > 0 ? ((quiz.incorrectCount / quiz.questionsCount) * 100).toFixed(0) : 0}% das questões
               </p>
             </CardContent>
           </Card>
@@ -167,7 +172,7 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{quiz.duration}</div>
+              <div className="text-3xl font-bold">{formatDuration(quiz.timeSpent)}</div>
               <p className="text-xs text-muted-foreground mt-1">tempo total</p>
             </CardContent>
           </Card>
@@ -234,8 +239,10 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
               <CardDescription>Veja suas respostas e gabaritos comentados</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {quiz.questions.map((question, index) => {
-                const isCorrect = question.userAnswer === question.correctAnswer
+              {quiz.questions.map((question: any, index: number) => {
+                const userAnswer = quiz.answers[question.id]
+                const isUnanswered = userAnswer === undefined
+                const isCorrect = !isUnanswered && userAnswer === question.correctAnswer
                 const letter = (i: number) => String.fromCharCode(65 + i)
 
                 return (
@@ -244,51 +251,69 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
                         <div className="mb-2 flex items-center gap-2">
-                          <Badge variant="outline">{question.subject}</Badge>
-                          <Badge variant={isCorrect ? "default" : "destructive"}>
-                            {isCorrect ? (
-                              <><CheckCircle2 className="mr-1 h-3 w-3" /> Acertou</>
-                            ) : (
-                              <><XCircle className="mr-1 h-3 w-3" /> Errou</>
-                            )}
-                          </Badge>
+                          <Badge variant="outline">{question.subject || question.area}</Badge>
+                          {!isUnanswered && (
+                            <Badge variant={isCorrect ? "default" : "destructive"}>
+                              {isCorrect ? (
+                                <><CheckCircle2 className="mr-1 h-3 w-3" /> Acertou</>
+                              ) : (
+                                <><XCircle className="mr-1 h-3 w-3" /> Errou</>
+                              )}
+                            </Badge>
+                          )}
+                          {isUnanswered && (
+                            <Badge variant="secondary">
+                              <Circle className="mr-1 h-3 w-3" /> Não respondida
+                            </Badge>
+                          )}
                         </div>
                         <h4 className="font-semibold text-lg leading-relaxed">
                           {index + 1}. {question.text}
                         </h4>
+                        {question.imagemUrl && (
+                          <div className="relative mt-3 h-48 w-full overflow-hidden rounded-lg border">
+                            <Image
+                              src={question.imagemUrl}
+                              alt="Questão"
+                              fill
+                              className="object-contain"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Alternatives */}
                     <div className="space-y-2">
-                      {question.alternatives.map((alt, altIndex) => {
-                        const isUserAnswer = question.userAnswer === altIndex
-                        const isCorrectAnswer = question.correctAnswer === altIndex
+                      {question.alternatives.map((alt: string, altIndex: number) => {
+                        const isUserAnswer = userAnswer === altIndex
+                        const isCorrectAnswer = altIndex === question.correctAnswer
+                        const showCorrectAnswer = !isUnanswered
 
                         return (
                           <div
                             key={altIndex}
                             className={cn(
                               "rounded-lg border-2 p-4",
-                              isCorrectAnswer && "border-success bg-success/5",
+                              showCorrectAnswer && isCorrectAnswer && "border-success bg-success/5",
                               isUserAnswer && !isCorrectAnswer && "border-destructive bg-destructive/5",
-                              !isUserAnswer && !isCorrectAnswer && "border-gray-200"
+                              (!showCorrectAnswer || (!isUserAnswer && !isCorrectAnswer)) && "border-gray-200"
                             )}
                           >
                             <div className="flex items-start gap-3">
                               <div
                                 className={cn(
                                   "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold",
-                                  isCorrectAnswer && "border-success bg-success text-white",
+                                  showCorrectAnswer && isCorrectAnswer && "border-success bg-success text-white",
                                   isUserAnswer && !isCorrectAnswer && "border-destructive bg-destructive text-white",
-                                  !isUserAnswer && !isCorrectAnswer && "border-gray-300"
+                                  (!showCorrectAnswer || (!isUserAnswer && !isCorrectAnswer)) && "border-gray-300"
                                 )}
                               >
                                 {letter(altIndex)}
                               </div>
                               <div className="flex-1">
                                 <p>{alt}</p>
-                                {isCorrectAnswer && (
+                                {showCorrectAnswer && isCorrectAnswer && (
                                   <p className="mt-1 text-xs font-medium text-success">
                                     ✓ Resposta correta
                                   </p>
@@ -305,16 +330,28 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
                       })}
                     </div>
 
-                    {/* Explanation */}
-                    <div className="rounded-lg bg-muted/50 p-4">
-                      <h5 className="mb-2 flex items-center gap-2 font-semibold">
-                        <TrendingUp className="h-4 w-4 text-primary" />
-                        Explicação
-                      </h5>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {question.explanation}
-                      </p>
-                    </div>
+                    {/* Explanation - Só mostra se foi respondida */}
+                    {!isUnanswered && (
+                      <div className="rounded-lg bg-muted/50 p-4">
+                        <h5 className="mb-2 flex items-center gap-2 font-semibold">
+                          <TrendingUp className="h-4 w-4 text-primary" />
+                          Explicação
+                        </h5>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {question.explanation || question.comentarioGabarito || 'Sem explicação disponível'}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Mensagem para questões não respondidas */}
+                    {isUnanswered && (
+                      <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-4 text-center">
+                        <Circle className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
+                        <p className="text-sm text-muted-foreground">
+                          Questão não respondida - Gabarito não revelado
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )
               })}

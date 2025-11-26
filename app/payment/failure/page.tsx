@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { Suspense, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,7 +13,7 @@ const friendlyStatusTitle: Record<string, string> = {
   pending: 'Pagamento Pendente',
 }
 
-export default function PaymentFailurePage() {
+function PaymentFailureContent() {
   const searchParams = useSearchParams()
   const status = searchParams.get('status') || 'rejected'
   const messageFromQuery = searchParams.get('message')
@@ -59,6 +59,27 @@ export default function PaymentFailurePage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function PaymentFailurePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-linear-to-b from-background to-muted/30">
+        <div className="container mx-auto max-w-2xl px-4 py-12">
+          <Card className="border-2">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+                <XCircle className="h-10 w-10 text-destructive" />
+              </div>
+              <CardTitle className="text-2xl">Carregando...</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+    }>
+      <PaymentFailureContent />
+    </Suspense>
   )
 }
 

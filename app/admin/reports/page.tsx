@@ -250,6 +250,7 @@ export default function ReportsPage() {
                     <TableCell>{getStatusBadge(report.status)}</TableCell>
                     <TableCell className="text-right">
                       <Button
+                      className="cursor-pointer"
                         variant="ghost"
                         size="sm"
                         onClick={() => handleViewReport(report)}

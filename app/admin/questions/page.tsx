@@ -209,7 +209,7 @@ export default function QuestionsListPage() {
             Gerencie o banco de questões do sistema
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="cursor-pointer">
           <Link href="/admin/questions/new">
             <Plus className="mr-2 h-4 w-4" />
             Nova Questão
@@ -354,17 +354,18 @@ export default function QuestionsListPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" asChild>
+                        <Button variant="ghost" size="icon" asChild className="cursor-pointer">
                           <Link href={`/admin/questions/${question.id}`}>
                             <Eye className="h-4 w-4" />
                           </Link>
                         </Button>
-                        <Button variant="ghost" size="icon" asChild>
+                        <Button variant="ghost" size="icon" asChild className="cursor-pointer">
                           <Link href={`/admin/questions/${question.id}/edit`}>
                             <Pencil className="h-4 w-4" />
                           </Link>
                         </Button>
                         <Button
+                        className="cursor-pointer"
                           variant="ghost"
                           size="icon"
                           onClick={() =>
@@ -379,7 +380,7 @@ export default function QuestionsListPage() {
                           size="icon"
                           onClick={() => handleDelete(question.id)}
                           title="Excluir permanentemente"
-                          className="text-destructive hover:text-destructive"
+                          className="cursor-pointer text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

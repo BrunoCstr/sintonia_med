@@ -538,7 +538,7 @@ export default function UsersPage() {
               Gerencie os usuários e suas assinaturas
             </p>
           </div>
-          <Button onClick={handleCreateUser}>
+          <Button onClick={handleCreateUser} className="cursor-pointer">
             <Plus className="mr-2 h-4 w-4" />
             Cadastrar Usuário
           </Button>
@@ -557,7 +557,7 @@ export default function UsersPage() {
                   variant="ghost"
                   size="sm"
                   onClick={clearFilters}
-                  className="text-muted-foreground"
+                  className="text-muted-foreground cursor-pointer"
                 >
                   <X className="mr-1 h-4 w-4" />
                   Limpar Filtros
@@ -709,6 +709,7 @@ export default function UsersPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
+                          className="cursor-pointer"
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewDetails(user)}
@@ -717,6 +718,7 @@ export default function UsersPage() {
                             Ver
                           </Button>
                           <Button
+                          className="cursor-pointer"
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditUser(user)}
@@ -728,7 +730,7 @@ export default function UsersPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleToggleUserStatus(user)}
-                            className={user.disabled ? 'text-success hover:text-success' : 'text-destructive hover:text-destructive'}
+                            className={user.disabled ? 'text-success hover:text-success' : 'text-destructive hover:text-destructive' + 'cursor-pointer'}
                           >
                             {user.disabled ? (
                               <>
@@ -743,6 +745,7 @@ export default function UsersPage() {
                             )}
                           </Button>
                           <Button
+                          className="cursor-pointer"
                             variant="outline"
                             size="sm"
                             onClick={() => handleGrantSubscription(user)}
@@ -751,6 +754,7 @@ export default function UsersPage() {
                             Liberar Acesso
                           </Button>
                           <Button
+                          className="cursor-pointer"
                             variant="outline"
                             size="sm"
                             onClick={() => handleChangeRole(user)}
@@ -831,7 +835,7 @@ export default function UsersPage() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
+            <Button variant="outline" onClick={() => setShowDetailsDialog(false)} className="cursor-pointer">
               Fechar
             </Button>
           </DialogFooter>
@@ -866,10 +870,10 @@ export default function UsersPage() {
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGrantDialog(false)} disabled={grantingAccess}>
+            <Button variant="outline" onClick={() => setShowGrantDialog(false)} disabled={grantingAccess} className="cursor-pointer">
               Cancelar
             </Button>
-            <Button onClick={confirmGrantSubscription} disabled={grantingAccess}>
+            <Button onClick={confirmGrantSubscription} disabled={grantingAccess} className="cursor-pointer">
               {grantingAccess ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -916,10 +920,10 @@ export default function UsersPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRoleDialog(false)}>
+            <Button variant="outline" onClick={() => setShowRoleDialog(false)} className="cursor-pointer">
               Cancelar
             </Button>
-            <Button onClick={confirmChangeRole}>Confirmar Alteração</Button>
+            <Button onClick={confirmChangeRole} className="cursor-pointer">Confirmar Alteração</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1015,10 +1019,10 @@ export default function UsersPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={creatingUser}>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={creatingUser} className="cursor-pointer">
               Cancelar
             </Button>
-            <Button onClick={confirmCreateUser} disabled={creatingUser}>
+            <Button onClick={confirmCreateUser} disabled={creatingUser} className="cursor-pointer">
               {creatingUser ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1124,10 +1128,10 @@ export default function UsersPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={editingUser}>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={editingUser} className="cursor-pointer">
               Cancelar
             </Button>
-            <Button onClick={confirmEditUser} disabled={editingUser}>
+            <Button onClick={confirmEditUser} disabled={editingUser} className="cursor-pointer">
               {editingUser ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

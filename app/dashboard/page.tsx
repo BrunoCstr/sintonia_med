@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useRole } from '@/lib/hooks/use-role'
+import { usePremium } from '@/lib/hooks/use-premium'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Brain, TrendingUp, Calendar, Target, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react'
+import { PlansWelcomeDialog } from '@/components/plans-welcome-dialog'
 
 // Cor vermelha da paleta (#90091C - Deep crimson)
 const CHART_COLOR = '#90091C'
@@ -25,9 +27,11 @@ const COLORS = [
 export default function DashboardPage() {
   const { user, userProfile, loading } = useAuth()
   const { userRole, isAdminMaster, isAdminQuestoes } = useRole()
+  const { isPremium } = usePremium()
   const router = useRouter()
   const [dashboardData, setDashboardData] = useState<any>(null)
   const [loadingStats, setLoadingStats] = useState(true)
+  const [showPlansDialog, setShowPlansDialog] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -40,6 +44,29 @@ export default function DashboardPage() {
       loadDashboardStats()
     }
   }, [user])
+
+  // Mostrar dialog de planos para usuários free somente uma vez após login
+  useEffect(() => {
+    if (!loading && user && userProfile && !isPremium) {
+      // Verificar se o modal já foi mostrado nesta sessão
+      if (typeof window !== 'undefined') {
+        const hasSeenInSession = sessionStorage.getItem('plansWelcomeShown') === 'true'
+        
+        if (!hasSeenInSession) {
+          // Mostrar apenas uma vez por sessão após login
+          const timer = setTimeout(() => {
+            setShowPlansDialog(true)
+            sessionStorage.setItem('plansWelcomeShown', 'true')
+          }, 1500)
+          
+          return () => clearTimeout(timer)
+        }
+      }
+    } else if (isPremium) {
+      // Se o usuário se tornou premium, fechar o dialog
+      setShowPlansDialog(false)
+    }
+  }, [loading, user, userProfile, isPremium])
 
   const loadDashboardStats = async () => {
     try {
@@ -102,12 +129,30 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Welcome Section */}
-        <div>
+        <div className="mb-6">
           <h1 className="text-3xl font-bold">Olá, {userProfile.name.split(' ')[0]}!</h1>
           <p className="text-muted-foreground">
             Bem-vindo de volta ao seu painel de estudos
           </p>
         </div>
+
+        {/* CTA Button - Top */}
+        <Card className="mb-6 bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 border-2 border-primary/20">
+          <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 py-6">
+            <div className="flex items-center gap-4">
+              <Brain className="h-10 w-10 text-primary" />
+              <div>
+                <h3 className="text-xl font-bold">Pronto para mais questões?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Crie um simulado personalizado e continue evoluindo
+                </p>
+              </div>
+            </div>
+            <Button size="lg" onClick={() => router.push('/generator')} className="w-full sm:w-auto cursor-pointer">
+              Gerar Lista de Questões
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -344,12 +389,18 @@ export default function DashboardPage() {
                 Crie um simulado personalizado e continue evoluindo
               </p>
             </div>
-            <Button size="lg" onClick={() => router.push('/generator')}>
+            <Button size="lg" onClick={() => router.push('/generator')} className="cursor-pointer">
               Gerar Lista de Questões
             </Button>
           </CardContent>
         </Card>
       </div>
+
+      {/* Plans Welcome Dialog */}
+      <PlansWelcomeDialog 
+        open={showPlansDialog} 
+        onOpenChange={setShowPlansDialog}
+      />
     </DashboardLayout>
   )
 }

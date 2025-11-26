@@ -354,7 +354,7 @@ export default function QuizPage() {
               </div>
             )}
           </div>
-          <Button variant="outline" onClick={() => setShowFinishDialog(true)}>
+          <Button variant="outline" onClick={() => setShowFinishDialog(true)} className="cursor-pointer">
             <Flag className="mr-2 h-4 w-4" />
             Finalizar
           </Button>
@@ -413,7 +413,7 @@ export default function QuizPage() {
                   key={index}
                   onClick={() => handleAnswer(currentQuestion.id, index)}
                   className={cn(
-                    'w-full max-w-full rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50 overflow-hidden',
+                    'w-full max-w-full cursor-pointer rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50 overflow-hidden',
                     isSelected
                       ? 'border-primary bg-primary/5'
                       : 'border-border bg-card hover:bg-accent'
@@ -447,6 +447,7 @@ export default function QuizPage() {
               variant="outline"
               onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
               disabled={currentIndex === 0}
+              className="cursor-pointer"
             >
               <ChevronLeft className="mr-2 h-4 w-4" />
               Anterior
@@ -454,6 +455,7 @@ export default function QuizPage() {
             <Button
               onClick={() => setCurrentIndex((prev) => Math.min(questions.length - 1, prev + 1))}
               disabled={currentIndex === questions.length - 1}
+              className="cursor-pointer"
             >
               Próxima
               <ChevronRight className="ml-2 h-4 w-4" />
@@ -477,7 +479,7 @@ export default function QuizPage() {
                     key={q.id}
                     onClick={() => setCurrentIndex(index)}
                     className={cn(
-                      'flex h-10 w-10 items-center justify-center rounded-lg border-2 font-medium transition-all',
+                      'flex h-10 w-10 items-center cursor-pointer justify-center rounded-lg border-2 font-medium transition-all',
                       isCurrent && 'border-primary ring-2 ring-primary/20',
                       isAnswered && !isCurrent && 'bg-success/10 border-success text-success',
                       !isAnswered && !isCurrent && 'border-border hover:border-primary/50'

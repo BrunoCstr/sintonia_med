@@ -94,7 +94,7 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
       <DashboardLayout>
         <div className="flex min-h-[400px] flex-col items-center justify-center">
           <p className="text-muted-foreground">Simulado não encontrado</p>
-          <Button className="mt-4" onClick={() => router.push('/history')}>
+          <Button className="mt-4 cursor-pointer" onClick={() => router.push('/history')} >
             Voltar ao Histórico
           </Button>
         </div>
@@ -107,7 +107,7 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
       <div className="space-y-6">
         {/* Header with back button */}
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/history')}>
+          <Button variant="ghost" size="icon" onClick={() => router.push('/history')} className="cursor-pointer">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -358,7 +358,7 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
                               <p className="mb-4 text-sm text-muted-foreground">
                                 Assine um plano premium para ter acesso ao gabarito comentado completo de todas as questões!
                               </p>
-                              <Button asChild className="w-full sm:w-auto">
+                              <Button asChild className="w-full sm:w-auto cursor-pointer">
                                 <Link href="/plans">
                                   <Crown className="mr-2 h-4 w-4" />
                                   Assinar Agora
@@ -408,12 +408,12 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
         {/* Actions */}
         <Card>
           <CardContent className="flex flex-col sm:flex-row gap-4 py-6">
-            <Button className="flex-1" asChild>
+            <Button className="flex-1 cursor-pointer" asChild>
               <a href="/generator">
                 Gerar Novo Simulado
               </a>
             </Button>
-            <Button variant="outline" className="flex-1" onClick={() => router.push('/history')}>
+            <Button variant="outline" className="flex-1 cursor-pointer" onClick={() => router.push('/history')}>
               Voltar ao Histórico
             </Button>
           </CardContent>

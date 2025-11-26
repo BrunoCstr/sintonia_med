@@ -135,7 +135,7 @@ export default function ReportDetailsPage() {
         <div className="text-center py-12">
           <p className="text-muted-foreground">Report não encontrado</p>
           <Link href="/admin/reports">
-            <Button variant="outline" className="mt-4">
+            <Button variant="outline" className="mt-4 cursor-pointer">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar para Reports
             </Button>
@@ -151,7 +151,7 @@ export default function ReportDetailsPage() {
       <div className="flex items-center justify-between">
         <div>
           <Link href="/admin/reports">
-            <Button variant="ghost" size="sm" className="mb-4">
+            <Button variant="ghost" size="sm" className="mb-4 cursor-pointer">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar para Reports
             </Button>
@@ -164,6 +164,7 @@ export default function ReportDetailsPage() {
         <div className="flex items-center gap-2">
           {getStatusBadge(report.status)}
           <Button
+          className="cursor-pointer"
             onClick={handleMarkAsResolved}
             disabled={updatingStatus}
             variant={report.status === 'pendente' ? 'default' : 'outline'}
@@ -270,7 +271,7 @@ export default function ReportDetailsPage() {
               {report.questionText}
             </p>
           </div>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" asChild className="cursor-pointer">
             <a
               href={`/admin/questions/${report.questionId}/edit`}
               target="_blank"

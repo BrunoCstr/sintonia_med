@@ -222,7 +222,7 @@ export default function PlansPage() {
   return (
     <div className="min-h-screen bg-linear-to-b from-background to-muted/30">
       <div className="container mx-auto max-w-6xl px-4 py-12">
-        <Button variant="ghost" asChild className="mb-8">
+        <Button variant="ghost" asChild className="mb-8 cursor-pointer">
           <Link href="/">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
@@ -309,7 +309,7 @@ export default function PlansPage() {
 
               <CardFooter>
                 <Button
-                  className="w-full"
+                  className="w-full cursor-pointer"
                   size="lg"
                   variant={plan.recommended ? 'default' : 'outline'}
                   onClick={() => handleSelectPlan(plan.id)}
@@ -350,7 +350,7 @@ export default function PlansPage() {
                 onChange={(e) => setCouponCode(e.target.value)}
                 className="flex-1"
               />
-              <Button onClick={handleApplyCoupon} disabled={!couponCode}>
+              <Button onClick={handleApplyCoupon} disabled={!couponCode} className="cursor-pointer">
                 Aplicar
               </Button>
             </div>

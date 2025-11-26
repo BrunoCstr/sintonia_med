@@ -47,10 +47,10 @@ export default function PaymentPendingPage() {
               Aguarde a confirmação do pagamento. Você receberá um email quando tudo estiver pronto.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-              <Button asChild>
+              <Button asChild className="cursor-pointer">
                 <Link href="/dashboard">Ir para Dashboard</Link>
               </Button>
-              <Button variant="outline" asChild>
+              <Button variant="outline" asChild className="cursor-pointer">
                 <Link href="/profile">Ver Status da Assinatura</Link>
               </Button>
             </div>

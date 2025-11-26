@@ -166,7 +166,7 @@ export default function MedicalAreasPage() {
             Gerencie as áreas médicas disponíveis no sistema
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
+        <Button onClick={() => handleOpenDialog()} className="cursor-pointer">
           <Plus className="mr-2 h-4 w-4" />
           Nova Área
         </Button>
@@ -226,10 +226,10 @@ export default function MedicalAreasPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                <Button className="cursor-pointer" type="button" variant="outline" onClick={handleCloseDialog}>
                   Cancelar
                 </Button>
-                <Button type="submit">
+                <Button type="submit" className="cursor-pointer">
                   {editingArea ? 'Salvar Alterações' : 'Criar Área'}
                 </Button>
               </DialogFooter>
@@ -286,6 +286,7 @@ export default function MedicalAreasPage() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
+                        className="cursor-pointer"
                           variant="ghost"
                           size="icon"
                           onClick={() => handleOpenDialog(area)}
@@ -293,6 +294,7 @@ export default function MedicalAreasPage() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
+                        className="cursor-pointer"
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(area.id)}

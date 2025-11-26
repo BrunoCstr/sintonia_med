@@ -550,7 +550,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button onClick={handleSave} disabled={loading}>
+                  <Button onClick={handleSave} disabled={loading} className="cursor-pointer">
                     {loading ? 'Salvando...' : 'Salvar'}
                   </Button>
                   <Button
@@ -561,6 +561,7 @@ export default function ProfilePage() {
                       setPeriod(userProfile?.period || '')
                     }}
                     disabled={loading}
+                    className="cursor-pointer"
                   >
                     Cancelar
                   </Button>
@@ -592,7 +593,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <Button onClick={() => setIsEditing(true)}>
+                <Button onClick={() => setIsEditing(true)} className="cursor-pointer">
                   <Edit2 className="mr-2 h-4 w-4" />
                   Editar Perfil
                 </Button>
@@ -669,7 +670,8 @@ export default function ProfilePage() {
             {!showPlans ? (
               <Button
                 variant={userProfile?.plan ? 'outline' : 'default'}
-                onClick={() => setShowPlans(true)}
+                onClick={() => setShowPlans(true)} 
+                className="cursor-pointer"
               >
                 {userProfile?.plan ? 'Alterar Plano' : 'Assinar Agora'}
               </Button>
@@ -685,6 +687,7 @@ export default function ProfilePage() {
                       setCouponCode('')
                       setAppliedCoupon(null)
                     }}
+                    className="cursor-pointer"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -756,7 +759,7 @@ export default function ProfilePage() {
 
                       <div className="px-6 pb-6">
                         <Button
-                          className="w-full"
+                          className="w-full cursor-pointer"
                           variant={plan.recommended ? 'default' : 'outline'}
                           onClick={() => handleSubscribe(plan.id)}
                           disabled={
@@ -799,7 +802,7 @@ export default function ProfilePage() {
                       className="flex-1"
                       disabled={subscribing}
                     />
-                    <Button onClick={handleApplyCoupon} disabled={!couponCode || subscribing}>
+                    <Button onClick={handleApplyCoupon} disabled={!couponCode || subscribing} className="cursor-pointer">
                       Aplicar
                     </Button>
                   </div>

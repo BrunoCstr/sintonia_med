@@ -274,7 +274,7 @@ export default function EditQuestionPage() {
     <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild className="cursor-pointer">
             <Link href="/admin/questions">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -321,7 +321,7 @@ export default function EditQuestionPage() {
                       variant="destructive"
                       size="sm"
                       onClick={handleRemoveImage}
-                      className="mt-2"
+                      className="mt-2 cursor-pointer"
                     >
                       <X className="mr-2 h-4 w-4" />
                       Remover Imagem
@@ -533,10 +533,10 @@ export default function EditQuestionPage() {
 
           {/* Submit */}
           <div className="flex justify-end gap-4">
-            <Button type="button" variant="outline" asChild>
+            <Button type="button" variant="outline" asChild className="cursor-pointer">
               <Link href="/admin/questions">Cancelar</Link>
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="cursor-pointer">
               <Save className="mr-2 h-4 w-4" />
               {loading ? 'Salvando...' : 'Salvar Alterações'}
             </Button>

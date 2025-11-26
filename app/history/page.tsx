@@ -126,7 +126,7 @@ export default function HistoryPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground">Você ainda não realizou nenhum simulado.</p>
-              <Button className="mt-4" asChild>
+              <Button className="mt-4 cursor-pointer" asChild>
                 <Link href="/generator">Gerar Primeiro Simulado</Link>
               </Button>
             </CardContent>
@@ -194,7 +194,7 @@ export default function HistoryPage() {
                   )}
 
                   {/* Actions */}
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" asChild className="cursor-pointer">
                     <Link href={`/history/${quiz.id}`}>
                       <Eye className="mr-2 h-4 w-4" />
                       Ver Detalhes

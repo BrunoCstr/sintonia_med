@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4 py-12">
       <div className="w-full max-w-md">
-        <Button variant="ghost" asChild className="mb-4">
+        <Button variant="ghost" asChild className="mb-4 cursor-pointer">
           <Link href="/auth/login">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar para login
@@ -121,7 +121,7 @@ export default function ForgotPasswordPage() {
               </CardContent>
 
               <CardFooter className="flex flex-col gap-4 mt-4">
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full cursor-pointer" disabled={loading}>
                   {loading ? 'Enviando...' : 'Enviar link de redefinição'}
                 </Button>
 

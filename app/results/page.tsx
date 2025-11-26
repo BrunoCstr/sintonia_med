@@ -20,7 +20,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, XCircle, Circle, ChevronDown, Flag, BarChart3, Home, RefreshCw, Lock, Crown } from 'lucide-react'
+import { CheckCircle2, XCircle, Circle, ChevronDown, Flag, BarChart3, Home, RefreshCw, Lock, Crown, Sparkles, ArrowRight } from 'lucide-react'
 import { type Question } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
@@ -215,15 +215,15 @@ export default function ResultsPage() {
           </CardContent>
 
           <CardFooter className="flex flex-wrap gap-2 justify-center">
-            <Button onClick={() => router.push('/generator')}>
+            <Button onClick={() => router.push('/generator')} className="cursor-pointer">
               <RefreshCw className="mr-2 h-4 w-4" />
               Novo Simulado
             </Button>
-            <Button variant="outline" onClick={() => router.push('/dashboard')}>
+            <Button variant="outline" onClick={() => router.push('/dashboard')} className="cursor-pointer">
               <Home className="mr-2 h-4 w-4" />
               Ir para Dashboard
             </Button>
-            <Button variant="outline" onClick={() => router.push('/dashboard')}>
+            <Button variant="outline" onClick={() => router.push('/dashboard')} className="cursor-pointer">
               <BarChart3 className="mr-2 h-4 w-4" />
               Ver Estatísticas
             </Button>
@@ -402,7 +402,7 @@ export default function ResultsPage() {
                                 <p className="mb-4 text-sm text-muted-foreground">
                                   Assine um plano premium para ter acesso ao gabarito comentado completo de todas as questões!
                                 </p>
-                                <Button asChild className="w-full sm:w-auto">
+                                <Button asChild className="w-full sm:w-auto cursor-pointer">
                                   <Link href="/plans">
                                     <Crown className="mr-2 h-4 w-4" />
                                     Assinar Agora
@@ -448,7 +448,7 @@ export default function ResultsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleReport(question.id)}
-                        className="w-full sm:w-auto"
+                        className="w-full sm:w-auto cursor-pointer"
                       >
                         <Flag className="mr-2 h-4 w-4" />
                         Relatar Erro
@@ -462,6 +462,62 @@ export default function ResultsPage() {
             )
           })}
         </div>
+
+        {/* Upgrade Banner for Free Users with 5 questions */}
+        {!isPremium && questions.length === 5 && (
+          <Card className="mt-8 border-2 border-primary/30 bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 shadow-lg">
+            <CardContent className="flex flex-col md:flex-row items-center justify-between gap-6 py-8">
+              <div className="flex items-start gap-4 flex-1">
+                <div className="rounded-full bg-primary/20 p-3">
+                  <Crown className="h-8 w-8 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold mb-2">Quer mais questões?</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Você completou sua lista diária de 5 questões no plano gratuito. 
+                    Upgrade para premium e tenha acesso a:
+                  </p>
+                  <ul className="space-y-2 mb-4">
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      <span>Listas ilimitadas</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      <span>Questões ilimitadas</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      <span>Gabarito comentado completo</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      <span>Painel personalizado com gráficos de desempenho</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <Button 
+                  size="lg" 
+                  onClick={() => router.push('/plans')}
+                  className="w-full md:w-auto gap-2 cursor-pointer"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Ver Planos Premium
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => router.push('/dashboard')}
+                  className="w-full md:w-auto cursor-pointer"
+                >
+                  Continuar Gratuito
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Report Dialog */}
@@ -528,7 +584,7 @@ export default function ResultsPage() {
                       variant="ghost"
                       size="sm"
                       onClick={removeFile}
-                      className="absolute right-2 top-2"
+                      className="absolute right-2 top-2 cursor-pointer"
                     >
                       Remover
                     </Button>
@@ -552,10 +608,10 @@ export default function ResultsPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReportDialog(false)}>
+            <Button variant="outline" onClick={() => setShowReportDialog(false)} className="cursor-pointer">
               Cancelar
             </Button>
-            <Button onClick={submitReport} disabled={reportTypes.length === 0 || !reportDescription.trim() || isSubmittingReport}>
+            <Button className="cursor-pointer" onClick={submitReport} disabled={reportTypes.length === 0 || !reportDescription.trim() || isSubmittingReport}>
               {isSubmittingReport ? 'Enviando...' : 'Enviar Relatório'}
             </Button>
           </DialogFooter>

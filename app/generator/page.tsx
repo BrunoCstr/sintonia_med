@@ -385,7 +385,7 @@ export default function GeneratorPage() {
               {freeLimits.remainingQuestions > 0 && (
                 <div className="pt-2">
                   <Link href="/plans">
-                    <Button variant="outline" className="w-full" size="sm">
+                    <Button variant="outline" className="w-full cursor-pointer" size="sm">
                       <Crown className="mr-2 h-4 w-4" />
                       Assine Premium para gerar questões ilimitadas
                     </Button>
@@ -631,6 +631,7 @@ export default function GeneratorPage() {
                 !difficulty ||
                 (!isPremium && freeLimits && (freeLimits.remainingQuestions === 0 || parseInt(questionCount) > freeLimits.remainingQuestions))
               }
+              className="cursor-pointer"
             >
               {checkingLimits 
                 ? 'Verificando...' 

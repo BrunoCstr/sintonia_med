@@ -48,10 +48,10 @@ function PaymentFailureContent() {
           <CardContent className="space-y-4 text-center">
             <p className="text-muted-foreground">Não se preocupe, você pode tentar novamente a qualquer momento.</p>
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-              <Button asChild>
+              <Button asChild className="cursor-pointer">
                 <Link href="/plans">Escolher Plano Novamente</Link>
               </Button>
-              <Button variant="outline" asChild>
+              <Button variant="outline" asChild className="cursor-pointer">
                 <Link href="/dashboard">Ir para Dashboard</Link>
               </Button>
             </div>

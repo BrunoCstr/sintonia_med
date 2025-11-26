@@ -88,10 +88,10 @@ function PaymentSuccessContent() {
                   Você já pode acessar todas as funcionalidades do SintoniaMed!
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                  <Button asChild>
+                  <Button asChild className="cursor-pointer">
                     <Link href="/dashboard">Ir para Dashboard</Link>
                   </Button>
-                  <Button variant="outline" asChild>
+                  <Button variant="outline" asChild className="cursor-pointer">
                     <Link href="/profile">Ver Minha Assinatura</Link>
                   </Button>
                 </div>
@@ -103,10 +103,10 @@ function PaymentSuccessContent() {
                   Aguarde a confirmação do pagamento. Você receberá um email quando tudo estiver pronto.
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                  <Button asChild>
+                  <Button asChild className="cursor-pointer">
                     <Link href="/dashboard">Ir para Dashboard</Link>
                   </Button>
-                  <Button variant="outline" asChild>
+                  <Button variant="outline" asChild className="cursor-pointer">
                     <Link href="/plans">Voltar para Planos</Link>
                   </Button>
                 </div>
@@ -118,10 +118,10 @@ function PaymentSuccessContent() {
                   Se o problema persistir, entre em contato com o suporte.
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                  <Button asChild>
+                  <Button asChild className="cursor-pointer">
                     <Link href="/plans">Tentar Novamente</Link>
                   </Button>
-                  <Button variant="outline" asChild>
+                  <Button variant="outline" asChild className="cursor-pointer">
                     <Link href="/dashboard">Ir para Dashboard</Link>
                   </Button>
                 </div>

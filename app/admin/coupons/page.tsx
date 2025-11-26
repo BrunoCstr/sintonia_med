@@ -344,7 +344,7 @@ export default function CouponsPage() {
             Crie e gerencie cupons de desconto para assinaturas
           </p>
         </div>
-        <Button onClick={handleCreate}>
+        <Button onClick={handleCreate} className="cursor-pointer">
           <Plus className="mr-2 h-4 w-4" />
           Novo Cupom
         </Button>
@@ -419,6 +419,7 @@ export default function CouponsPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Button
+                            className="cursor-pointer"
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewStats(coupon)}
@@ -426,6 +427,7 @@ export default function CouponsPage() {
                             <TrendingUp className="h-4 w-4" />
                           </Button>
                           <Button
+                           className="cursor-pointer"
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEdit(coupon)}
@@ -433,6 +435,7 @@ export default function CouponsPage() {
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
+                           className="cursor-pointer"
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(coupon.code)}
@@ -607,6 +610,7 @@ export default function CouponsPage() {
 
           <DialogFooter>
             <Button
+            className="cursor-pointer"
               variant="outline"
               onClick={() => {
                 setShowCreateDialog(false)
@@ -616,7 +620,7 @@ export default function CouponsPage() {
             >
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving} className="cursor-pointer">
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -683,7 +687,7 @@ export default function CouponsPage() {
           )}
 
           <DialogFooter>
-            <Button onClick={() => setShowStatsDialog(false)}>Fechar</Button>
+            <Button onClick={() => setShowStatsDialog(false)} className="cursor-pointer">Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

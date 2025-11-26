@@ -82,13 +82,13 @@ export default function WelcomePage() {
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="flex flex-col gap-4 sm:flex-row"
               >
-                <Button asChild size="lg" className="gap-2 shadow-lg shadow-primary/20">
+                <Button asChild size="lg" className="gap-2 cursor-pointer shadow-lg shadow-primary/20">
                   <Link href="/auth/register">
                     Começar agora
                     <ArrowRight className="h-5 w-5" />
                   </Link>
                 </Button>
-                <Button asChild size="lg" variant="outline" className="gap-2 border-primary/20">
+                <Button asChild size="lg" variant="outline" className="gap-2 border-primary/20 cursor-pointer">
                   <Link href="/auth/login">
                     Já tenho conta
                   </Link>

@@ -83,7 +83,7 @@ export default function ViewQuestionPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild className="cursor-pointer">
             <Link href="/admin/questions">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -109,7 +109,7 @@ export default function ViewQuestionPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild className="cursor-pointer">
             <Link href="/admin/questions">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -121,7 +121,7 @@ export default function ViewQuestionPage() {
             </p>
           </div>
         </div>
-        <Button asChild>
+        <Button asChild className="cursor-pointer">
           <Link href={`/admin/questions/${question.id}/edit`}>
             <Pencil className="mr-2 h-4 w-4" />
             Editar Questão
@@ -270,10 +270,10 @@ export default function ViewQuestionPage() {
 
       {/* Actions */}
       <div className="flex justify-end gap-4">
-        <Button variant="outline" asChild>
+        <Button variant="outline" asChild className="cursor-pointer">
           <Link href="/admin/questions">Voltar para Lista</Link>
         </Button>
-        <Button asChild>
+        <Button asChild className="cursor-pointer">
           <Link href={`/admin/questions/${question.id}/edit`}>
             <Pencil className="mr-2 h-4 w-4" />
             Editar Questão

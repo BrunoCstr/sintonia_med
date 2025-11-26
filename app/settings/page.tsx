@@ -242,7 +242,7 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setShowPasswords(!showPasswords)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute cursor-pointer right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -273,6 +273,7 @@ export default function SettingsPage() {
             </div>
 
             <Button
+              className="cursor-pointer"
               onClick={handleChangePassword}
               disabled={!currentPassword || !newPassword || !confirmPassword || loading}
             >
@@ -298,7 +299,7 @@ export default function SettingsPage() {
               <Button
                 variant="outline"
                 onClick={() => setShowResetDialog(true)}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 cursor-pointer"
               >
                 <RotateCcw className="h-4 w-4" />
                 Resetar Histórico de Questões
@@ -320,7 +321,7 @@ export default function SettingsPage() {
           <CardContent>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="w-full sm:w-auto">
+                <Button variant="destructive" className="w-full sm:w-auto cursor-pointer">
                   Inativar Conta
                 </Button>
               </AlertDialogTrigger>

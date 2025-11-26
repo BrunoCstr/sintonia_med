@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useRole } from '@/lib/hooks/use-role'
+import { usePremium } from '@/lib/hooks/use-premium'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,14 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
-import { Brain, Clock, Filter } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Brain, Clock, Filter, AlertCircle, Crown } from 'lucide-react'
 import type { MedicalArea } from '@/lib/types'
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import Link from 'next/link'
 
 export default function GeneratorPage() {
   const { user, userProfile, loading } = useAuth()
   const { isAdminMaster, isAdminQuestoes } = useRole()
+  const { isPremium } = usePremium()
   const router = useRouter()
   const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([])
   const [loadingAreas, setLoadingAreas] = useState(true)
@@ -30,13 +34,106 @@ export default function GeneratorPage() {
   const [questionCount, setQuestionCount] = useState('5')
   const [timed, setTimed] = useState(false)
   const [timeLimit, setTimeLimit] = useState('30')
-  const [errors, setErrors] = useState<{ subjects?: string; difficulty?: string }>({})
+  const [errors, setErrors] = useState<{ subjects?: string; difficulty?: string; limit?: string }>({})
+  const [freeLimits, setFreeLimits] = useState<{ 
+    canGenerate: boolean
+    maxQuestionsPerDay: number
+    questionsGeneratedToday: number
+    remainingQuestions: number
+    resetTime: number
+    timeUntilReset: number
+    reason: string | null 
+  } | null>(null)
+  const [checkingLimits, setCheckingLimits] = useState(true)
+  const [timeUntilReset, setTimeUntilReset] = useState<number | null>(null)
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/auth/login')
     }
   }, [user, loading, router])
+
+  useEffect(() => {
+    const checkFreeLimits = async () => {
+      if (!user || isPremium) {
+        setCheckingLimits(false)
+        return
+      }
+
+      try {
+        const response = await fetch('/api/user/check-free-limits')
+        if (response.ok) {
+          const data = await response.json()
+          setFreeLimits({
+            canGenerate: data.canGenerate,
+            maxQuestionsPerDay: data.maxQuestionsPerDay || 5,
+            questionsGeneratedToday: data.questionsGeneratedToday || 0,
+            remainingQuestions: data.remainingQuestions || 5,
+            resetTime: data.resetTime,
+            timeUntilReset: data.timeUntilReset,
+            reason: data.reason,
+          })
+          setTimeUntilReset(data.timeUntilReset)
+        }
+      } catch (error) {
+        console.error('Erro ao verificar limitações:', error)
+      } finally {
+        setCheckingLimits(false)
+      }
+    }
+
+    if (user && !loading) {
+      checkFreeLimits()
+      // Atualizar a cada minuto
+      const interval = setInterval(() => {
+        checkFreeLimits()
+      }, 60000) // 1 minuto
+      
+      // Atualizar quando a página ganha foco (usuário volta para a aba)
+      const handleFocus = () => {
+        checkFreeLimits()
+      }
+      window.addEventListener('focus', handleFocus)
+      
+      return () => {
+        clearInterval(interval)
+        window.removeEventListener('focus', handleFocus)
+      }
+    }
+  }, [user, loading, isPremium])
+
+  // Atualizar contador de tempo a cada segundo
+  useEffect(() => {
+    if (!freeLimits || isPremium || !freeLimits.resetTime) return
+
+    const interval = setInterval(() => {
+      const now = Date.now()
+      const remaining = freeLimits.resetTime - now
+      setTimeUntilReset(Math.max(0, remaining))
+      
+      // Se chegou a meia-noite, recarregar limites
+      if (remaining <= 0) {
+        setFreeLimits(prev => prev ? {
+          ...prev,
+          canGenerate: true,
+          questionsGeneratedToday: 0,
+          remainingQuestions: prev.maxQuestionsPerDay,
+          timeUntilReset: 24 * 60 * 60 * 1000, // 24 horas
+        } : null)
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [freeLimits, isPremium])
+
+  // Função para formatar tempo restante
+  const formatTimeRemaining = (ms: number) => {
+    if (ms <= 0) return '00:00:00'
+    const hours = Math.floor(ms / (1000 * 60 * 60))
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60))
+    const seconds = Math.floor((ms % (1000 * 60)) / 1000)
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  }
 
   useEffect(() => {
     const loadMedicalAreas = async () => {
@@ -98,7 +195,7 @@ export default function GeneratorPage() {
     )
   }
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     // Reset errors
     setErrors({})
 
@@ -115,6 +212,54 @@ export default function GeneratorPage() {
     // If there are errors, don't proceed
     if (selectedSubjects.length === 0 || !difficulty) {
       return
+    }
+
+    const requestedCount = parseInt(questionCount)
+
+    // VALIDAÇÃO NO BACKEND para usuários Free
+    if (!isPremium) {
+      try {
+        const validationResponse = await fetch('/api/user/validate-question-generation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ questionCount: requestedCount }),
+        })
+
+        if (!validationResponse.ok) {
+          const errorData = await validationResponse.json()
+          setErrors((prev) => ({ 
+            ...prev, 
+            limit: errorData.reason || 'Limite diário atingido. Você não pode gerar mais questões hoje.' 
+          }))
+          // Recarregar limites após erro
+          if (user && !loading) {
+            const limitsResponse = await fetch('/api/user/check-free-limits')
+            if (limitsResponse.ok) {
+              const limitsData = await limitsResponse.json()
+              setFreeLimits({
+                canGenerate: limitsData.canGenerate,
+                maxQuestionsPerDay: limitsData.maxQuestionsPerDay || 5,
+                questionsGeneratedToday: limitsData.questionsGeneratedToday || 0,
+                remainingQuestions: limitsData.remainingQuestions || 0,
+                resetTime: limitsData.resetTime,
+                timeUntilReset: limitsData.timeUntilReset,
+                reason: limitsData.reason,
+              })
+            }
+          }
+          return
+        }
+      } catch (error) {
+        console.error('Erro ao validar geração:', error)
+        setErrors((prev) => ({ 
+          ...prev, 
+          limit: 'Erro ao verificar limites. Tente novamente.' 
+        }))
+        return
+      }
     }
 
     // Mapear dificuldade para o formato do banco
@@ -162,6 +307,94 @@ export default function GeneratorPage() {
             </p>
           )}
         </div>
+
+        {/* Contador de Limites do Plano Free */}
+        {!isPremium && freeLimits && (
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Limite Diário - Plano Free
+              </CardTitle>
+              <CardDescription>
+                Você pode gerar até {freeLimits.maxQuestionsPerDay} questões por dia
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Questões geradas hoje</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {freeLimits.questionsGeneratedToday} / {freeLimits.maxQuestionsPerDay}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Questões restantes</p>
+                  <p className={`text-2xl font-bold ${freeLimits.remainingQuestions > 0 ? 'text-success' : 'text-destructive'}`}>
+                    {freeLimits.remainingQuestions}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Progresso diário</span>
+                  <span className="font-medium">
+                    {Math.round((freeLimits.questionsGeneratedToday / freeLimits.maxQuestionsPerDay) * 100)}%
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{
+                      width: `${Math.min(100, (freeLimits.questionsGeneratedToday / freeLimits.maxQuestionsPerDay) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {freeLimits.remainingQuestions === 0 && timeUntilReset !== null && (
+                <div className="rounded-lg border border-warning/20 bg-warning/5 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-4 w-4 text-warning" />
+                    <p className="text-sm font-semibold text-warning">Limite diário atingido</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    O limite será resetado em:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <span className="text-lg font-mono font-bold text-primary">
+                      {formatTimeRemaining(timeUntilReset)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {freeLimits.remainingQuestions > 0 && timeUntilReset !== null && (
+                <div className="rounded-lg border border-muted bg-muted/30 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Próximo reset em:</span>
+                    <span className="text-sm font-mono font-medium text-foreground">
+                      {formatTimeRemaining(timeUntilReset)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {freeLimits.remainingQuestions > 0 && (
+                <div className="pt-2">
+                  <Link href="/plans">
+                    <Button variant="outline" className="w-full" size="sm">
+                      <Crown className="mr-2 h-4 w-4" />
+                      Assine Premium para gerar questões ilimitadas
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -273,17 +506,29 @@ export default function GeneratorPage() {
 
             <div className="space-y-2">
               <Label>Número de Questões</Label>
-              <Select value={questionCount} onValueChange={setQuestionCount}>
+              <Select 
+                value={questionCount} 
+                onValueChange={setQuestionCount}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="5">5 questões</SelectItem>
-                  <SelectItem value="10">10 questões</SelectItem>
-                  <SelectItem value="20">20 questões</SelectItem>
-                  <SelectItem value="30">30 questões</SelectItem>
+                  {isPremium && (
+                    <>
+                      <SelectItem value="10">10 questões</SelectItem>
+                      <SelectItem value="20">20 questões</SelectItem>
+                      <SelectItem value="30">30 questões</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
+              {!isPremium && (
+                <p className="text-xs text-muted-foreground">
+                  Plano Free: máximo de 5 questões por simulado
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -324,6 +569,47 @@ export default function GeneratorPage() {
           </CardContent>
         </Card>
 
+        {/* Alertas de limitação para plano Free */}
+        {!isPremium && freeLimits && freeLimits.remainingQuestions === 0 && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Limite diário de questões atingido</AlertTitle>
+            <AlertDescription>
+              Você já gerou todas as {freeLimits.maxQuestionsPerDay} questões disponíveis hoje.
+              {timeUntilReset !== null && (
+                <>
+                  <br />
+                  <span className="font-medium">O limite será resetado em: {formatTimeRemaining(timeUntilReset)}</span>
+                </>
+              )}
+              <br />
+              <Link href="/plans" className="mt-2 inline-flex items-center gap-1 text-sm font-medium underline">
+                <Crown className="h-3 w-3" />
+                Assine um plano premium para gerar questões ilimitadas
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {errors.limit && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Limitação do plano Free</AlertTitle>
+            <AlertDescription>
+              {errors.limit}
+              {!isPremium && (
+                <>
+                  <br />
+                  <Link href="/plans" className="mt-2 inline-flex items-center gap-1 text-sm font-medium underline">
+                    <Crown className="h-3 w-3" />
+                    Assine um plano premium para remover limitações
+                  </Link>
+                </>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-secondary/5">
           <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
             <Brain className="h-12 w-12 text-primary" />
@@ -338,10 +624,25 @@ export default function GeneratorPage() {
             <Button
               size="lg"
               onClick={handleGenerate}
-              disabled={parseInt(questionCount) === 0 || selectedSubjects.length === 0 || !difficulty}
+              disabled={
+                checkingLimits ||
+                parseInt(questionCount) === 0 || 
+                selectedSubjects.length === 0 || 
+                !difficulty ||
+                (!isPremium && freeLimits && (freeLimits.remainingQuestions === 0 || parseInt(questionCount) > freeLimits.remainingQuestions))
+              }
             >
-              Gerar Simulado
+              {checkingLimits 
+                ? 'Verificando...' 
+                : !isPremium && freeLimits && freeLimits.remainingQuestions === 0
+                ? 'Limite Diário Atingido'
+                : 'Gerar Simulado'}
             </Button>
+            {!isPremium && freeLimits && freeLimits.remainingQuestions > 0 && (
+              <p className="text-xs text-center text-muted-foreground">
+                Você pode gerar mais {freeLimits.remainingQuestions} questão{freeLimits.remainingQuestions > 1 ? 'ões' : ''} hoje
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

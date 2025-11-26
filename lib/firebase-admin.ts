@@ -242,7 +242,21 @@ export async function isUserPremium(uid: string): Promise<boolean> {
     if (userData.planExpiresAt) {
       const expiresAt = userData.planExpiresAt.toDate ? userData.planExpiresAt.toDate() : new Date(userData.planExpiresAt)
       const now = new Date()
-      return expiresAt > now
+      const isExpired = expiresAt <= now
+      
+      // Se expirou, limpar no banco de dados
+      if (isExpired) {
+        const userRef = db.collection('users').doc(uid)
+        await userRef.update({
+          plan: null,
+          planExpiresAt: null,
+          updatedAt: new Date(),
+        })
+        console.log(`[isUserPremium] Plano expirado removido para usuário ${uid}`)
+        return false
+      }
+      
+      return true
     }
     
     // Se não tem data de expiração, considerar como ativo

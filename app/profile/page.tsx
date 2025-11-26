@@ -64,6 +64,8 @@ const features = [
 export default function ProfilePage() {
   const router = useRouter()
   const { user, userProfile, refreshUserProfile } = useAuth()
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null)
+  const [checkingPlan, setCheckingPlan] = useState(true)
 
   const getFriendlyPaymentError = (status?: string | null, statusDetail?: string | null) => {
     const detailMap: Record<string, string> = {
@@ -143,6 +145,79 @@ export default function ProfilePage() {
       setPeriod(userProfile.period || '')
     }
   }, [userProfile])
+
+  // Verificar plano expirado e calcular dias restantes
+  useEffect(() => {
+    const checkExpiredPlan = async () => {
+      if (!user) {
+        setCheckingPlan(false)
+        return
+      }
+
+      try {
+        setCheckingPlan(true)
+        const response = await fetch('/api/user/check-expired-plan', {
+          method: 'POST',
+          credentials: 'include',
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          
+          // Se o plano expirou, atualizar o perfil
+          if (data.expired) {
+            await refreshUserProfile()
+            setDaysRemaining(null)
+          } else if (data.daysRemaining !== undefined) {
+            setDaysRemaining(data.daysRemaining)
+          } else if (userProfile?.planExpiresAt) {
+            // Calcular dias restantes localmente se a API não retornou
+            try {
+              const expiresDate = typeof userProfile.planExpiresAt === 'string'
+                ? new Date(userProfile.planExpiresAt)
+                : userProfile.planExpiresAt instanceof Date
+                  ? userProfile.planExpiresAt
+                  : new Date(userProfile.planExpiresAt)
+              
+              if (!isNaN(expiresDate.getTime())) {
+                const now = new Date()
+                const diffTime = expiresDate.getTime() - now.getTime()
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                setDaysRemaining(Math.max(0, diffDays))
+              }
+            } catch (error) {
+              console.error('Erro ao calcular dias restantes:', error)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar plano expirado:', error)
+        // Calcular dias restantes localmente em caso de erro
+        if (userProfile?.planExpiresAt) {
+          try {
+            const expiresDate = typeof userProfile.planExpiresAt === 'string'
+              ? new Date(userProfile.planExpiresAt)
+              : userProfile.planExpiresAt instanceof Date
+                ? userProfile.planExpiresAt
+                : new Date(userProfile.planExpiresAt)
+            
+            if (!isNaN(expiresDate.getTime())) {
+              const now = new Date()
+              const diffTime = expiresDate.getTime() - now.getTime()
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+              setDaysRemaining(Math.max(0, diffDays))
+            }
+          } catch (error) {
+            console.error('Erro ao calcular dias restantes:', error)
+          }
+        }
+      } finally {
+        setCheckingPlan(false)
+      }
+    }
+
+    checkExpiredPlan()
+  }, [user, userProfile, refreshUserProfile])
 
   useEffect(() => {
     loadStats()
@@ -556,13 +631,28 @@ export default function ProfilePage() {
                       return null
                     }
 
+                    // Calcular dias restantes se não foi calculado ainda
+                    let daysLeft = daysRemaining
+                    if (daysLeft === null) {
+                      const now = new Date()
+                      const diffTime = expiresDate.getTime() - now.getTime()
+                      daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                    }
+
+                    const formattedDate = expiresDate.toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                    })
+
                     return (
                       <p className="text-sm text-muted-foreground">
-                        Expira em: {expiresDate.toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric',
-                        })}
+                        Expira em: {formattedDate}
+                        {daysLeft !== null && daysLeft >= 0 && (
+                          <span className="ml-2 text-primary font-medium">
+                            ({daysLeft} {daysLeft === 1 ? 'dia' : 'dias'})
+                          </span>
+                        )}
                       </p>
                     )
                   } catch (error) {

@@ -18,23 +18,33 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { signIn } = useAuth()
+  const [showResendEmail, setShowResendEmail] = useState(false)
+  const [resendingEmail, setResendingEmail] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
+  const { signIn, resendVerificationEmail } = useAuth()
   const { theme } = useTheme()
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/dashboard'
+  const accountCreated = searchParams.get('message') === 'account-created'
+  const accountCreatedNoEmail = searchParams.get('message') === 'account-created-no-email'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setShowResendEmail(false)
+    setResendSuccess(false)
     setLoading(true)
 
     try {
       await signIn(email, password)
       router.push(redirect)
     } catch (err: any) {
-      // Tratar erro específico de usuário desativado
-      if (err.code === 'auth/user-disabled') {
+      // Tratar erro específico de e-mail não verificado
+      if (err.code === 'auth/email-not-verified') {
+        setError(err.message || 'Por favor, verifique seu e-mail antes de fazer login.')
+        setShowResendEmail(true)
+      } else if (err.code === 'auth/user-disabled') {
         setError('Sua conta foi desativada. Entre em contato com o administrador para mais informações.')
       } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setError('Email ou senha incorretos. Tente novamente.')
@@ -48,6 +58,68 @@ function LoginForm() {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResendEmail = async () => {
+    if (!email) {
+      setError('Por favor, insira seu e-mail primeiro.')
+      return
+    }
+
+    if (!password) {
+      setError('Por favor, digite sua senha para reenviar o e-mail de verificação.')
+      return
+    }
+
+    setResendingEmail(true)
+    setResendSuccess(false)
+    setError('')
+
+    try {
+      // Fazer login temporário para enviar o e-mail
+      const { signInWithEmailAndPassword, sendEmailVerification, signOut } = await import('firebase/auth')
+      const { auth } = await import('@/lib/firebase')
+      
+      try {
+        // Fazer login temporário
+        const userCredential = await signInWithEmailAndPassword(auth, email, password)
+        
+        if (!userCredential.user.emailVerified) {
+          // Enviar e-mail de verificação usando Client SDK
+          await sendEmailVerification(userCredential.user, {
+            url: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/login`,
+            handleCodeInApp: false,
+          })
+          
+          console.log('✅ E-mail de verificação enviado com sucesso')
+          
+          // Fazer logout após enviar o e-mail
+          await signOut(auth)
+          
+          setResendSuccess(true)
+          setError('')
+        } else {
+          // E-mail já verificado
+          await signOut(auth)
+          setError('E-mail já está verificado. Você pode fazer login normalmente.')
+        }
+      } catch (loginError: any) {
+        // Se o login falhar, mostrar erro específico
+        if (loginError.code === 'auth/user-not-found' || loginError.code === 'auth/wrong-password' || loginError.code === 'auth/invalid-credential') {
+          setError('Email ou senha incorretos. Verifique e tente novamente.')
+        } else if (loginError.code === 'auth/user-disabled') {
+          setError('Sua conta foi desativada. Entre em contato com o administrador.')
+        } else {
+          setError(`Erro ao fazer login temporário: ${loginError.message || 'Tente novamente.'}`)
+        }
+        console.error('Erro ao fazer login temporário:', loginError)
+      }
+    } catch (err: any) {
+      console.error('Erro ao importar módulos:', err)
+      setError('Erro ao reenviar e-mail. Tente novamente.')
+    } finally {
+      setResendingEmail(false)
     }
   }
 
@@ -80,9 +152,51 @@ function LoginForm() {
 
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
+              {accountCreated && (
+                <div className="rounded-lg bg-success/10 p-3 text-sm text-success">
+                  Conta criada com sucesso! Verifique seu e-mail para ativar sua conta. O e-mail de verificação foi enviado para sua caixa de entrada.
+                </div>
+              )}
+
+              {accountCreatedNoEmail && (
+                <div className="rounded-lg bg-warning/10 p-3 text-sm text-warning border border-warning/20">
+                  <p className="font-semibold mb-1">Conta criada com sucesso!</p>
+                  <p className="mb-2">Porém, não foi possível enviar o e-mail de verificação automaticamente.</p>
+                  <p>Por favor, use o botão abaixo para reenviar o e-mail de verificação.</p>
+                </div>
+              )}
+
               {error && (
                 <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
                   {error}
+                </div>
+              )}
+
+              {resendSuccess && (
+                <div className="rounded-lg bg-success/10 p-3 text-sm text-success">
+                  E-mail de verificação reenviado com sucesso! Verifique sua caixa de entrada e spam.
+                </div>
+              )}
+
+              {showResendEmail && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
+                  <p className="text-sm text-foreground">
+                    Seu e-mail ainda não foi verificado. {password ? 'Clique no botão abaixo para reenviar o e-mail de verificação usando sua senha.' : 'Digite sua senha acima e clique no botão abaixo para reenviar o e-mail de verificação.'}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleResendEmail}
+                    disabled={resendingEmail || !password}
+                    className="w-full"
+                  >
+                    {resendingEmail ? 'Enviando...' : password ? 'Reenviar E-mail de Verificação' : 'Digite sua senha primeiro'}
+                  </Button>
+                  {!password && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      💡 Digite sua senha no campo acima para habilitar o botão
+                    </p>
+                  )}
                 </div>
               )}
 

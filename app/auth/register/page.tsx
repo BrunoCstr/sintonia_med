@@ -105,14 +105,18 @@ export default function RegisterPage() {
 
     try {
       await signUp(email, password, name, period, institution)
-      router.push('/plans')
+      // Mostrar mensagem de sucesso e redirecionar
+      router.push('/auth/login?message=account-created')
     } catch (err: any) {
       if (err.code === 'auth/email-already-in-use') {
         setError('Este email já está em uso')
+      } else if (err.message && err.message.includes('Limite de tentativas')) {
+        setError(err.message)
       } else {
-        setError('Erro ao criar conta. Tente novamente.')
+        // Para outros erros, mostrar mensagem genérica
+        setError(err.message || 'Erro ao criar conta. Tente novamente.')
+        console.error('Erro ao criar conta:', err)
       }
-      console.error(err)
     } finally {
       setLoading(false)
     }

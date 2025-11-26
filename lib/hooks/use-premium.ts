@@ -1,12 +1,42 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
 
 /**
  * Hook para verificar se o usuário tem plano premium ativo
  */
 export function usePremium() {
-  const { userProfile } = useAuth()
+  const { userProfile, refreshUserProfile } = useAuth()
+  const [hasCheckedExpired, setHasCheckedExpired] = useState(false)
+
+  // Verificar plano expirado uma vez quando o componente monta
+  useEffect(() => {
+    if (!hasCheckedExpired && userProfile?.plan && userProfile?.planExpiresAt) {
+      const checkExpired = async () => {
+        try {
+          const response = await fetch('/api/user/check-expired-plan', {
+            method: 'POST',
+            credentials: 'include',
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            if (data.expired) {
+              // Plano expirou, atualizar perfil
+              await refreshUserProfile()
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao verificar plano expirado:', error)
+        } finally {
+          setHasCheckedExpired(true)
+        }
+      }
+      
+      checkExpired()
+    }
+  }, [userProfile, hasCheckedExpired, refreshUserProfile])
 
   const isPremium = () => {
     if (!userProfile?.plan) return false

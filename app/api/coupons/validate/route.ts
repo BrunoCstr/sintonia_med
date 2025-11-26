@@ -135,6 +135,7 @@ export async function GET(request: NextRequest) {
       discount: couponData.discount,
       code: code.toUpperCase(),
       description: couponData.description || null,
+      applicablePlans: couponData.applicablePlans || null, // Retornar planos aplicáveis
     })
   } catch (error: any) {
     console.error('Erro ao validar cupom:', error)

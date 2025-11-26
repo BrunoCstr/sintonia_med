@@ -3,11 +3,14 @@ import { MercadoPagoConfig, Payment } from 'mercadopago'
 import { verifyFirebaseToken } from '@/lib/middleware-auth'
 import { getAdminApp } from '@/lib/firebase-admin'
 
+// Configurar timeout máximo para esta rota (60 segundos)
+export const maxDuration = 60
+
 // Inicializar cliente base do Mercado Pago (sem idempotency fixo)
 const baseClient = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
   options: {
-    timeout: 5000,
+    timeout: 30000, // 30 segundos - tempo adequado para APIs externas
   },
 })
 
@@ -64,8 +67,11 @@ export async function POST(request: NextRequest) {
     // Criar pagamento no Mercado Pago usando os dados do form
     // O Payment Brick já inclui todas as informações do cartão no token, incluindo o nome do titular
     // O nome do titular é usado pelo Mercado Pago para determinar o status em testes (APRO=aprovado, OTHE=rejeitado, etc)
+    // Arredondar valor para 2 casas decimais para evitar problemas de precisão de ponto flutuante
+    const transactionAmount = Math.round((paymentData.amount || 0) * 100) / 100
+    
     const paymentBody = {
-      transaction_amount: paymentData.amount,
+      transaction_amount: Number(transactionAmount.toFixed(2)), // Garantir exatamente 2 casas decimais
       token: formData.token,
       description: `Assinatura ${paymentData.planId === 'monthly' ? 'Mensal' : 'Semestral'} - SintoniaMed`,
       installments: formData.installments || 1,

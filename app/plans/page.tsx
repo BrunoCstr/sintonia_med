@@ -53,7 +53,11 @@ const features = [
 
 export default function PlansPage() {
   const [couponCode, setCouponCode] = useState('')
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null)
+  const [appliedCoupon, setAppliedCoupon] = useState<{ 
+    code: string; 
+    discount: number; 
+    applicablePlans: string[] | null 
+  } | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [showCheckout, setShowCheckout] = useState(false)
   const [checkoutData, setCheckoutData] = useState<{ preferenceId: string; amount: number } | null>(null)
@@ -123,7 +127,8 @@ export default function PlansPage() {
       if (data.valid) {
         setAppliedCoupon({ 
           code: data.code, 
-          discount: data.discount / 100 // Converter de percentual para decimal
+          discount: data.discount / 100, // Converter de percentual para decimal
+          applicablePlans: data.applicablePlans || null, // Planos aplicáveis do cupom
         })
       } else {
         alert(data.error || 'Cupom inválido')
@@ -136,8 +141,19 @@ export default function PlansPage() {
     }
   }
 
-  const calculatePrice = (basePrice: number) => {
-    if (appliedCoupon) {
+  // Verificar se o cupom é aplicável a um plano específico
+  const isCouponApplicableToPlan = (planId: string) => {
+    if (!appliedCoupon) return false
+    // Se não há restrição de planos, o cupom é aplicável a todos
+    if (!appliedCoupon.applicablePlans || appliedCoupon.applicablePlans.length === 0) {
+      return true
+    }
+    // Verificar se o plano está na lista de planos aplicáveis
+    return appliedCoupon.applicablePlans.includes(planId)
+  }
+
+  const calculatePrice = (basePrice: number, planId: string) => {
+    if (appliedCoupon && isCouponApplicableToPlan(planId)) {
       return basePrice * (1 - appliedCoupon.discount)
     }
     return basePrice
@@ -147,6 +163,12 @@ export default function PlansPage() {
     const currentUser = auth.currentUser
     if (!currentUser) {
       router.push('/auth/login?redirect=/plans')
+      return
+    }
+
+    // Validar se o cupom é aplicável ao plano selecionado
+    if (appliedCoupon && !isCouponApplicableToPlan(planId)) {
+      alert(`O cupom "${appliedCoupon.code}" não é válido para o ${planId === 'monthly' ? 'Plano Mensal' : 'Plano Semestral'}.`)
       return
     }
 
@@ -173,7 +195,7 @@ export default function PlansPage() {
         credentials: 'include',
         body: JSON.stringify({
           planId,
-          couponCode: appliedCoupon?.code || null,
+          couponCode: appliedCoupon && isCouponApplicableToPlan(planId) ? appliedCoupon.code : null,
         }),
       })
 
@@ -252,9 +274,9 @@ export default function PlansPage() {
                   )}
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold">
-                      R$ {calculatePrice(plan.price).toFixed(2)}
+                      R$ {calculatePrice(plan.price, plan.id).toFixed(2)}
                     </span>
-                    {appliedCoupon && (
+                    {appliedCoupon && isCouponApplicableToPlan(plan.id) && (
                       <Badge variant="secondary" className="ml-2 text-xs">
                         Cupom aplicado
                       </Badge>
@@ -265,7 +287,12 @@ export default function PlansPage() {
                   )}
                   {plan.id === 'semester' && (
                     <p className="text-sm text-muted-foreground">
-                      ou R$ {(calculatePrice(plan.price) / 6).toFixed(2)}/mês
+                      ou R$ {(calculatePrice(plan.price, plan.id) / 6).toFixed(2)}/mês
+                    </p>
+                  )}
+                  {appliedCoupon && !isCouponApplicableToPlan(plan.id) && (
+                    <p className="text-sm text-destructive font-medium">
+                      Cupom não aplicável a este plano
                     </p>
                   )}
                 </div>
@@ -286,9 +313,21 @@ export default function PlansPage() {
                   size="lg"
                   variant={plan.recommended ? 'default' : 'outline'}
                   onClick={() => handleSelectPlan(plan.id)}
-                  disabled={selectedPlan === plan.id}
+                  disabled={
+                    (selectedPlan === plan.id) || 
+                    (appliedCoupon ? !isCouponApplicableToPlan(plan.id) : false)
+                  }
+                  title={
+                    appliedCoupon && !isCouponApplicableToPlan(plan.id)
+                      ? `O cupom "${appliedCoupon.code}" não é válido para este plano`
+                      : undefined
+                  }
                 >
-                  {selectedPlan === plan.id ? 'Processando...' : 'Assinar Agora'}
+                  {selectedPlan === plan.id 
+                    ? 'Processando...' 
+                    : appliedCoupon && !isCouponApplicableToPlan(plan.id)
+                    ? 'Cupom não aplicável'
+                    : 'Assinar Agora'}
                 </Button>
               </CardFooter>
             </Card>
@@ -316,9 +355,18 @@ export default function PlansPage() {
               </Button>
             </div>
             {appliedCoupon && (
-              <p className="mt-2 text-sm text-success">
-                Cupom "{appliedCoupon.code}" aplicado! Desconto de {appliedCoupon.discount * 100}%
-              </p>
+              <div className="mt-2 space-y-1">
+                <p className="text-sm text-success">
+                  Cupom "{appliedCoupon.code}" aplicado! Desconto de {appliedCoupon.discount * 100}%
+                </p>
+                {appliedCoupon.applicablePlans && appliedCoupon.applicablePlans.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Válido apenas para: {appliedCoupon.applicablePlans.map(p => 
+                      p === 'monthly' ? 'Plano Mensal' : 'Plano Semestral'
+                    ).join(' e ')}
+                  </p>
+                )}
+              </div>
             )}
             <p className="mt-3 text-xs text-muted-foreground">
               Digite o código do cupom para aplicar o desconto
@@ -332,6 +380,8 @@ export default function PlansPage() {
         // Só permite fechar programaticamente (via botão X ou código)
         if (open === false) {
           setShowCheckout(false)
+          setSelectedPlan(null) // Resetar estado do botão quando fechar o dialog
+          setCheckoutData(null) // Limpar dados do checkout
         }
       }}>
         <DialogContent 
@@ -363,6 +413,7 @@ export default function PlansPage() {
                 const friendlyMessage = getFriendlyPaymentError(error.status, error.statusDetail) || error.message
                 setShowCheckout(false)
                 setSelectedPlan(null)
+                setCheckoutData(null) // Limpar dados do checkout
                 router.push(
                   `/payment/failure?status=${error.status || 'rejected'}&message=${encodeURIComponent(
                     friendlyMessage

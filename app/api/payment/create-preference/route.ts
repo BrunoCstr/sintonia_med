@@ -3,11 +3,14 @@ import { MercadoPagoConfig, Preference } from 'mercadopago'
 import { verifyFirebaseToken } from '@/lib/middleware-auth'
 import { getAdminApp } from '@/lib/firebase-admin'
 
+// Configurar timeout máximo para esta rota (60 segundos)
+export const maxDuration = 60
+
 // Inicializar cliente do Mercado Pago
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
   options: {
-    timeout: 5000,
+    timeout: 30000, // 30 segundos - tempo adequado para APIs externas
     idempotencyKey: 'abc',
   },
 })
@@ -20,6 +23,15 @@ const preference = new Preference(client)
  */
 export async function POST(request: NextRequest) {
   try {
+    // Verificar se o token do Mercado Pago está configurado
+    if (!process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MERCADOPAGO_ACCESS_TOKEN.trim() === '') {
+      console.error('MERCADOPAGO_ACCESS_TOKEN não configurado')
+      return NextResponse.json(
+        { error: 'Configuração do Mercado Pago não encontrada. Entre em contato com o suporte.' },
+        { status: 500 }
+      )
+    }
+
     // Verificar autenticação
     const token = request.cookies.get('firebase-token')?.value
     if (!token) {
@@ -105,7 +117,8 @@ export async function POST(request: NextRequest) {
       semester: 143.00,
     }
     const basePrice = planPrices[planId]
-    const finalPrice = basePrice * (1 - discount)
+    // Arredondar para 2 casas decimais para evitar problemas de precisão de ponto flutuante
+    const finalPrice = Math.round((basePrice * (1 - discount)) * 100) / 100
 
     // Calcular datas de expiração
     const now = new Date()
@@ -126,7 +139,7 @@ export async function POST(request: NextRequest) {
             ? 'Acesso completo por 1 mês' 
             : 'Acesso completo por 6 meses',
           quantity: 1,
-          unit_price: finalPrice,
+          unit_price: Number(finalPrice.toFixed(2)), // Garantir exatamente 2 casas decimais
           currency_id: 'BRL',
         },
       ],
@@ -160,7 +173,7 @@ export async function POST(request: NextRequest) {
       planId,
       preferenceId: response.id,
       status: 'pending',
-      amount: finalPrice,
+      amount: Number(finalPrice.toFixed(2)), // Garantir exatamente 2 casas decimais ao salvar
       originalAmount: basePrice,
       couponCode: couponCode || null,
       discount: discount * 100,
@@ -174,9 +187,9 @@ export async function POST(request: NextRequest) {
         couponCode: couponCode.toUpperCase(),
         userId: authUser.uid,
         planId,
-        discountApplied: basePrice - finalPrice,
+        discountApplied: Number((basePrice - finalPrice).toFixed(2)), // Garantir 2 casas decimais
         originalPrice: basePrice,
-        finalPrice,
+        finalPrice: Number(finalPrice.toFixed(2)), // Garantir 2 casas decimais
         preferenceId: response.id,
         usedAt: now,
       })
@@ -185,16 +198,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       preferenceId: response.id,
-      amount: finalPrice,
+      amount: Number(finalPrice.toFixed(2)), // Garantir exatamente 2 casas decimais na resposta
       // Manter URLs antigas para compatibilidade, mas não serão usadas com checkout transparente
       initPoint: response.init_point,
       sandboxInitPoint: response.sandbox_init_point,
     })
   } catch (error: any) {
     console.error('Erro ao criar preferência de pagamento:', error)
+    
+    // Tratamento específico para erros de timeout
+    if (error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT')) {
+      return NextResponse.json(
+        { 
+          error: 'Timeout ao conectar com o Mercado Pago. Por favor, tente novamente em alguns instantes.',
+          details: 'A requisição demorou mais que o esperado. Isso pode ocorrer devido a problemas temporários de rede ou alta demanda no serviço.'
+        },
+        { status: 504 }
+      )
+    }
+    
+    // Tratamento para erros de autenticação
+    if (error.status === 401 || error.message?.includes('Unauthorized')) {
+      return NextResponse.json(
+        { 
+          error: 'Erro de autenticação com o Mercado Pago. Verifique as credenciais configuradas.',
+          details: 'O token de acesso do Mercado Pago pode estar inválido ou expirado.'
+        },
+        { status: 401 }
+      )
+    }
+    
+    // Tratamento genérico
     return NextResponse.json(
-      { error: error.message || 'Erro ao criar preferência de pagamento' },
-      { status: 500 }
+      { 
+        error: error.message || 'Erro ao criar preferência de pagamento',
+        details: error.cause || null
+      },
+      { status: error.status || 500 }
     )
   }
 }

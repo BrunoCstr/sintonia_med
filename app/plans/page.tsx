@@ -1,14 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Check, Sparkles, TrendingUp, ArrowLeft } from 'lucide-react'
+import { Check, Sparkles, TrendingUp, ArrowLeft, X } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
+import { auth } from '@/lib/firebase'
+import { PaymentBrick } from '@/components/payment-brick'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const plans = [
   {
@@ -46,22 +55,84 @@ export default function PlansPage() {
   const [couponCode, setCouponCode] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
+  const [showCheckout, setShowCheckout] = useState(false)
+  const [checkoutData, setCheckoutData] = useState<{ preferenceId: string; amount: number } | null>(null)
+  const [processingPayment, setProcessingPayment] = useState(false)
   const router = useRouter()
   const { user } = useAuth()
 
-  const handleApplyCoupon = () => {
-    // Mock coupon validation
-    const mockCoupons: Record<string, number> = {
-      'MEDICINA20': 0.20,
-      'ESTUDANTE15': 0.15,
-      'SINTONIZA10': 0.10,
+  const getFriendlyPaymentError = (status?: string | null, statusDetail?: string | null) => {
+    const detailMap: Record<string, string> = {
+      cc_rejected_bad_filled_card_number: 'Número do cartão inválido. Confira e tente novamente.',
+      cc_rejected_bad_filled_date: 'Data de validade inválida.',
+      cc_rejected_bad_filled_other: 'Dados do cartão inválidos. Revise as informações.',
+      cc_rejected_bad_filled_security_code: 'Código de segurança inválido.',
+      cc_rejected_blacklist: 'Pagamento bloqueado. Entre em contato com o emissor.',
+      cc_rejected_call_for_authorize: 'É necessário autorizar a compra com o banco.',
+      cc_rejected_card_disabled: 'Cartão inativo. Ative-o antes de usar.',
+      cc_rejected_duplicated_payment: 'Pagamento duplicado. Verifique seu histórico.',
+      cc_rejected_high_risk: 'Pagamento rejeitado por risco elevado.',
+      cc_rejected_insufficient_amount: 'Saldo insuficiente.',
+      cc_rejected_other_reason: 'Pagamento rejeitado pelo emissor. Use outro cartão ou contato o banco.',
     }
 
-    const discount = mockCoupons[couponCode.toUpperCase()]
-    if (discount) {
-      setAppliedCoupon({ code: couponCode, discount })
-    } else {
-      alert('Cupom inválido')
+    if (statusDetail && detailMap[statusDetail]) {
+      return detailMap[statusDetail]
+    }
+
+    const statusMap: Record<string, string> = {
+      rejected: 'Pagamento rejeitado. Tente novamente ou use outro cartão.',
+      cancelled: 'Pagamento cancelado.',
+      pending: 'Pagamento pendente de confirmação.',
+      in_process: 'Pagamento em processamento.',
+    }
+
+    if (status && statusMap[status]) {
+      return statusMap[status]
+    }
+
+    return 'Não foi possível aprovar o pagamento. Tente novamente.'
+  }
+
+  // Tornar overlay transparente quando o dialog estiver aberto
+  useEffect(() => {
+    if (showCheckout) {
+      // Aguardar um pouco para garantir que o overlay foi renderizado
+      const timer = setTimeout(() => {
+        const overlay = document.querySelector('[data-radix-dialog-overlay]') as HTMLElement
+        if (overlay) {
+          overlay.style.backgroundColor = 'transparent'
+          overlay.style.backdropFilter = 'none'
+        }
+      }, 10)
+
+      return () => clearTimeout(timer)
+    }
+  }, [showCheckout])
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      alert('Digite um código de cupom')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/coupons/validate?code=${encodeURIComponent(couponCode)}`)
+      const data = await response.json()
+
+      if (data.valid) {
+        setAppliedCoupon({ 
+          code: data.code, 
+          discount: data.discount / 100 // Converter de percentual para decimal
+        })
+      } else {
+        alert(data.error || 'Cupom inválido')
+        setAppliedCoupon(null)
+      }
+    } catch (error) {
+      console.error('Erro ao validar cupom:', error)
+      alert('Erro ao validar cupom. Tente novamente.')
+      setAppliedCoupon(null)
     }
   }
 
@@ -72,21 +143,62 @@ export default function PlansPage() {
     return basePrice
   }
 
-  const handleSelectPlan = (planId: string) => {
-    if (!user) {
+  const handleSelectPlan = async (planId: string) => {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
       router.push('/auth/login?redirect=/plans')
       return
     }
-    setSelectedPlan(planId)
-    // Here you would integrate with Mercado Pago
-    // For now, we'll just redirect to dashboard
-    setTimeout(() => {
-      router.push('/dashboard')
-    }, 1000)
+
+    try {
+      setSelectedPlan(planId)
+      
+      // Garantir que o token está sincronizado antes de fazer a requisição
+      const token = await currentUser.getIdToken(true) // true para forçar refresh do token
+      await fetch('/api/auth/sync-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ token }),
+      })
+      
+      // Criar preferência de pagamento no Mercado Pago
+      const response = await fetch('/api/payment/create-preference', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          planId,
+          couponCode: appliedCoupon?.code || null,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Erro ao criar pagamento')
+      }
+
+      const data = await response.json()
+      
+      // Abrir checkout transparente
+      setCheckoutData({
+        preferenceId: data.preferenceId,
+        amount: data.amount,
+      })
+      setShowCheckout(true)
+    } catch (error: any) {
+      console.error('Erro ao processar pagamento:', error)
+      alert(`Erro ao processar pagamento: ${error.message}`)
+      setSelectedPlan(null)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
+    <div className="min-h-screen bg-linear-to-b from-background to-muted/30">
       <div className="container mx-auto max-w-6xl px-4 py-12">
         <Button variant="ghost" asChild className="mb-8">
           <Link href="/">
@@ -209,11 +321,58 @@ export default function PlansPage() {
               </p>
             )}
             <p className="mt-3 text-xs text-muted-foreground">
-              Experimente os cupons: MEDICINA20, ESTUDANTE15, ou SINTONIZA10
+              Digite o código do cupom para aplicar o desconto
             </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Checkout Transparente Dialog */}
+      <Dialog open={showCheckout} onOpenChange={(open) => {
+        // Só permite fechar programaticamente (via botão X ou código)
+        if (open === false) {
+          setShowCheckout(false)
+        }
+      }}>
+        <DialogContent 
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => {
+            // Prevenir fechar ao clicar fora
+            e.preventDefault()
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Finalizar Pagamento</DialogTitle>
+            <DialogDescription>
+              Complete o pagamento para ativar sua assinatura
+            </DialogDescription>
+          </DialogHeader>
+          
+          {checkoutData && (
+            <PaymentBrick
+              publicKey={process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || ''}
+              preferenceId={checkoutData.preferenceId}
+              amount={checkoutData.amount}
+              onPaymentSuccess={(paymentId, status) => {
+                setProcessingPayment(true)
+                setShowCheckout(false)
+                router.push(`/payment/success?status=${status}&payment_id=${paymentId}`)
+              }}
+              onPaymentError={(error) => {
+                console.error('Erro no pagamento:', error)
+                const friendlyMessage = getFriendlyPaymentError(error.status, error.statusDetail) || error.message
+                setShowCheckout(false)
+                setSelectedPlan(null)
+                router.push(
+                  `/payment/failure?status=${error.status || 'rejected'}&message=${encodeURIComponent(
+                    friendlyMessage
+                  )}`
+                )
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

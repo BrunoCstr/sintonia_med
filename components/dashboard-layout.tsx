@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
-import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope } from 'lucide-react'
+import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope, Ticket } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -173,6 +173,24 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                             </Link>
                           )
                         })}
+                        {/* Cupons - fora da seção ADMINISTRAÇÃO */}
+                        {userRole === 'admin_master' && (
+                          <>
+                            <Link
+                              href="/admin/coupons"
+                              onClick={() => setMobileMenuOpen(false)}
+                              className={cn(
+                                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                                pathname === '/admin/coupons' || pathname?.startsWith('/admin/coupons/')
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                              )}
+                            >
+                              <Ticket className="h-5 w-5" />
+                              Cupons
+                            </Link>
+                          </>
+                        )}
                       </>
                     )}
                   </nav>

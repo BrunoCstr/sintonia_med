@@ -33,15 +33,34 @@ export async function POST(request: NextRequest) {
     const app = getAdminApp()
     const db = app.firestore()
 
-    // Validar cupom (mock - em produção deveria buscar do banco)
-    const mockCoupons: Record<string, number> = {
-      MEDICINA20: 0.2,
-      ESTUDANTE15: 0.15,
-      SINTONIZA10: 0.1,
+    // Validar cupom no Firestore
+    let discount = 0
+    if (couponCode) {
+      try {
+        const couponDoc = await db.collection('coupons').doc(couponCode.toUpperCase()).get()
+        
+        if (couponDoc.exists) {
+          const couponData = couponDoc.data()!
+          
+          // Validar se está ativo e dentro do período de validade
+          const now = new Date()
+          const validFrom = couponData.validFrom?.toDate ? couponData.validFrom.toDate() : new Date(couponData.validFrom)
+          const validUntil = couponData.validUntil?.toDate ? couponData.validUntil.toDate() : new Date(couponData.validUntil)
+          
+          if (couponData.active && now >= validFrom && now <= validUntil) {
+            // Validar plano aplicável
+            if (!couponData.applicablePlans || 
+                couponData.applicablePlans.length === 0 || 
+                couponData.applicablePlans.includes(planId)) {
+              discount = couponData.discount / 100 // Converter de percentual para decimal
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao validar cupom:', error)
+        // Continua sem desconto se houver erro
+      }
     }
-    const discount = couponCode
-      ? mockCoupons[couponCode.toUpperCase()] || 0
-      : 0
 
     // Calcular datas
     const now = new Date()
@@ -100,4 +119,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
 

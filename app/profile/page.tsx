@@ -13,6 +13,14 @@ import { useAuth } from '@/lib/auth-context'
 import { User, Mail, Calendar, CreditCard, Edit2, Loader2, Check, Sparkles, TrendingUp, X, Camera } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { auth } from '@/lib/firebase'
+import { PaymentBrick } from '@/components/payment-brick'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const periods = [
   '1º Período',
@@ -56,6 +64,39 @@ const features = [
 export default function ProfilePage() {
   const router = useRouter()
   const { user, userProfile, refreshUserProfile } = useAuth()
+
+  const getFriendlyPaymentError = (status?: string | null, statusDetail?: string | null) => {
+    const detailMap: Record<string, string> = {
+      cc_rejected_bad_filled_card_number: 'Número do cartão inválido. Confira e tente novamente.',
+      cc_rejected_bad_filled_date: 'Data de validade inválida.',
+      cc_rejected_bad_filled_other: 'Dados do cartão inválidos. Revise as informações.',
+      cc_rejected_bad_filled_security_code: 'Código de segurança inválido.',
+      cc_rejected_blacklist: 'Pagamento bloqueado. Entre em contato com o emissor.',
+      cc_rejected_call_for_authorize: 'É necessário autorizar a compra com o banco.',
+      cc_rejected_card_disabled: 'Cartão inativo. Ative-o antes de usar.',
+      cc_rejected_duplicated_payment: 'Pagamento duplicado. Verifique seu histórico.',
+      cc_rejected_high_risk: 'Pagamento rejeitado por risco elevado.',
+      cc_rejected_insufficient_amount: 'Saldo insuficiente.',
+      cc_rejected_other_reason: 'Pagamento rejeitado pelo emissor. Use outro cartão ou contato o banco.',
+    }
+
+    if (statusDetail && detailMap[statusDetail]) {
+      return detailMap[statusDetail]
+    }
+
+    const statusMap: Record<string, string> = {
+      rejected: 'Pagamento rejeitado. Tente novamente ou use outro cartão.',
+      cancelled: 'Pagamento cancelado.',
+      pending: 'Pagamento pendente de confirmação.',
+      in_process: 'Pagamento em processamento.',
+    }
+
+    if (status && statusMap[status]) {
+      return statusMap[status]
+    }
+
+    return 'Não foi possível aprovar o pagamento. Tente novamente.'
+  }
   const [isEditing, setIsEditing] = useState(false)
   const [name, setName] = useState(userProfile?.name || '')
   const [period, setPeriod] = useState(userProfile?.period || '')
@@ -73,6 +114,24 @@ export default function ProfilePage() {
   const [subscribing, setSubscribing] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [showCheckout, setShowCheckout] = useState(false)
+  const [checkoutData, setCheckoutData] = useState<{ preferenceId: string; amount: number } | null>(null)
+
+  // Tornar overlay transparente quando o dialog estiver aberto
+  useEffect(() => {
+    if (showCheckout) {
+      // Aguardar um pouco para garantir que o overlay foi renderizado
+      const timer = setTimeout(() => {
+        const overlay = document.querySelector('[data-radix-dialog-overlay]') as HTMLElement
+        if (overlay) {
+          overlay.style.backgroundColor = 'transparent'
+          overlay.style.backdropFilter = 'none'
+        }
+      }, 10)
+
+      return () => clearTimeout(timer)
+    }
+  }, [showCheckout])
 
   useEffect(() => {
     if (userProfile) {
@@ -140,18 +199,29 @@ export default function ProfilePage() {
     }
   }
 
-  const handleApplyCoupon = () => {
-    const mockCoupons: Record<string, number> = {
-      MEDICINA20: 0.2,
-      ESTUDANTE15: 0.15,
-      SINTONIZA10: 0.1,
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      alert('Digite um código de cupom')
+      return
     }
 
-    const discount = mockCoupons[couponCode.toUpperCase()]
-    if (discount) {
-      setAppliedCoupon({ code: couponCode.toUpperCase(), discount })
-    } else {
-      alert('Cupom inválido')
+    try {
+      const response = await fetch(`/api/coupons/validate?code=${encodeURIComponent(couponCode)}`)
+      const data = await response.json()
+
+      if (data.valid) {
+        setAppliedCoupon({ 
+          code: data.code, 
+          discount: data.discount / 100 // Converter de percentual para decimal
+        })
+      } else {
+        alert(data.error || 'Cupom inválido')
+        setAppliedCoupon(null)
+      }
+    } catch (error) {
+      console.error('Erro ao validar cupom:', error)
+      alert('Erro ao validar cupom. Tente novamente.')
+      setAppliedCoupon(null)
     }
   }
 
@@ -163,7 +233,8 @@ export default function ProfilePage() {
   }
 
   const handleSubscribe = async (planId: string) => {
-    if (!user) {
+    const currentUser = auth.currentUser
+    if (!currentUser) {
       router.push('/auth/login?redirect=/profile')
       return
     }
@@ -172,7 +243,19 @@ export default function ProfilePage() {
     setSelectedPlan(planId)
 
     try {
-      const response = await fetch('/api/user/subscribe', {
+      // Garantir que o token está sincronizado antes de fazer a requisição
+      const token = await currentUser.getIdToken(true) // true para forçar refresh do token
+      await fetch('/api/auth/sync-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ token }),
+      })
+
+      // Criar preferência de pagamento no Mercado Pago
+      const response = await fetch('/api/payment/create-preference', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -186,18 +269,17 @@ export default function ProfilePage() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao assinar plano')
+        throw new Error(errorData.error || 'Erro ao criar pagamento')
       }
 
       const data = await response.json()
-      if (refreshUserProfile) {
-        await refreshUserProfile()
-      }
-      alert('Assinatura ativada com sucesso!')
-      setShowPlans(false)
-      setSelectedPlan(null)
-      setCouponCode('')
-      setAppliedCoupon(null)
+      
+      // Abrir checkout transparente
+      setCheckoutData({
+        preferenceId: data.preferenceId,
+        amount: data.amount,
+      })
+      setShowCheckout(true)
     } catch (error: any) {
       console.error('Erro ao assinar plano:', error)
       alert(error.message || 'Erro ao assinar plano')
@@ -440,11 +522,32 @@ export default function ProfilePage() {
                   {userProfile?.plan === 'semester' && 'Plano Semestral'}
                   {!userProfile?.plan && 'Nenhum Plano Ativo'}
                 </p>
-                {userProfile?.plan && userProfile?.planExpiresAt && (
-                  <p className="text-sm text-muted-foreground">
-                    Expira em: {new Date(userProfile.planExpiresAt).toLocaleDateString('pt-BR')}
-                  </p>
-                )}
+                {userProfile?.plan && userProfile?.planExpiresAt && (() => {
+                  try {
+                    const expiresDate = typeof userProfile.planExpiresAt === 'string' 
+                      ? new Date(userProfile.planExpiresAt)
+                      : userProfile.planExpiresAt instanceof Date
+                      ? userProfile.planExpiresAt
+                      : new Date(userProfile.planExpiresAt)
+                    
+                    if (isNaN(expiresDate.getTime())) {
+                      return null
+                    }
+                    
+                    return (
+                      <p className="text-sm text-muted-foreground">
+                        Expira em: {expiresDate.toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    )
+                  } catch (error) {
+                    console.error('Erro ao formatar data de expiração:', error)
+                    return null
+                  }
+                })()}
               </div>
               <Badge variant={userProfile?.plan ? 'default' : 'secondary'}>
                 {userProfile?.plan ? 'Ativo' : 'Inativo'}
@@ -624,6 +727,57 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Checkout Transparente Dialog */}
+      <Dialog open={showCheckout} onOpenChange={(open) => {
+        // Só permite fechar programaticamente (via botão X ou código)
+        if (open === false) {
+          setShowCheckout(false)
+        }
+      }}>
+        <DialogContent 
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => {
+            // Prevenir fechar ao clicar fora
+            e.preventDefault()
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Finalizar Pagamento</DialogTitle>
+            <DialogDescription>
+              Complete o pagamento para ativar sua assinatura
+            </DialogDescription>
+          </DialogHeader>
+          
+          {checkoutData && (
+            <PaymentBrick
+              publicKey={process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || ''}
+              preferenceId={checkoutData.preferenceId}
+              amount={checkoutData.amount}
+              onPaymentSuccess={(paymentId, status) => {
+                setSubscribing(false)
+                setShowCheckout(false)
+                if (refreshUserProfile) {
+                  refreshUserProfile()
+                }
+                router.push(`/payment/success?status=${status}&payment_id=${paymentId}`)
+              }}
+              onPaymentError={(error) => {
+                console.error('Erro no pagamento:', error)
+                const friendlyMessage = getFriendlyPaymentError(error.status, error.statusDetail) || error.message
+                setSubscribing(false)
+                setSelectedPlan(null)
+                setShowCheckout(false)
+                router.push(
+                  `/payment/failure?status=${error.status || 'rejected'}&message=${encodeURIComponent(
+                    friendlyMessage
+                  )}`
+                )
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   )
 }

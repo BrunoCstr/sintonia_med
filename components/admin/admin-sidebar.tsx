@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useRole } from '@/lib/hooks/use-role'
-import { LayoutDashboard, FileQuestion, Users, Flag, LogOut, Menu, X, Stethoscope } from 'lucide-react'
+import { LayoutDashboard, FileQuestion, Users, Flag, LogOut, Menu, X, Stethoscope, Ticket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
 import { useState } from 'react'
@@ -42,18 +42,26 @@ const navigation = [
     icon: Flag,
     roles: ['admin_master'],
   },
+  {
+    name: 'Cupons',
+    href: '/admin/coupons',
+    icon: Ticket,
+    roles: ['admin_master'],
+  },
 ]
 
 export function AdminSidebar() {
   const pathname = usePathname()
   const { logout, userProfile } = useAuth()
-  const { userRole } = useRole()
+  const { userRole, loading } = useRole()
   const { theme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  const filteredNavigation = navigation.filter((item) =>
-    item.roles.includes(userRole || 'aluno')
-  )
+  // Filtrar navegação baseado no role do usuário
+  const filteredNavigation = navigation.filter((item) => {
+    if (loading || !userRole) return false
+    return item.roles.includes(userRole)
+  })
 
   const handleLogout = async () => {
     await logout()

@@ -222,6 +222,66 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     
+    // Coupons collection
+    match /coupons/{couponId} {
+      // Leitura: todos autenticados podem ler cupons ativos
+      allow read: if isAuthenticated() && (
+        resource.data.active == true || isAdmin()
+      );
+      
+      // Criação: apenas admin_master pode criar cupons
+      allow create: if isAdminMaster() &&
+                       // Validar campos obrigatórios
+                       'code' in request.resource.data &&
+                       'discount' in request.resource.data &&
+                       'active' in request.resource.data &&
+                       'validFrom' in request.resource.data &&
+                       'validUntil' in request.resource.data &&
+                       'createdAt' in request.resource.data &&
+                       'createdBy' in request.resource.data;
+      
+      // Atualização: apenas admin_master pode atualizar cupons
+      allow update: if isAdminMaster();
+      
+      // Exclusão: apenas admin_master pode excluir cupons
+      allow delete: if isAdminMaster();
+    }
+    
+    // Coupon Uses collection
+    match /coupon_uses/{useId} {
+      // Leitura: usuário pode ler seus próprios usos, admins podem ler todos
+      allow read: if isAuthenticated() && (
+        isOwner(resource.data.userId) || isAdmin()
+      );
+      
+      // Criação: apenas sistema (via Admin SDK) pode criar registros de uso
+      // Usuários não podem criar diretamente
+      allow create: if false;
+      
+      // Atualização: apenas sistema pode atualizar
+      allow update: if false;
+      
+      // Exclusão: apenas admin_master pode excluir
+      allow delete: if isAdminMaster();
+    }
+    
+    // Payments collection
+    match /payments/{paymentId} {
+      // Leitura: usuário pode ler seus próprios pagamentos, admins podem ler todos
+      allow read: if isAuthenticated() && (
+        isOwner(resource.data.userId) || isAdmin()
+      );
+      
+      // Criação: apenas sistema (via Admin SDK) pode criar pagamentos
+      allow create: if false;
+      
+      // Atualização: apenas sistema pode atualizar
+      allow update: if false;
+      
+      // Exclusão: apenas admin_master pode excluir
+      allow delete: if isAdminMaster();
+    }
+    
     // Deny all other collections by default
     match /{document=**} {
       allow read, write: if false;

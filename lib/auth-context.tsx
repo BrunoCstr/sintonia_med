@@ -65,7 +65,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (auth.currentUser) {
       const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid))
       if (userDoc.exists()) {
-        const profile = userDoc.data() as UserProfile
+        const profileData = userDoc.data()
+        // Converter Timestamp do Firestore para Date
+        const profile: UserProfile = {
+          ...profileData,
+          planExpiresAt: profileData.planExpiresAt?.toDate 
+            ? profileData.planExpiresAt.toDate().toISOString()
+            : profileData.planExpiresAt,
+        } as UserProfile
         setUserProfile(profile)
       }
     }
@@ -78,7 +85,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Load user profile from Firestore
         const userDoc = await getDoc(doc(db, 'users', user.uid))
         if (userDoc.exists()) {
-          const profile = userDoc.data() as UserProfile
+          const profileData = userDoc.data()
+          // Converter Timestamp do Firestore para Date
+          const profile: UserProfile = {
+            ...profileData,
+            planExpiresAt: profileData.planExpiresAt?.toDate 
+              ? profileData.planExpiresAt.toDate().toISOString()
+              : profileData.planExpiresAt,
+          } as UserProfile
           setUserProfile(profile)
           
           const token = await user.getIdTokenResult()

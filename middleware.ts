@@ -26,6 +26,7 @@ const adminQuestionRoutes = [
 const adminMasterRoutes = [
   '/admin/users',
   '/admin/reports',
+  '/admin/coupons',
 ]
 
 /**

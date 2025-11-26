@@ -30,7 +30,7 @@ export default function GeneratorPage() {
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([])
   const [difficulty, setDifficulty] = useState('')
   const [officialOnly, setOfficialOnly] = useState(false)
-  const [tipoProva, setTipoProva] = useState<string>('all')
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
   const [questionCount, setQuestionCount] = useState('5')
   const [timed, setTimed] = useState(false)
   const [timeLimit, setTimeLimit] = useState('30')
@@ -52,6 +52,7 @@ export default function GeneratorPage() {
       router.push('/auth/login')
     }
   }, [user, loading, router])
+
 
   useEffect(() => {
     const checkFreeLimits = async () => {
@@ -165,6 +166,9 @@ export default function GeneratorPage() {
         
         console.log('Áreas médicas carregadas:', areas.length)
         setMedicalAreas(areas)
+        // Marcar todas as matérias por padrão
+        const allAreaNames = areas.map(area => area.nome)
+        setSelectedSubjects(allAreaNames)
       } catch (error) {
         console.error('Erro ao carregar áreas médicas:', error)
         // Tentar via API como fallback
@@ -270,11 +274,10 @@ export default function GeneratorPage() {
     }
 
     const filters = {
-      period: userProfile?.period || '',
+      period: selectedPeriod === 'all' ? '' : (selectedPeriod || userProfile?.period || ''),
       areas: selectedSubjects, // Usar áreas ao invés de subjects
       difficulty: difficultyMap[difficulty] || difficulty,
       officialOnly, // Flag para filtrar questões oficiais
-      tipo: tipoProva && tipoProva !== 'all' ? tipoProva : undefined, // Tipo de prova selecionado (undefined = todos)
       count: parseInt(questionCount),
       timed,
       timeLimit: timed ? parseInt(timeLimit) : undefined,
@@ -489,19 +492,29 @@ export default function GeneratorPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Tipo de Prova</Label>
-              <Select value={tipoProva} onValueChange={setTipoProva}>
+              <Label>Período</Label>
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Todos os tipos" />
+                  <SelectValue placeholder="Selecione o período" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os tipos</SelectItem>
-                  <SelectItem value="REVALIDA">REVALIDA</SelectItem>
-                  <SelectItem value="ENARE">ENARE</SelectItem>
-                  <SelectItem value="Residência">Residência Médica</SelectItem>
-                  <SelectItem value="Concurso">Concurso Público</SelectItem>
+                  <SelectItem value="all">Todos os períodos</SelectItem>
+                  <SelectItem value="1º Período">1º Período</SelectItem>
+                  <SelectItem value="2º Período">2º Período</SelectItem>
+                  <SelectItem value="3º Período">3º Período</SelectItem>
+                  <SelectItem value="4º Período">4º Período</SelectItem>
+                  <SelectItem value="5º Período">5º Período</SelectItem>
+                  <SelectItem value="6º Período">6º Período</SelectItem>
+                  <SelectItem value="7º Período">7º Período</SelectItem>
+                  <SelectItem value="8º Período">8º Período</SelectItem>
+                  <SelectItem value="Formado">Formado</SelectItem>
                 </SelectContent>
               </Select>
+              {userProfile?.period && selectedPeriod !== userProfile.period && selectedPeriod !== 'all' && (
+                <p className="text-xs text-muted-foreground">
+                  Seu período cadastrado é: <span className="font-medium">{userProfile.period}</span>
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

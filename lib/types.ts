@@ -30,7 +30,11 @@ export interface Question {
   area: string
   subarea: string
   dificuldade: 'facil' | 'medio' | 'dificil'
-  tipo: string
+  tipo?: string // Mantido para compatibilidade com questões antigas
+  period?: string // Novo campo: período da questão
+  createdBy?: string // ID do usuário que criou a questão
+  createdByName?: string // Nome do criador (para exibição)
+  createdByPhotoURL?: string // Foto do criador (para exibição)
   oficial: boolean
   ativo: boolean
   createdAt: Date

@@ -35,12 +35,26 @@ export async function GET(
     }
 
     const data = doc.data()!
-    const question = {
+    let question: Question = {
       id: doc.id,
       ...data,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
     } as Question
+
+    // Se a questão tem createdBy mas não tem createdByName, buscar
+    if (data.createdBy && !data.createdByName) {
+      try {
+        const creatorDoc = await db.collection('users').doc(data.createdBy).get()
+        if (creatorDoc.exists) {
+          const creatorData = creatorDoc.data()
+          question.createdByName = creatorData?.name || ''
+          question.createdByPhotoURL = creatorData?.photoURL || ''
+        }
+      } catch (error) {
+        console.error(`Erro ao buscar criador da questão ${id}:`, error)
+      }
+    }
 
     return NextResponse.json({ question })
   } catch (error: any) {
@@ -88,7 +102,7 @@ export async function PUT(
       area,
       subarea,
       dificuldade,
-      tipo,
+      period,
       oficial,
       ativo,
     } = body
@@ -281,15 +295,15 @@ export async function PUT(
       updateData.dificuldade = dificuldade
     }
 
-    // Validar e atualizar tipo
-    if (tipo !== undefined) {
-      if (!tipo || typeof tipo !== 'string' || !tipo.trim()) {
+    // Validar e atualizar período
+    if (period !== undefined) {
+      if (!period || typeof period !== 'string' || !period.trim()) {
         return NextResponse.json(
-          { error: 'O tipo de prova é obrigatório' },
+          { error: 'O período é obrigatório' },
           { status: 400 }
         )
       }
-      updateData.tipo = tipo.trim()
+      updateData.period = period.trim()
     }
 
     // Atualizar status (ativo)

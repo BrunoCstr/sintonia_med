@@ -243,8 +243,8 @@ export default function ViewQuestionPage() {
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Tipo de Prova</p>
-              <Badge variant="outline">{question.tipo}</Badge>
+              <p className="text-sm font-medium text-muted-foreground">Período</p>
+              <Badge variant="outline">{question.period || question.tipo || 'N/A'}</Badge>
             </div>
 
             <div className="space-y-2">

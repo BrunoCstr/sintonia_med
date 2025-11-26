@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     const subareas = searchParams.get('subareas')?.split(',').filter(Boolean) || []
     const dificuldade = searchParams.get('dificuldade') || ''
     const tipo = searchParams.get('tipo') || ''
+    const period = searchParams.get('period') || ''
     const officialOnly = searchParams.get('officialOnly') === 'true'
     const excludeAnswered = searchParams.get('excludeAnswered') !== 'false' // Por padrão exclui questões já respondidas
     const limit = parseInt(searchParams.get('limit') || '100')
@@ -86,6 +87,20 @@ export async function GET(request: NextRequest) {
     // Filtrar questões oficiais (campo oficial === true)
     if (officialOnly) {
       questions = questions.filter((q) => q.oficial === true)
+    }
+
+    // Filtrar por período se fornecido (as questões podem ter campo period/periodo)
+    // Se o período for vazio ou "all", não filtra por período (retorna questões de todos os períodos)
+    if (period && period.trim() !== '') {
+      questions = questions.filter((q) => {
+        // Verificar se a questão tem campo period ou periodo
+        const questionPeriod = (q as any).period || (q as any).periodo
+        // Se a questão não tiver campo de período, excluir da lista quando um período específico é selecionado
+        if (questionPeriod === undefined || questionPeriod === null || questionPeriod === '') {
+          return false // Excluir questões sem período quando um período específico é selecionado
+        }
+        return questionPeriod === period
+      })
     }
 
     // Filtrar questões já respondidas pelo usuário

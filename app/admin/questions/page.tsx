@@ -24,12 +24,14 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import type { Question, MedicalArea } from "@/lib/types";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function QuestionsListPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [areaFilter, setAreaFilter] = useState("all");
   const [dificuldadeFilter, setDificuldadeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("all");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,6 +198,14 @@ export default function QuestionsListPage() {
       return false;
     }
 
+    // Filtro de período
+    if (periodFilter !== "all") {
+      const questionPeriod = question.period || question.tipo || "";
+      if (questionPeriod !== periodFilter) {
+        return false;
+      }
+    }
+
     return true;
   });
 
@@ -223,7 +233,7 @@ export default function QuestionsListPage() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-2 md:grid-cols-4">
+          <div className="grid gap-2 md:grid-cols-5">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -263,6 +273,24 @@ export default function QuestionsListPage() {
               </SelectContent>
             </Select>
 
+            <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os períodos</SelectItem>
+                <SelectItem value="1º Período">1º Período</SelectItem>
+                <SelectItem value="2º Período">2º Período</SelectItem>
+                <SelectItem value="3º Período">3º Período</SelectItem>
+                <SelectItem value="4º Período">4º Período</SelectItem>
+                <SelectItem value="5º Período">5º Período</SelectItem>
+                <SelectItem value="6º Período">6º Período</SelectItem>
+                <SelectItem value="7º Período">7º Período</SelectItem>
+                <SelectItem value="8º Período">8º Período</SelectItem>
+                <SelectItem value="Formado">Formado</SelectItem>
+              </SelectContent>
+            </Select>
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Status" />
@@ -287,7 +315,9 @@ export default function QuestionsListPage() {
                 <TableHead>Área</TableHead>
                 <TableHead>Subárea</TableHead>
                 <TableHead>Dificuldade</TableHead>
-                <TableHead>Tipo</TableHead>
+                <TableHead>Período</TableHead>
+                <TableHead>Oficial</TableHead>
+                <TableHead>Criador</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -295,7 +325,7 @@ export default function QuestionsListPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     <div className="flex items-center justify-center">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                     </div>
@@ -304,7 +334,7 @@ export default function QuestionsListPage() {
               ) : filteredQuestions.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={9}
                     className="text-center py-8 text-muted-foreground"
                   >
                     Nenhuma questão encontrada
@@ -333,7 +363,45 @@ export default function QuestionsListPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{question.tipo}</Badge>
+                      <Badge variant="outline">{question.period || question.tipo || 'N/A'}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {question.oficial ? (
+                        <Badge
+                          variant="secondary"
+                          className="bg-primary/10 text-primary"
+                        >
+                          Oficial
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className="bg-muted text-muted-foreground"
+                        >
+                          Não Oficial
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {question.createdByName ? (
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={question.createdByPhotoURL} alt={question.createdByName} />
+                            <AvatarFallback>
+                              {question.createdByName
+                                .split(' ')
+
+                                .map((n) => n[0])
+                                .join('')
+                                .toUpperCase()
+                                .slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm">{question.createdByName}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">N/A</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {question.ativo ? (

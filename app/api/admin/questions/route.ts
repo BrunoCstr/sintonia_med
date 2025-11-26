@@ -26,15 +26,34 @@ export async function GET(request: NextRequest) {
     // Buscar questões
     const questionsSnapshot = await db.collection('questions').orderBy('createdAt', 'desc').get()
     
-    const questions = questionsSnapshot.docs.map((doc) => {
+    // Mapear questões e buscar informações do criador se não estiverem no documento
+    const questionsPromises = questionsSnapshot.docs.map(async (doc) => {
       const data = doc.data()
-      return {
+      let question: Question = {
         id: doc.id,
         ...data,
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
       } as Question
+
+      // Se a questão tem createdBy mas não tem createdByName, buscar
+      if (data.createdBy && !data.createdByName) {
+        try {
+          const creatorDoc = await db.collection('users').doc(data.createdBy).get()
+          if (creatorDoc.exists) {
+            const creatorData = creatorDoc.data()
+            question.createdByName = creatorData?.name || ''
+            question.createdByPhotoURL = creatorData?.photoURL || ''
+          }
+        } catch (error) {
+          console.error(`Erro ao buscar criador da questão ${doc.id}:`, error)
+        }
+      }
+
+      return question
     })
+
+    const questions = await Promise.all(questionsPromises)
 
     return NextResponse.json({ questions })
   } catch (error: any) {
@@ -77,7 +96,7 @@ export async function POST(request: NextRequest) {
       area,
       subarea,
       dificuldade,
-      tipo,
+      period,
       oficial = false,
       ativo = true,
     } = body
@@ -135,15 +154,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!tipo || typeof tipo !== 'string' || !tipo.trim()) {
+    if (!period || typeof period !== 'string' || !period.trim()) {
       return NextResponse.json(
-        { error: 'O tipo de prova é obrigatório' },
+        { error: 'O período é obrigatório' },
         { status: 400 }
       )
     }
 
     const app = getAdminApp()
     const db = app.firestore()
+
+    // Buscar informações do usuário criador
+    let createdByName = ''
+    let createdByPhotoURL = ''
+    try {
+      const userDoc = await db.collection('users').doc(authUser.uid).get()
+      if (userDoc.exists) {
+        const userData = userDoc.data()
+        createdByName = userData?.name || ''
+        createdByPhotoURL = userData?.photoURL || ''
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados do usuário criador:', error)
+    }
 
     // Criar questão
     const questionData = {
@@ -159,7 +192,10 @@ export async function POST(request: NextRequest) {
       area,
       subarea,
       dificuldade,
-      tipo,
+      period,
+      createdBy: authUser.uid,
+      createdByName,
+      createdByPhotoURL,
       oficial: oficial === true || oficial === 'true',
       ativo,
       createdAt: new Date(),

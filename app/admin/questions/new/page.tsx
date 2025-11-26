@@ -41,7 +41,7 @@ export default function NewQuestionPage() {
     area: '',
     subarea: '',
     dificuldade: '',
-    tipo: '',
+    period: '',
     oficial: false,
   })
 
@@ -137,9 +137,9 @@ export default function NewQuestionPage() {
       return 'A dificuldade é obrigatória'
     }
 
-    // Validar tipo
-    if (!formData.tipo.trim()) {
-      return 'O tipo de prova é obrigatório'
+    // Validar período
+    if (!formData.period.trim()) {
+      return 'O período é obrigatório'
     }
 
     return null
@@ -478,22 +478,28 @@ export default function NewQuestionPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="tipo">Tipo de Prova <span className="text-destructive">*</span></Label>
+                <Label htmlFor="period">Período <span className="text-destructive">*</span></Label>
                 <Select
-                  value={formData.tipo}
+                  value={formData.period}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, tipo: value })
+                    setFormData({ ...formData, period: value })
                   }
                   required
                 >
-                  <SelectTrigger id="tipo">
-                    <SelectValue placeholder="Selecione o tipo" />
+                  <SelectTrigger id="period">
+                    <SelectValue placeholder="Selecione o período" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="REVALIDA">REVALIDA</SelectItem>
-                    <SelectItem value="ENARE">ENARE</SelectItem>
-                    <SelectItem value="Residência">Residência Médica</SelectItem>
-                    <SelectItem value="Concurso">Concurso Público</SelectItem>
+                    <SelectItem value="Todos os períodos">Todos os períodos</SelectItem>
+                    <SelectItem value="1º Período">1º Período</SelectItem>
+                    <SelectItem value="2º Período">2º Período</SelectItem>
+                    <SelectItem value="3º Período">3º Período</SelectItem>
+                    <SelectItem value="4º Período">4º Período</SelectItem>
+                    <SelectItem value="5º Período">5º Período</SelectItem>
+                    <SelectItem value="6º Período">6º Período</SelectItem>
+                    <SelectItem value="7º Período">7º Período</SelectItem>
+                    <SelectItem value="8º Período">8º Período</SelectItem>
+                    <SelectItem value="Formado">Formado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

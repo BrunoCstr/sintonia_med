@@ -64,7 +64,7 @@ function convertQuestionToQuiz(question: QuestionDB, period: string): QuizQuesti
     subject: question.area,
     difficulty: difficultyMap[question.dificuldade] || 'medium',
     period,
-    isOfficial: question.tipo === 'oficial' || question.tipo.toLowerCase().includes('oficial'),
+    isOfficial: question.oficial || question.tipo === 'oficial' || (question.tipo?.toLowerCase().includes('oficial') ?? false),
     imagemUrl: question.imagemUrl,
   }
 }
@@ -105,8 +105,8 @@ export default function QuizPage() {
         if (filters.officialOnly) {
           params.append('officialOnly', 'true')
         }
-        if (filters.tipo) {
-          params.append('tipo', filters.tipo)
+        if (filters.period) {
+          params.append('period', filters.period)
         }
         params.append('limit', filters.count.toString())
         params.append('excludeAnswered', 'true') // Excluir questões já respondidas por padrão

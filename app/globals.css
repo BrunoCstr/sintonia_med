@@ -137,3 +137,64 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Estilos para renderização de HTML rico (Rich Text) */
+.prose {
+  @apply text-foreground;
+}
+
+.prose p {
+  @apply mb-2 last:mb-0;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  @apply font-bold mb-2 mt-4 first:mt-0;
+}
+
+.prose h1 {
+  @apply text-xl;
+}
+
+.prose h2 {
+  @apply text-lg;
+}
+
+.prose h3 {
+  @apply text-base;
+}
+
+.prose ul, .prose ol {
+  @apply ml-4 mb-2;
+}
+
+.prose ul {
+  @apply list-disc;
+}
+
+.prose ol {
+  @apply list-decimal;
+}
+
+.prose li {
+  @apply mb-1;
+}
+
+.prose a {
+  @apply text-primary underline hover:text-primary/80;
+}
+
+.prose img {
+  @apply max-w-full h-auto rounded-lg my-2;
+}
+
+.prose strong {
+  @apply font-bold;
+}
+
+.prose em {
+  @apply italic;
+}
+
+.prose u {
+  @apply underline;
+}

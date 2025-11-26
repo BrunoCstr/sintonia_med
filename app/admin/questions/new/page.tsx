@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Select,
@@ -98,6 +99,14 @@ export default function NewQuestionPage() {
     setFormData({ ...formData, imagemUrl: '' })
   }
 
+  // Função helper para verificar se HTML está vazio
+  const isHtmlEmpty = (html: string): boolean => {
+    if (!html) return true
+    // Remove tags HTML e espaços em branco
+    const textContent = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+    return textContent.length === 0
+  }
+
   const validateForm = (): string | null => {
     // Validar enunciado
     if (!formData.enunciado.trim()) {
@@ -118,7 +127,7 @@ export default function NewQuestionPage() {
     }
 
     // Validar comentário do gabarito
-    if (!formData.comentarioGabarito.trim()) {
+    if (isHtmlEmpty(formData.comentarioGabarito)) {
       return 'O comentário do gabarito é obrigatório'
     }
 
@@ -263,14 +272,12 @@ export default function NewQuestionPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Textarea
-                placeholder="Ex: Paciente de 45 anos, hipertenso, apresenta dor torácica..."
+              <RichTextEditor
                 value={formData.enunciado}
-                onChange={(e) =>
-                  setFormData({ ...formData, enunciado: e.target.value })
+                onChange={(value) =>
+                  setFormData({ ...formData, enunciado: value })
                 }
-                rows={6}
-                required
+                placeholder="Ex: Paciente de 45 anos, hipertenso, apresenta dor torácica..."
               />
               
               {/* Image Upload */}
@@ -391,18 +398,16 @@ export default function NewQuestionPage() {
             <CardHeader>
               <CardTitle>Comentário do Gabarito <span className="text-destructive">*</span></CardTitle>
               <CardDescription>
-                Explique o raciocínio da resposta correta
+                Explique o raciocínio da resposta correta. Você pode formatar o texto, adicionar imagens e links.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Textarea
-                placeholder="Ex: A alternativa correta é A porque..."
+              <RichTextEditor
                 value={formData.comentarioGabarito}
-                onChange={(e) =>
-                  setFormData({ ...formData, comentarioGabarito: e.target.value })
+                onChange={(value) =>
+                  setFormData({ ...formData, comentarioGabarito: value })
                 }
-                rows={4}
-                required
+                placeholder="Ex: A alternativa correta é A porque..."
               />
             </CardContent>
           </Card>

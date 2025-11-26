@@ -270,9 +270,13 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
                             </Badge>
                           )}
                         </div>
-                        <h4 className="font-semibold text-lg leading-relaxed">
-                          {index + 1}. {question.text}
-                        </h4>
+                        <div className="font-semibold text-lg leading-relaxed">
+                          <span>{index + 1}. </span>
+                          <span
+                            className="prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: question.text }}
+                          />
+                        </div>
                         {question.imagemUrl && (
                           <div className="relative mt-3 h-48 w-full overflow-hidden rounded-lg border">
                             <Image

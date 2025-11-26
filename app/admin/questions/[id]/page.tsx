@@ -139,9 +139,10 @@ export default function ViewQuestionPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg border bg-muted/50 p-4">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {question.enunciado}
-            </p>
+            <div
+              className="prose prose-sm max-w-none text-sm leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: question.enunciado }}
+            />
           </div>
           
           {question.imagemUrl && (
@@ -205,9 +206,10 @@ export default function ViewQuestionPage() {
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border bg-muted/50 p-4">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {question.comentarioGabarito}
-            </p>
+            <div
+              className="prose prose-sm max-w-none text-sm leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: question.comentarioGabarito }}
+            />
           </div>
         </CardContent>
       </Card>

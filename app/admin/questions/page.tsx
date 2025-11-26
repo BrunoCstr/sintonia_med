@@ -62,6 +62,22 @@ export default function QuestionsListPage() {
     }
   };
 
+  // Função helper para extrair texto puro do HTML
+  const stripHtml = (html: string): string => {
+    if (!html) return '';
+    // Remove tags HTML e decodifica entidades HTML básicas
+    return html
+      .replace(/<[^>]*>/g, '') // Remove tags HTML
+      .replace(/&nbsp;/g, ' ') // Substitui &nbsp; por espaço
+      .replace(/&amp;/g, '&') // Decodifica &amp;
+      .replace(/&lt;/g, '<') // Decodifica &lt;
+      .replace(/&gt;/g, '>') // Decodifica &gt;
+      .replace(/&quot;/g, '"') // Decodifica &quot;
+      .replace(/&#39;/g, "'") // Decodifica &#39;
+      .replace(/\s+/g, ' ') // Remove espaços múltiplos
+      .trim(); // Remove espaços no início e fim
+  };
+
   useEffect(() => {
     const loadQuestions = async () => {
       try {
@@ -345,7 +361,7 @@ export default function QuestionsListPage() {
                   <TableRow key={question.id}>
                     <TableCell className="max-w-md">
                       <p className="truncate font-medium">
-                        {question.enunciado}
+                        {stripHtml(question.enunciado)}
                       </p>
                     </TableCell>
                     <TableCell className="capitalize">

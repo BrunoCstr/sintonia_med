@@ -266,12 +266,11 @@ export default function ResultsPage() {
                             {index + 1}
                           </div>
                           <div className="flex-1 min-w-0 w-full max-w-full overflow-hidden">
-                            <CardTitle 
-                              className="break-words whitespace-normal text-base leading-relaxed w-full max-w-full overflow-wrap-anywhere"
+                            <div
+                              className="prose prose-sm max-w-none break-words text-base leading-relaxed w-full max-w-full overflow-wrap-anywhere"
                               style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                            >
-                              {question.text}
-                            </CardTitle>
+                              dangerouslySetInnerHTML={{ __html: question.text }}
+                            />
                             {/* Image if exists */}
                             {(question as any).imagemUrl && (
                               <div className="relative mt-3 h-48 w-full overflow-hidden rounded-lg border">
@@ -391,9 +390,12 @@ export default function ResultsPage() {
                             )}
                           </h4>
                           {isPremium ? (
-                            <p className="break-words whitespace-normal text-sm leading-relaxed text-muted-foreground">
-                              {(question as any).comentarioGabarito || question.explanation}
-                            </p>
+                            <div
+                              className="prose prose-sm max-w-none break-words text-sm leading-relaxed text-muted-foreground"
+                              dangerouslySetInnerHTML={{
+                                __html: (question as any).comentarioGabarito || question.explanation || '',
+                              }}
+                            />
                           ) : (
                             <div className="space-y-4">
                               <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 bg-background/50 p-6 text-center">

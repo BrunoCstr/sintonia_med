@@ -384,12 +384,11 @@ export default function QuizPage() {
                 </span>
               )}
             </div>
-            <CardTitle 
-              className="break-words whitespace-normal text-lg leading-relaxed w-full max-w-full overflow-wrap-anywhere"
+            <div
+              className="prose prose-sm max-w-none break-words text-lg leading-relaxed w-full max-w-full overflow-wrap-anywhere"
               style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-            >
-              {currentQuestion.text}
-            </CardTitle>
+              dangerouslySetInnerHTML={{ __html: currentQuestion.text }}
+            />
           </CardHeader>
 
           <CardContent className="space-y-3">

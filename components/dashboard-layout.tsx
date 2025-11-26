@@ -109,7 +109,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <Button 
                   variant="outline" 
                   size="lg"
-                  className="border-2 border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 shadow-md hover:shadow-lg transition-all"
+                  className="cursor-pointer border-2 border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 shadow-md hover:shadow-lg transition-all"
                   title="Abrir menu de navegação"
                 >
                   <Menu className="h-6 w-6 text-primary font-bold" />
@@ -225,7 +225,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           {/* Right Side */}
           <div className="flex items-center gap-2">
             {hasAccessToAdminPanel && (
-              <Button variant="outline" size="sm" asChild className="gap-2">
+              <Button variant="outline" size="sm" asChild className="gap-2 cursor-pointer">
                 <Link href="/admin">
                   <Shield className="h-4 w-4" />
                   <span className="hidden sm:inline">Painel Admin</span>
@@ -233,7 +233,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               </Button>
             )}
 
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="cursor-pointer">
               {theme === 'light' ? (
                 <Moon className="h-5 w-5" />
               ) : (
@@ -243,7 +243,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 gap-2 rounded-full">
+                <Button variant="ghost" className="relative h-10 gap-2 rounded-full cursor-pointer">
                   <Avatar className="h-8 w-8">
                     {userProfile?.photoURL && (
                       <AvatarImage

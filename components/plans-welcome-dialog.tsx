@@ -230,6 +230,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
                   </DialogDescription>
                 </div>
                 <Button
+                className="cursor-pointer"
                   variant="ghost"
                   size="icon"
                   onClick={() => {
@@ -300,8 +301,9 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
             </CardContent>
             <CardFooter>
               <Button 
+              
                 variant="outline" 
-                className="w-full"
+                className="w-full cursor-pointer"
                 onClick={handleContinueFree}
               >
                 Continuar Gratuito
@@ -371,7 +373,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
 
               <CardFooter>
                 <Button
-                  className="w-full"
+                  className="w-full cursor-pointer"
                   size="lg"
                   variant={plan.recommended ? 'default' : 'outline'}
                   onClick={() => handleSelectPlan(plan.id)}
@@ -388,7 +390,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
               <Button
                 variant="ghost"
                 onClick={handleContinueFree}
-                className="text-muted-foreground"
+                className="text-muted-foreground cursor-pointer"
               >
                 Continuar com o plano gratuito por enquanto
               </Button>

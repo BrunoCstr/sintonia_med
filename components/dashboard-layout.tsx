@@ -24,7 +24,7 @@ import Image from 'next/image'
 import { RoleGuard } from '@/components/role-guard'
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
+  { name: 'Página Inicial', href: '/dashboard', icon: Home },
   { name: 'Gerar Questões', href: '/generator', icon: FileText },
   { name: 'Histórico', href: '/history', icon: History },
   { name: 'Perfil', href: '/profile', icon: User },
@@ -33,7 +33,7 @@ const navigation = [
 
 const adminNavigation = [
   {
-    name: 'Dashboard',
+    name: 'Página Inicial',
     href: '/admin',
     icon: LayoutDashboard,
     roles: ['admin_master', 'admin_questoes'],

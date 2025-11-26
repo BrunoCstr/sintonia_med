@@ -12,7 +12,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Check, Sparkles, Crown, ArrowLeft } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Check, Sparkles, Crown, ArrowLeft, TrendingUp } from 'lucide-react'
 import { usePremium } from '@/lib/hooks/use-premium'
 import { auth } from '@/lib/firebase'
 import { PaymentBrick, PaymentErrorInfo } from '@/components/payment-brick'
@@ -69,6 +70,12 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
   const [checkoutData, setCheckoutData] = useState<{ preferenceId: string; amount: number } | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [processingPayment, setProcessingPayment] = useState(false)
+  const [couponCode, setCouponCode] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<{ 
+    code: string; 
+    discount: number; 
+    applicablePlans: string[] | null 
+  } | null>(null)
 
   // Se o usuário já for premium, não mostrar o dialog
   useEffect(() => {
@@ -83,6 +90,8 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
       setShowCheckout(false)
       setCheckoutData(null)
       setSelectedPlan(null)
+      setCouponCode('')
+      setAppliedCoupon(null)
     }
   }, [open])
 
@@ -103,6 +112,51 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
   const handleContinueFree = () => {
     onOpenChange(false)
     onContinueFree?.()
+  }
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      alert('Digite um código de cupom')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/coupons/validate?code=${encodeURIComponent(couponCode)}`)
+      const data = await response.json()
+
+      if (data.valid) {
+        setAppliedCoupon({ 
+          code: data.code, 
+          discount: data.discount / 100, // Converter de percentual para decimal
+          applicablePlans: data.applicablePlans || null, // Planos aplicáveis do cupom
+        })
+      } else {
+        alert(data.error || 'Cupom inválido')
+        setAppliedCoupon(null)
+      }
+    } catch (error) {
+      console.error('Erro ao validar cupom:', error)
+      alert('Erro ao validar cupom. Tente novamente.')
+      setAppliedCoupon(null)
+    }
+  }
+
+  // Verificar se o cupom é aplicável a um plano específico
+  const isCouponApplicableToPlan = (planId: string) => {
+    if (!appliedCoupon) return false
+    // Se não há restrição de planos, o cupom é aplicável a todos
+    if (!appliedCoupon.applicablePlans || appliedCoupon.applicablePlans.length === 0) {
+      return true
+    }
+    // Verificar se o plano está na lista de planos aplicáveis
+    return appliedCoupon.applicablePlans.includes(planId)
+  }
+
+  const calculatePrice = (basePrice: number, planId: string) => {
+    if (appliedCoupon && isCouponApplicableToPlan(planId)) {
+      return basePrice * (1 - appliedCoupon.discount)
+    }
+    return basePrice
   }
 
   const getFriendlyPaymentError = (status?: string | null, statusDetail?: string | null) => {
@@ -145,6 +199,12 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
       return
     }
 
+    // Validar se o cupom é aplicável ao plano selecionado
+    if (appliedCoupon && !isCouponApplicableToPlan(planId)) {
+      alert(`O cupom "${appliedCoupon.code}" não é válido para o ${planId === 'monthly' ? 'Plano Mensal' : 'Plano Semestral'}.`)
+      return
+    }
+
     try {
       setSelectedPlan(planId)
       
@@ -168,7 +228,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
         credentials: 'include',
         body: JSON.stringify({
           planId,
-          couponCode: null,
+          couponCode: appliedCoupon && isCouponApplicableToPlan(planId) ? appliedCoupon.code : null,
         }),
       })
 
@@ -346,9 +406,19 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
                       </Badge>
                     </div>
                   )}
+                  {appliedCoupon && isCouponApplicableToPlan(plan.id) && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground line-through">
+                        R$ {plan.price.toFixed(2)}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        Cupom aplicado
+                      </Badge>
+                    </div>
+                  )}
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-bold">
-                      R$ {plan.price.toFixed(2)}
+                      R$ {calculatePrice(plan.price, plan.id).toFixed(2)}
                     </span>
                   </div>
                   {plan.id === 'monthly' && (
@@ -356,7 +426,12 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
                   )}
                   {plan.id === 'semester' && (
                     <p className="text-sm text-muted-foreground">
-                      ou R$ {(plan.price / 6).toFixed(2)}/mês
+                      ou R$ {(calculatePrice(plan.price, plan.id) / 6).toFixed(2)}/mês
+                    </p>
+                  )}
+                  {appliedCoupon && !isCouponApplicableToPlan(plan.id) && (
+                    <p className="text-sm text-destructive font-medium">
+                      Cupom não aplicável a este plano
                     </p>
                   )}
                 </div>
@@ -377,14 +452,71 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
                   size="lg"
                   variant={plan.recommended ? 'default' : 'outline'}
                   onClick={() => handleSelectPlan(plan.id)}
+                  disabled={
+                    (selectedPlan === plan.id) || 
+                    (appliedCoupon ? !isCouponApplicableToPlan(plan.id) : false)
+                  }
+                  title={
+                    appliedCoupon && !isCouponApplicableToPlan(plan.id)
+                      ? `O cupom "${appliedCoupon.code}" não é válido para este plano`
+                      : undefined
+                  }
                 >
-                  <Crown className="mr-2 h-4 w-4" />
-                  Assinar Agora
+                  {selectedPlan === plan.id 
+                    ? 'Processando...' 
+                    : appliedCoupon && !isCouponApplicableToPlan(plan.id)
+                    ? 'Cupom não aplicável'
+                    : 'Assinar Agora'}
                 </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
+
+            {/* Coupon Section */}
+            <Card className="mx-auto max-w-2xl mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <TrendingUp className="h-5 w-5" />
+                  Tem um cupom de desconto?
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Digite o código do cupom"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleApplyCoupon()
+                      }
+                    }}
+                  />
+                  <Button onClick={handleApplyCoupon} disabled={!couponCode} className="cursor-pointer">
+                    Aplicar
+                  </Button>
+                </div>
+                {appliedCoupon && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-sm text-success">
+                      Cupom "{appliedCoupon.code}" aplicado! Desconto de {appliedCoupon.discount * 100}%
+                    </p>
+                    {appliedCoupon.applicablePlans && appliedCoupon.applicablePlans.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Válido apenas para: {appliedCoupon.applicablePlans.map(p => 
+                          p === 'monthly' ? 'Plano Mensal' : 'Plano Semestral'
+                        ).join(' e ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Digite o código do cupom para aplicar o desconto
+                </p>
+              </CardContent>
+            </Card>
 
             <div className="mt-6 text-center">
               <Button

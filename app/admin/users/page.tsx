@@ -27,10 +27,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Search, Eye, Shield, CheckCircle, XCircle, Plus, Loader2, Edit, UserX, UserCheck, Filter, X } from 'lucide-react'
+import { Search, Eye, Shield, CheckCircle, XCircle, Plus, Loader2, Edit, UserX, UserCheck, Filter, X, Crown, MinusCircle } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/lib/auth-context'
+import { useRole } from '@/lib/hooks/use-role'
 
 const periods = [
   '1º Período',
@@ -92,10 +93,15 @@ interface User {
   status: string
   disabled?: boolean
   createdAt: Date
+  editedBy?: string | null
+  editedByName?: string | null
+  editedByPhoto?: string | null
+  editedAt?: Date | null
 }
 
 export default function UsersPage() {
   const { user } = useAuth()
+  const { isAdminMaster } = useRole()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -114,6 +120,7 @@ export default function UsersPage() {
   const [grantPlan, setGrantPlan] = useState<'monthly' | 'semester'>('monthly')
   const [newRole, setNewRole] = useState<string>('')
   const [grantingAccess, setGrantingAccess] = useState(false)
+  const [removingPlan, setRemovingPlan] = useState(false)
   
   // Form states for creating user
   const [newUserName, setNewUserName] = useState('')
@@ -155,6 +162,7 @@ export default function UsersPage() {
           ...u,
           createdAt: u.createdAt ? (typeof u.createdAt === 'string' ? new Date(u.createdAt) : u.createdAt) : new Date(),
           planExpiresAt: u.planExpiresAt ? (typeof u.planExpiresAt === 'string' ? new Date(u.planExpiresAt) : u.planExpiresAt) : null,
+          editedAt: u.editedAt ? (typeof u.editedAt === 'string' ? new Date(u.editedAt) : u.editedAt) : null,
           disabled: u.disabled || false,
         }))
         setUsers(usersWithDates)
@@ -398,6 +406,46 @@ export default function UsersPage() {
     } catch (error: any) {
       console.error('Erro ao alterar permissão:', error)
       alert(error.message || 'Erro ao alterar permissão')
+    }
+  }
+
+  const handleRemovePlan = (userToRemove: User) => {
+    setSelectedUser(userToRemove)
+    if (confirm(`Tem certeza que deseja remover o plano do usuário ${userToRemove.name}?`)) {
+      confirmRemovePlan()
+    }
+  }
+
+  const confirmRemovePlan = async () => {
+    if (!user?.uid || !selectedUser) return
+
+    try {
+      setRemovingPlan(true)
+      const response = await fetch(`/api/admin/users/${selectedUser.id}/remove-plan`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requesterUid: user.uid,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao remover plano')
+      }
+
+      // Success - refresh users list
+      await fetchUsers()
+      alert('Plano removido com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao remover plano:', error)
+      alert(error.message || 'Erro ao remover plano')
+    } finally {
+      setRemovingPlan(false)
+      setSelectedUser(null)
     }
   }
 
@@ -707,61 +755,69 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell>{getStatusBadge(user.status, user.disabled)}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex flex-wrap justify-end gap-2">
                           <Button
-                          className="cursor-pointer"
+                            className="cursor-pointer"
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewDetails(user)}
+                            title="Ver detalhes"
                           >
-                            <Eye className="mr-1 h-4 w-4" />
-                            Ver
+                            <Eye className="h-4 w-4" />
                           </Button>
                           <Button
-                          className="cursor-pointer"
-                            variant="outline"
+                            className="cursor-pointer"
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleEditUser(user)}
+                            title="Editar usuário"
                           >
-                            <Edit className="mr-1 h-4 w-4" />
-                            Editar
+                            <Edit className="h-4 w-4" />
                           </Button>
                           <Button
-                            variant="outline"
+                            className={`cursor-pointer ${user.disabled ? 'text-success hover:text-success' : 'text-destructive hover:text-destructive'}`}
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleToggleUserStatus(user)}
-                            className={user.disabled ? 'text-success hover:text-success' : 'text-destructive hover:text-destructive' + 'cursor-pointer'}
+                            title={user.disabled ? 'Ativar usuário' : 'Desativar usuário'}
                           >
                             {user.disabled ? (
-                              <>
-                                <UserCheck className="mr-1 h-4 w-4" />
-                                Ativar
-                              </>
+                              <UserCheck className="h-4 w-4" />
                             ) : (
-                              <>
-                                <UserX className="mr-1 h-4 w-4" />
-                                Desativar
-                              </>
+                              <UserX className="h-4 w-4" />
                             )}
                           </Button>
                           <Button
-                          className="cursor-pointer"
-                            variant="outline"
+                            className="cursor-pointer"
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleGrantSubscription(user)}
                             disabled={user.disabled}
+                            title="Liberar acesso"
                           >
-                            Liberar Acesso
+                            <Crown className="h-4 w-4" />
                           </Button>
                           <Button
-                          className="cursor-pointer"
-                            variant="outline"
+                            className="cursor-pointer"
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleChangeRole(user)}
+                            title="Alterar permissão"
                           >
-                            <Shield className="mr-1 h-4 w-4" />
-                            Permissão
+                            <Shield className="h-4 w-4" />
                           </Button>
+                          {isAdminMaster && (
+                            <Button
+                              className="cursor-pointer text-destructive hover:text-destructive disabled:opacity-50"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemovePlan(user)}
+                              disabled={!user.plan || removingPlan || user.disabled}
+                              title={user.plan ? 'Remover plano' : 'Usuário não possui plano'}
+                            >
+                              <MinusCircle className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -832,6 +888,36 @@ export default function UsersPage() {
                   <p className="text-sm">{formatDate(selectedUser.createdAt)}</p>
                 </div>
               </div>
+              {selectedUser.editedBy && selectedUser.editedAt && (
+                <div className="mt-4 rounded-lg border border-muted bg-muted/30 p-4">
+                  <p className="mb-2 text-sm font-medium text-muted-foreground">
+                    Última edição
+                  </p>
+                  <div className="flex items-center gap-3">
+                    {selectedUser.editedByPhoto ? (
+                      <img
+                        src={selectedUser.editedByPhoto}
+                        alt={selectedUser.editedByName || 'Admin'}
+                        className="h-10 w-10 rounded-full object-cover border-2 border-border"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 border-2 border-border">
+                        <span className="text-sm font-semibold text-primary">
+                          {(selectedUser.editedByName || 'A')[0].toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">
+                        {selectedUser.editedByName || 'Admin'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(selectedUser.editedAt)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>

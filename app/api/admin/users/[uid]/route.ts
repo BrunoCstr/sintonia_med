@@ -44,6 +44,19 @@ export async function PUT(
     const app = getAdminApp()
     const db = app.firestore()
 
+    // Buscar informações do usuário que está editando
+    const requesterDoc = await db.collection('users').doc(requesterUid).get()
+    const requesterData = requesterDoc.exists ? requesterDoc.data() : null
+    const requesterAuth = await app.auth().getUser(requesterUid)
+
+    // Preparar dados de quem editou
+    const editedBy = {
+      uid: requesterUid,
+      name: requesterData?.name || requesterAuth.displayName || requesterAuth.email?.split('@')[0] || 'Admin',
+      photoURL: requesterData?.photoURL || requesterAuth.photoURL || null,
+      editedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }
+
     // Verificar se o usuário existe
     let authUser
     try {
@@ -58,7 +71,12 @@ export async function PUT(
       throw error
     }
 
-    const firestoreUpdates: any = {}
+    const firestoreUpdates: any = {
+      editedBy: editedBy.uid,
+      editedByName: editedBy.name,
+      editedByPhoto: editedBy.photoURL,
+      editedAt: editedBy.editedAt,
+    }
 
     // Atualizar nome no Auth se fornecido
     if (name !== undefined) {

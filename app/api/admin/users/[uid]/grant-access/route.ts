@@ -61,6 +61,19 @@ export async function POST(
       throw error
     }
 
+    // Buscar informações do usuário que está concedendo o plano
+    const requesterDoc = await db.collection('users').doc(requesterUid).get()
+    const requesterData = requesterDoc.exists ? requesterDoc.data() : null
+    const requesterAuth = await app.auth().getUser(requesterUid)
+
+    // Preparar dados de quem editou
+    const editedBy = {
+      uid: requesterUid,
+      name: requesterData?.name || requesterAuth.displayName || requesterAuth.email?.split('@')[0] || 'Admin',
+      photoURL: requesterData?.photoURL || requesterAuth.photoURL || null,
+      editedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }
+
     // Calcular data de expiração
     const now = new Date()
     const expiresAt = new Date(now)
@@ -79,6 +92,10 @@ export async function POST(
       await userRef.update({
         plan,
         planExpiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        editedBy: editedBy.uid,
+        editedByName: editedBy.name,
+        editedByPhoto: editedBy.photoURL,
+        editedAt: editedBy.editedAt,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       })
     } else {
@@ -92,6 +109,10 @@ export async function POST(
         role: authUser.customClaims?.role || 'aluno',
         plan,
         planExpiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        editedBy: editedBy.uid,
+        editedByName: editedBy.name,
+        editedByPhoto: editedBy.photoURL,
+        editedAt: editedBy.editedAt,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       })

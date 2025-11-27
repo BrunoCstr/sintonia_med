@@ -85,6 +85,10 @@ export async function GET(request: NextRequest) {
         status,
         disabled: isDisabled,
         createdAt: userData.createdAt?.toDate ? userData.createdAt.toDate() : (userData.createdAt ? new Date(userData.createdAt) : (authUser.metadata.creationTime ? new Date(authUser.metadata.creationTime) : new Date())),
+        editedBy: userData.editedBy || null,
+        editedByName: userData.editedByName || null,
+        editedByPhoto: userData.editedByPhoto || null,
+        editedAt: userData.editedAt?.toDate ? userData.editedAt.toDate() : (userData.editedAt ? new Date(userData.editedAt) : null),
       }
     })
 
@@ -103,6 +107,10 @@ export async function GET(request: NextRequest) {
           status: 'expired',
           disabled: true, // Se não está no Auth, considerar como desativado
           createdAt: userData.createdAt?.toDate ? userData.createdAt.toDate() : (userData.createdAt ? new Date(userData.createdAt) : new Date()),
+          editedBy: userData.editedBy || null,
+          editedByName: userData.editedByName || null,
+          editedByPhoto: userData.editedByPhoto || null,
+          editedAt: userData.editedAt?.toDate ? userData.editedAt.toDate() : (userData.editedAt ? new Date(userData.editedAt) : null),
         })
       }
     })

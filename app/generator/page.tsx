@@ -181,6 +181,28 @@ export default function GeneratorPage() {
     }
   }, [user, loading, isPremium])
 
+  // Ajustar questionCount quando freeLimits mudar (para usuários Free)
+  useEffect(() => {
+    if (!isPremium && freeLimits) {
+      const currentCount = parseInt(questionCount)
+      const maxAllowed = Math.min(5, freeLimits.remainingQuestions)
+      
+      if (freeLimits.remainingQuestions > 0) {
+        // Se o valor atual for maior que o permitido, ajustar para o máximo permitido
+        if (currentCount > maxAllowed) {
+          setQuestionCount(maxAllowed.toString())
+        } else if (currentCount < 1) {
+          // Garantir que o valor mínimo seja 1
+          setQuestionCount('1')
+        }
+      } else {
+        // Se não houver questões restantes, resetar para 1 (mas o botão estará desabilitado)
+        setQuestionCount('1')
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [freeLimits, isPremium]) // questionCount intencionalmente omitido para evitar loop
+
   // Atualizar contador de tempo a cada segundo
   useEffect(() => {
     if (!freeLimits || isPremium) return
@@ -636,9 +658,24 @@ export default function GeneratorPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="5">5 questões</SelectItem>
-                  {isPremium && (
+                  {!isPremium && freeLimits ? (
+                    // Para usuários Free, mostrar opções baseadas nas questões restantes
+                    freeLimits.remainingQuestions > 0 ? (
+                      Array.from({ length: Math.min(5, freeLimits.remainingQuestions) }, (_, i) => {
+                        const count = i + 1
+                        return (
+                          <SelectItem key={count} value={count.toString()}>
+                            {count} {count === 1 ? 'questão' : 'questões'}
+                          </SelectItem>
+                        )
+                      })
+                    ) : (
+                      <SelectItem value="0" disabled>Nenhuma questão disponível</SelectItem>
+                    )
+                  ) : (
+                    // Para usuários Premium, mostrar opções padrão
                     <>
+                      <SelectItem value="5">5 questões</SelectItem>
                       <SelectItem value="10">10 questões</SelectItem>
                       <SelectItem value="20">20 questões</SelectItem>
                       <SelectItem value="30">30 questões</SelectItem>
@@ -646,9 +683,11 @@ export default function GeneratorPage() {
                   )}
                 </SelectContent>
               </Select>
-              {!isPremium && (
+              {!isPremium && freeLimits && (
                 <p className="text-xs text-muted-foreground">
-                  Plano Free: máximo de 5 questões por simulado
+                  {freeLimits.remainingQuestions > 0 
+                    ? `Você pode gerar até ${Math.min(5, freeLimits.remainingQuestions)} ${Math.min(5, freeLimits.remainingQuestions) === 1 ? 'questão' : 'questões'} por simulado`
+                    : 'Limite diário atingido'}
                 </p>
               )}
             </div>
@@ -763,7 +802,7 @@ export default function GeneratorPage() {
             </Button>
             {!isPremium && freeLimits && freeLimits.remainingQuestions > 0 && (
               <p className="text-xs text-center text-muted-foreground">
-                Você pode gerar mais {freeLimits.remainingQuestions} questão{freeLimits.remainingQuestions > 1 ? 'ões' : ''} hoje
+                Você pode gerar mais {freeLimits.remainingQuestions} {freeLimits.remainingQuestions === 1 ? 'questão' : 'questões'} hoje
               </p>
             )}
           </CardContent>

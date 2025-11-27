@@ -4,22 +4,21 @@ import { getAdminApp } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
 
 /**
- * PATCH /api/admin/users/[uid]/toggle-status
- * Ativa ou desativa um usuário no Firebase Auth
+ * DELETE /api/admin/users/[uid]/remove-plan
+ * Remove o plano de um usuário (apenas admin_master)
  * 
  * Body:
  * {
- *   disabled: boolean,
  *   requesterUid: string
  * }
  */
-export async function PATCH(
+export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ uid: string }> }
 ) {
   try {
     const body = await request.json()
-    const { disabled, requesterUid } = body
+    const { requesterUid } = body
     const { uid } = await params
 
     if (!requesterUid) {
@@ -29,34 +28,33 @@ export async function PATCH(
       )
     }
 
-    if (typeof disabled !== 'boolean') {
-      return NextResponse.json(
-        { error: 'disabled deve ser um boolean' },
-        { status: 400 }
-      )
-    }
-
     // Verificar se o requester é admin_master
     const isAdmin = await verifyAdmin(requesterUid)
     if (!isAdmin) {
       return NextResponse.json(
-        { error: 'Acesso negado. Apenas admin_master pode ativar/desativar usuários.' },
+        { error: 'Acesso negado. Apenas admin_master pode remover planos.' },
         { status: 403 }
-      )
-    }
-
-    // Não permitir desativar a si mesmo
-    if (uid === requesterUid) {
-      return NextResponse.json(
-        { error: 'Você não pode desativar sua própria conta' },
-        { status: 400 }
       )
     }
 
     const app = getAdminApp()
     const db = app.firestore()
 
-    // Buscar informações do usuário que está alterando o status
+    // Verificar se o usuário existe
+    let authUser
+    try {
+      authUser = await app.auth().getUser(uid)
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        return NextResponse.json(
+          { error: 'Usuário não encontrado' },
+          { status: 404 }
+        )
+      }
+      throw error
+    }
+
+    // Buscar informações do usuário que está removendo o plano
     const requesterDoc = await db.collection('users').doc(requesterUid).get()
     const requesterData = requesterDoc.exists ? requesterDoc.data() : null
     const requesterAuth = await app.auth().getUser(requesterUid)
@@ -69,30 +67,14 @@ export async function PATCH(
       editedAt: admin.firestore.FieldValue.serverTimestamp(),
     }
 
-    // Verificar se o usuário existe
-    try {
-      await app.auth().getUser(uid)
-    } catch (error: any) {
-      if (error.code === 'auth/user-not-found') {
-        return NextResponse.json(
-          { error: 'Usuário não encontrado' },
-          { status: 404 }
-        )
-      }
-      throw error
-    }
-
-    // Atualizar status do usuário
-    await app.auth().updateUser(uid, {
-      disabled: disabled,
-    })
-
-    // Atualizar informações de quem editou no Firestore
+    // Atualizar documento no Firestore
     const userRef = db.collection('users').doc(uid)
     const userDoc = await userRef.get()
 
     if (userDoc.exists) {
       await userRef.update({
+        plan: null,
+        planExpiresAt: null,
         editedBy: editedBy.uid,
         editedByName: editedBy.name,
         editedByPhoto: editedBy.photoURL,
@@ -101,13 +83,12 @@ export async function PATCH(
       })
     } else {
       // Se o documento não existe, criar com dados básicos
-      const targetUser = await app.auth().getUser(uid)
       await userRef.set({
-        email: targetUser.email,
-        name: targetUser.displayName || targetUser.email?.split('@')[0] || 'Usuário',
+        email: authUser.email,
+        name: authUser.displayName || authUser.email?.split('@')[0] || 'Usuário',
         period: '-',
         institution: '-',
-        role: targetUser.customClaims?.role || 'aluno',
+        role: authUser.customClaims?.role || 'aluno',
         plan: null,
         planExpiresAt: null,
         editedBy: editedBy.uid,
@@ -121,12 +102,12 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      message: disabled ? 'Usuário desativado com sucesso' : 'Usuário ativado com sucesso',
+      message: 'Plano removido com sucesso',
     })
   } catch (error: any) {
-    console.error('Erro ao alterar status do usuário:', error)
+    console.error('Erro ao remover plano:', error)
     return NextResponse.json(
-      { error: error.message || 'Erro ao alterar status do usuário' },
+      { error: error.message || 'Erro ao remover plano' },
       { status: 500 }
     )
   }

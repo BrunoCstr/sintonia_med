@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { setUserRole, verifyAdmin, getUserByUid } from '@/lib/firebase-admin'
+import { setUserRole, verifyAdmin, getUserByUid, getAdminApp } from '@/lib/firebase-admin'
 import type { UserRole } from '@/lib/firebase-admin'
+import * as admin from 'firebase-admin'
 
 /**
  * POST /api/admin/set-role
@@ -63,8 +64,55 @@ export async function POST(request: NextRequest) {
       throw error
     }
 
-    // Definir role
+    const app = getAdminApp()
+    const db = app.firestore()
+
+    // Buscar informações do usuário que está alterando a permissão
+    const requesterDoc = await db.collection('users').doc(requesterUid).get()
+    const requesterData = requesterDoc.exists ? requesterDoc.data() : null
+    const requesterAuth = await app.auth().getUser(requesterUid)
+
+    // Preparar dados de quem editou
+    const editedBy = {
+      uid: requesterUid,
+      name: requesterData?.name || requesterAuth.displayName || requesterAuth.email?.split('@')[0] || 'Admin',
+      photoURL: requesterData?.photoURL || requesterAuth.photoURL || null,
+      editedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }
+
+    // Definir role (isso já atualiza o Firestore, mas vamos adicionar informações de quem editou)
     await setUserRole(uid, role)
+
+    // Atualizar informações de quem editou no Firestore
+    const userRef = db.collection('users').doc(uid)
+    const userDoc = await userRef.get()
+
+    if (userDoc.exists) {
+      await userRef.update({
+        editedBy: editedBy.uid,
+        editedByName: editedBy.name,
+        editedByPhoto: editedBy.photoURL,
+        editedAt: editedBy.editedAt,
+      })
+    } else {
+      // Se o documento não existe, criar com dados básicos
+      const targetUser = await app.auth().getUser(uid)
+      await userRef.set({
+        email: targetUser.email,
+        name: targetUser.displayName || targetUser.email?.split('@')[0] || 'Usuário',
+        period: '-',
+        institution: '-',
+        role,
+        plan: null,
+        planExpiresAt: null,
+        roleUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        editedBy: editedBy.uid,
+        editedByName: editedBy.name,
+        editedByPhoto: editedBy.photoURL,
+        editedAt: editedBy.editedAt,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+    }
 
     return NextResponse.json({ 
       success: true, 

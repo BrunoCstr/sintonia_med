@@ -101,6 +101,7 @@ export async function PUT(
       comentarioGabarito,
       area,
       subarea,
+      disciplina,
       dificuldade,
       period,
       oficial,
@@ -282,6 +283,17 @@ export async function PUT(
         )
       }
       updateData.subarea = subarea.trim()
+    }
+
+    // Validar e atualizar disciplina
+    if (disciplina !== undefined) {
+      if (!disciplina || typeof disciplina !== 'string' || !['SOI', 'HAM', 'IESC', 'CI'].includes(disciplina)) {
+        return NextResponse.json(
+          { error: 'A disciplina é obrigatória' },
+          { status: 400 }
+        )
+      }
+      updateData.disciplina = disciplina
     }
 
     // Validar e atualizar dificuldade

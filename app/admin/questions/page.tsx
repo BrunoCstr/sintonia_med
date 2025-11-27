@@ -329,6 +329,7 @@ export default function QuestionsListPage() {
                 <TableHead>Enunciado</TableHead>
                 <TableHead>Área</TableHead>
                 <TableHead>Subárea</TableHead>
+                <TableHead>Disciplina</TableHead>
                 <TableHead>Dificuldade</TableHead>
                 <TableHead>Período</TableHead>
                 <TableHead>Oficial</TableHead>
@@ -340,7 +341,7 @@ export default function QuestionsListPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
+                  <TableCell colSpan={10} className="text-center py-8">
                     <div className="flex items-center justify-center">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                     </div>
@@ -349,7 +350,7 @@ export default function QuestionsListPage() {
               ) : filteredQuestions.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={9}
+                    colSpan={10}
                     className="text-center py-8 text-muted-foreground"
                   >
                     Nenhuma questão encontrada
@@ -368,6 +369,11 @@ export default function QuestionsListPage() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {question.subarea}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {question.disciplina || 'N/A'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge

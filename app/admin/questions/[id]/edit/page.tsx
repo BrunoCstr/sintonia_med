@@ -310,7 +310,7 @@ export default function EditQuestionPage() {
         },
         body: JSON.stringify({
           ...formData,
-          disciplina: formData.disciplina === 'none' ? '' : formData.disciplina,
+          disciplina: formData.disciplina,
           imagemUrl,
         }),
       })

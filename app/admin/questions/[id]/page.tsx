@@ -235,6 +235,11 @@ export default function ViewQuestionPage() {
             </div>
 
             <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Disciplina</p>
+              <Badge variant="outline">{question.disciplina || 'N/A'}</Badge>
+            </div>
+
+            <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Dificuldade</p>
               <Badge
                 variant="secondary"

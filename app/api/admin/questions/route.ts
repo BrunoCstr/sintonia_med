@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
       comentarioGabarito,
       area,
       subarea,
+      disciplina,
       dificuldade,
       period,
       oficial = false,
@@ -161,6 +162,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!disciplina || typeof disciplina !== 'string' || !['SOI', 'HAM', 'IESC', 'CI'].includes(disciplina)) {
+      return NextResponse.json(
+        { error: 'A disciplina é obrigatória' },
+        { status: 400 }
+      )
+    }
+
     const app = getAdminApp()
     const db = app.firestore()
 
@@ -191,6 +199,7 @@ export async function POST(request: NextRequest) {
       comentarioGabarito,
       area,
       subarea,
+      disciplina,
       dificuldade,
       period,
       createdBy: authUser.uid,

@@ -33,9 +33,10 @@ import {
   Calendar,
   Users
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { useRole } from '@/lib/hooks/use-role'
+import { DataTablePagination } from '@/components/data-table-pagination'
 
 interface Coupon {
   code: string
@@ -67,6 +68,8 @@ export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [stats, setStats] = useState<Record<string, CouponStats>>({})
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(15)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showStatsDialog, setShowStatsDialog] = useState(false)
@@ -321,6 +324,15 @@ export default function CouponsPage() {
     return coupon.active && !isExpired(coupon.validUntil)
   }
 
+  // Paginar os cupons
+  const paginatedCoupons = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return coupons.slice(startIndex, endIndex)
+  }, [coupons, currentPage, itemsPerPage])
+
+  const totalPages = Math.ceil(coupons.length / itemsPerPage)
+
   if (!isAdminMaster) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -365,19 +377,20 @@ export default function CouponsPage() {
                 Nenhum cupom cadastrado
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Desconto</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Validade</TableHead>
-                    <TableHead>Usos</TableHead>
-                    <TableHead>Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {coupons.map((coupon) => (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Desconto</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Validade</TableHead>
+                      <TableHead>Usos</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedCoupons.map((coupon) => (
                     <TableRow key={coupon.code}>
                       <TableCell className="font-mono font-medium">
                         {coupon.code}
@@ -445,9 +458,22 @@ export default function CouponsPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                    ))}
+                  </TableBody>
+                </Table>
+                {coupons.length > 0 && (
+                  <div className="border-t px-6 py-4">
+                    <DataTablePagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      itemsPerPage={itemsPerPage}
+                      totalItems={coupons.length}
+                      onPageChange={setCurrentPage}
+                      onItemsPerPageChange={setItemsPerPage}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

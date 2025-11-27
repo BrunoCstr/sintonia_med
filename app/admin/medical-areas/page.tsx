@@ -23,14 +23,26 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Plus, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { MedicalArea, Materia } from '@/lib/types'
+import { DataTablePagination } from '@/components/data-table-pagination'
 
 export default function MedicalAreasPage() {
   const [areas, setAreas] = useState<MedicalArea[]>([])
   const [materias, setMaterias] = useState<Record<string, Materia[]>>({})
   const [expandedSistemas, setExpandedSistemas] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(15)
+
+  // Paginar as áreas
+  const paginatedAreas = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return areas.slice(startIndex, endIndex)
+  }, [areas, currentPage, itemsPerPage])
+
+  const totalPages = Math.ceil(areas.length / itemsPerPage)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isMateriaDialogOpen, setIsMateriaDialogOpen] = useState(false)
   const [editingArea, setEditingArea] = useState<MedicalArea | null>(null)
@@ -460,7 +472,8 @@ export default function MedicalAreasPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                areas.map((area) => {
+                <>
+                  {paginatedAreas.map((area) => {
                   const isExpanded = expandedSistemas.has(area.id)
                   const sistemaMaterias = materias[area.id] || []
                   return (
@@ -592,7 +605,25 @@ export default function MedicalAreasPage() {
                       )}
                     </>
                   )
-                })
+                  })
+                  }
+                  {areas.length > itemsPerPage && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="p-0">
+                        <div className="border-t px-6 py-4">
+                          <DataTablePagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            itemsPerPage={itemsPerPage}
+                            totalItems={areas.length}
+                            onPageChange={setCurrentPage}
+                            onItemsPerPageChange={setItemsPerPage}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               )}
             </TableBody>
           </Table>

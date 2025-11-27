@@ -21,10 +21,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Pencil, Archive, Eye, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { Question, MedicalArea } from "@/lib/types";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DataTablePagination } from "@/components/data-table-pagination";
 
 export default function QuestionsListPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -35,6 +36,8 @@ export default function QuestionsListPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
 
   const getDifficultyColor = (dificuldade: string) => {
     switch (dificuldade) {
@@ -183,47 +186,63 @@ export default function QuestionsListPage() {
     }
   };
 
-  // Filtrar questões
-  const filteredQuestions = questions.filter((question) => {
-    // Filtro de busca
-    if (
-      searchTerm &&
-      !question.enunciado.toLowerCase().includes(searchTerm.toLowerCase())
-    ) {
-      return false;
-    }
-
-    // Filtro de área
-    if (areaFilter !== "all" && question.area !== areaFilter) {
-      return false;
-    }
-
-    // Filtro de dificuldade
-    if (
-      dificuldadeFilter !== "all" &&
-      question.dificuldade !== dificuldadeFilter
-    ) {
-      return false;
-    }
-
-    // Filtro de status
-    if (statusFilter === "ativo" && !question.ativo) {
-      return false;
-    }
-    if (statusFilter === "inativo" && question.ativo) {
-      return false;
-    }
-
-    // Filtro de período
-    if (periodFilter !== "all") {
-      const questionPeriod = question.period || question.tipo || "";
-      if (questionPeriod !== periodFilter) {
+  // Filtrar todas as questões primeiro
+  const filteredQuestions = useMemo(() => {
+    return questions.filter((question) => {
+      // Filtro de busca
+      if (
+        searchTerm &&
+        !question.enunciado.toLowerCase().includes(searchTerm.toLowerCase())
+      ) {
         return false;
       }
-    }
 
-    return true;
-  });
+      // Filtro de área
+      if (areaFilter !== "all" && question.area !== areaFilter) {
+        return false;
+      }
+
+      // Filtro de dificuldade
+      if (
+        dificuldadeFilter !== "all" &&
+        question.dificuldade !== dificuldadeFilter
+      ) {
+        return false;
+      }
+
+      // Filtro de status
+      if (statusFilter === "ativo" && !question.ativo) {
+        return false;
+      }
+      if (statusFilter === "inativo" && question.ativo) {
+        return false;
+      }
+
+      // Filtro de período
+      if (periodFilter !== "all") {
+        const questionPeriod = question.period || question.tipo || "";
+        if (questionPeriod !== periodFilter) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [questions, searchTerm, areaFilter, dificuldadeFilter, statusFilter, periodFilter]);
+
+  // Paginar os resultados filtrados
+  const paginatedQuestions = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredQuestions.slice(startIndex, endIndex);
+  }, [filteredQuestions, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, areaFilter, dificuldadeFilter, statusFilter, periodFilter]);
 
   return (
     <div className="space-y-6">
@@ -357,7 +376,8 @@ export default function QuestionsListPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredQuestions.map((question) => (
+                <>
+                  {paginatedQuestions.map((question) => (
                   <TableRow key={question.id}>
                     <TableCell className="max-w-md">
                       <p className="truncate font-medium">
@@ -476,7 +496,22 @@ export default function QuestionsListPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                  ))}
+                  <TableRow>
+                    <TableCell colSpan={10} className="p-0">
+                      <div className="border-t px-6 py-4">
+                        <DataTablePagination
+                          currentPage={currentPage}
+                          totalPages={totalPages}
+                          itemsPerPage={itemsPerPage}
+                          totalItems={filteredQuestions.length}
+                          onPageChange={setCurrentPage}
+                          onItemsPerPageChange={setItemsPerPage}
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </>
               )}
             </TableBody>
           </Table>

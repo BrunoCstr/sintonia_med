@@ -23,14 +23,26 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Plus, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
 import type { MedicalArea, Materia } from '@/lib/types'
+import { DataTablePagination } from '@/components/data-table-pagination'
 
 export default function MedicalAreasPage() {
   const [areas, setAreas] = useState<MedicalArea[]>([])
   const [materias, setMaterias] = useState<Record<string, Materia[]>>({})
   const [expandedSistemas, setExpandedSistemas] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(15)
+
+  // Paginar as áreas
+  const paginatedAreas = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return areas.slice(startIndex, endIndex)
+  }, [areas, currentPage, itemsPerPage])
+
+  const totalPages = Math.ceil(areas.length / itemsPerPage)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isMateriaDialogOpen, setIsMateriaDialogOpen] = useState(false)
   const [editingArea, setEditingArea] = useState<MedicalArea | null>(null)
@@ -434,38 +446,33 @@ export default function MedicalAreasPage() {
       {/* Areas Table */}
       <Card>
         <CardContent className="px-6 py-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12"></TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
-                    <div className="flex items-center justify-center">
-                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : areas.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    Nenhum sistema cadastrado
-                  </TableCell>
-                </TableRow>
-              ) : (
-                areas.map((area) => {
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
+          ) : areas.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              Nenhum sistema cadastrado
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedAreas.map((area) => {
                   const isExpanded = expandedSistemas.has(area.id)
                   const sistemaMaterias = materias[area.id] || []
                   return (
-                    <>
-                      <TableRow key={area.id}>
+                    <Fragment key={area.id}>
+                      <TableRow>
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -590,12 +597,25 @@ export default function MedicalAreasPage() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   )
-                })
+                  })}
+                </TableBody>
+              </Table>
+              {areas.length > 0 && (
+                <div className="border-t px-6 py-4">
+                  <DataTablePagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={areas.length}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={setItemsPerPage}
+                  />
+                </div>
               )}
-            </TableBody>
-          </Table>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

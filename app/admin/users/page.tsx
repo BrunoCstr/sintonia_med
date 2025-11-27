@@ -28,10 +28,11 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Search, Eye, Shield, CheckCircle, XCircle, Plus, Loader2, Edit, UserX, UserCheck, Filter, X, Crown, MinusCircle } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/lib/auth-context'
 import { useRole } from '@/lib/hooks/use-role'
+import { DataTablePagination } from '@/components/data-table-pagination'
 
 const periods = [
   '1º Período',
@@ -106,6 +107,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(15)
   
   // Filter states
   const [filterPeriod, setFilterPeriod] = useState<string>('all')
@@ -529,30 +532,32 @@ export default function UsersPage() {
 
   const hasActiveFilters = searchTerm || filterPeriod !== 'all' || filterPlan !== 'all' || filterStatus !== 'all' || filterRole !== 'all'
 
-  const filteredUsers = users.filter((user) => {
-    // Filtro de busca (nome ou email)
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase()
-      const matchesSearch = 
-        user.name.toLowerCase().includes(searchLower) ||
-        user.email.toLowerCase().includes(searchLower)
-      if (!matchesSearch) return false
-    }
+  // Filtrar todos os usuários primeiro
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      // Filtro de busca (nome ou email)
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase()
+        const matchesSearch = 
+          user.name.toLowerCase().includes(searchLower) ||
+          user.email.toLowerCase().includes(searchLower)
+        if (!matchesSearch) return false
+      }
 
-    // Filtro de período
-    if (filterPeriod !== 'all' && user.period !== filterPeriod) {
-      return false
-    }
-
-    // Filtro de plano
-    if (filterPlan !== 'all') {
-      if (filterPlan === 'none' && user.plan !== null) {
+      // Filtro de período
+      if (filterPeriod !== 'all' && user.period !== filterPeriod) {
         return false
       }
-      if (filterPlan !== 'none' && user.plan !== filterPlan) {
-        return false
+
+      // Filtro de plano
+      if (filterPlan !== 'all') {
+        if (filterPlan === 'none' && user.plan !== null) {
+          return false
+        }
+        if (filterPlan !== 'none' && user.plan !== filterPlan) {
+          return false
+        }
       }
-    }
 
     // Filtro de status
     if (filterStatus !== 'all') {
@@ -574,6 +579,21 @@ export default function UsersPage() {
 
     return true
   })
+  }, [users, searchTerm, filterPeriod, filterPlan, filterStatus, filterRole])
+
+  // Paginar os resultados filtrados
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return filteredUsers.slice(startIndex, endIndex)
+  }, [filteredUsers, currentPage, itemsPerPage])
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterPeriod, filterPlan, filterStatus, filterRole])
 
   return (
     <>
@@ -695,12 +715,6 @@ export default function UsersPage() {
                 </div>
               </div>
 
-              {/* Active Filters Count */}
-              {hasActiveFilters && (
-                <div className="text-sm text-muted-foreground">
-                  Mostrando {filteredUsers.length} de {users.length} usuário(s)
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -719,111 +733,123 @@ export default function UsersPage() {
                 </p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Período</TableHead>
-                    <TableHead>Permissão</TableHead>
-                    <TableHead>Plano</TableHead>
-                    <TableHead>Expira em</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {user.email}
-                      </TableCell>
-                      <TableCell>{user.period}</TableCell>
-                      <TableCell>{getRoleBadge(user.role)}</TableCell>
-                      <TableCell>
-                        {user.plan ? (
-                          <Badge variant="outline">
-                            {user.plan === 'monthly' ? 'Mensal' : 'Semestral'}
-                          </Badge>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {formatDate(user.planExpiresAt)}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(user.status, user.disabled)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button
-                            className="cursor-pointer"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewDetails(user)}
-                            title="Ver detalhes"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            className="cursor-pointer"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditUser(user)}
-                            title="Editar usuário"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            className={`cursor-pointer ${user.disabled ? 'text-success hover:text-success' : 'text-destructive hover:text-destructive'}`}
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleUserStatus(user)}
-                            title={user.disabled ? 'Ativar usuário' : 'Desativar usuário'}
-                          >
-                            {user.disabled ? (
-                              <UserCheck className="h-4 w-4" />
-                            ) : (
-                              <UserX className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            className="cursor-pointer"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleGrantSubscription(user)}
-                            disabled={user.disabled}
-                            title="Liberar acesso"
-                          >
-                            <Crown className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            className="cursor-pointer"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleChangeRole(user)}
-                            title="Alterar permissão"
-                          >
-                            <Shield className="h-4 w-4" />
-                          </Button>
-                          {isAdminMaster && (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Período</TableHead>
+                      <TableHead>Permissão</TableHead>
+                      <TableHead>Plano</TableHead>
+                      <TableHead>Expira em</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {user.email}
+                        </TableCell>
+                        <TableCell>{user.period}</TableCell>
+                        <TableCell>{getRoleBadge(user.role)}</TableCell>
+                        <TableCell>
+                          {user.plan ? (
+                            <Badge variant="outline">
+                              {user.plan === 'monthly' ? 'Mensal' : 'Semestral'}
+                            </Badge>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {formatDate(user.planExpiresAt)}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(user.status, user.disabled)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap justify-end gap-2">
                             <Button
-                              className="cursor-pointer text-destructive hover:text-destructive disabled:opacity-50"
+                              className="cursor-pointer"
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleRemovePlan(user)}
-                              disabled={!user.plan || removingPlan || user.disabled}
-                              title={user.plan ? 'Remover plano' : 'Usuário não possui plano'}
+                              onClick={() => handleViewDetails(user)}
+                              title="Ver detalhes"
                             >
-                              <MinusCircle className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            <Button
+                              className="cursor-pointer"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditUser(user)}
+                              title="Editar usuário"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              className={`cursor-pointer ${user.disabled ? 'text-success hover:text-success' : 'text-destructive hover:text-destructive'}`}
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleToggleUserStatus(user)}
+                              title={user.disabled ? 'Ativar usuário' : 'Desativar usuário'}
+                            >
+                              {user.disabled ? (
+                                <UserCheck className="h-4 w-4" />
+                              ) : (
+                                <UserX className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              className="cursor-pointer"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleGrantSubscription(user)}
+                              disabled={user.disabled}
+                              title="Liberar acesso"
+                            >
+                              <Crown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              className="cursor-pointer"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleChangeRole(user)}
+                              title="Alterar permissão"
+                            >
+                              <Shield className="h-4 w-4" />
+                            </Button>
+                            {isAdminMaster && (
+                              <Button
+                                className="cursor-pointer text-destructive hover:text-destructive disabled:opacity-50"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemovePlan(user)}
+                                disabled={!user.plan || removingPlan || user.disabled}
+                                title={user.plan ? 'Remover plano' : 'Usuário não possui plano'}
+                              >
+                                <MinusCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="border-t px-6 py-4">
+                  <DataTablePagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={filteredUsers.length}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={setItemsPerPage}
+                  />
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

@@ -89,6 +89,9 @@ export async function GET(request: NextRequest) {
     let usersThisMonth = 0
     let pendingReports = 0
     let growthRate = 0
+    let usersWithFreePlan = 0
+    let usersWithMonthlyPlan = 0
+    let usersWithSemesterPlan = 0
 
     if (authUser.role === 'admin_master') {
       // Buscar usuários do Firebase Auth
@@ -117,10 +120,37 @@ export async function GET(request: NextRequest) {
             const expiresAt = convertToDate(userData.planExpiresAt)
             if (expiresAt > now) {
               activeUsers++
+              
+              // Contar por tipo de plano
+              if (userData.plan === 'monthly') {
+                usersWithMonthlyPlan++
+              } else if (userData.plan === 'semester') {
+                usersWithSemesterPlan++
+              }
+            } else {
+              // Plano expirado, considerar como free
+              usersWithFreePlan++
             }
           } else {
-            // Usuário sem plano mas ativo (considerado ativo)
+            // Usuário sem plano mas ativo (considerado ativo e free)
             activeUsers++
+            usersWithFreePlan++
+          }
+        } else {
+          // Usuário desativado, mas ainda contar o plano para estatísticas
+          if (userData.plan && userData.planExpiresAt) {
+            const expiresAt = convertToDate(userData.planExpiresAt)
+            if (expiresAt > now) {
+              if (userData.plan === 'monthly') {
+                usersWithMonthlyPlan++
+              } else if (userData.plan === 'semester') {
+                usersWithSemesterPlan++
+              }
+            } else {
+              usersWithFreePlan++
+            }
+          } else {
+            usersWithFreePlan++
           }
         }
         
@@ -132,6 +162,27 @@ export async function GET(request: NextRequest) {
         // Contar usuários do mês anterior
         if (createdAt >= lastMonthStart && createdAt <= lastMonthEnd) {
           usersLastMonth++
+        }
+      })
+      
+      // Também contar usuários do Firestore que não estão no Auth
+      firestoreUsersMap.forEach((userData, uid) => {
+        if (!authUsersList.users.find(u => u.uid === uid)) {
+          // Usuário apenas no Firestore
+          if (userData.plan && userData.planExpiresAt) {
+            const expiresAt = convertToDate(userData.planExpiresAt)
+            if (expiresAt > now) {
+              if (userData.plan === 'monthly') {
+                usersWithMonthlyPlan++
+              } else if (userData.plan === 'semester') {
+                usersWithSemesterPlan++
+              }
+            } else {
+              usersWithFreePlan++
+            }
+          } else {
+            usersWithFreePlan++
+          }
         }
       })
 
@@ -157,6 +208,9 @@ export async function GET(request: NextRequest) {
           usersThisMonth,
           pendingReports,
           growthRate,
+          usersWithFreePlan,
+          usersWithMonthlyPlan,
+          usersWithSemesterPlan,
         }),
       },
     })

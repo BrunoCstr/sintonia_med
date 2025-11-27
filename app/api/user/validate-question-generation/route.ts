@@ -42,11 +42,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Para usuários Free, verificar limite
-    // Usar UTC para evitar problemas de timezone
+    // Usar horário de Brasília (UTC-3) para reset à meia-noite local (00:00 BRT)
+    // Brasília está sempre UTC-3 (sem horário de verão desde 2019)
     const now = new Date()
-    const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0))
-    const endOfDay = new Date(startOfDay)
-    endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
+    
+    // Calcular data atual em Brasília
+    // UTC-3 significa que quando são 00:00 em Brasília, são 03:00 UTC
+    // Então, para obter a data em Brasília, subtraímos 3 horas do UTC
+    const brasiliaTime = new Date(now.getTime() - (3 * 60 * 60 * 1000))
+    
+    // Início do dia em Brasília (00:00:00.000 BRT = 03:00:00.000 UTC)
+    const startOfDay = new Date(Date.UTC(
+      brasiliaTime.getUTCFullYear(),
+      brasiliaTime.getUTCMonth(),
+      brasiliaTime.getUTCDate(),
+      3, 0, 0, 0 // 03:00 UTC = 00:00 BRT
+    ))
+    
+    // Fim do dia em Brasília (23:59:59.999 BRT = 02:59:59.999 UTC do dia seguinte)
+    const endOfDay = new Date(Date.UTC(
+      brasiliaTime.getUTCFullYear(),
+      brasiliaTime.getUTCMonth(),
+      brasiliaTime.getUTCDate() + 1,
+      2, 59, 59, 999 // 02:59:59.999 UTC = 23:59:59.999 BRT
+    ))
 
     // Converter para Firestore Timestamp
     const startTimestamp = admin.firestore.Timestamp.fromDate(startOfDay)

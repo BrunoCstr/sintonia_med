@@ -60,11 +60,51 @@ export async function GET(request: NextRequest) {
     const db = app.firestore()
 
     const now = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - now.getDay())
-    weekStart.setHours(0, 0, 0, 0)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    
+    // Calcular início do dia em Brasília (UTC-3)
+    // Brasília está sempre UTC-3 (sem horário de verão desde 2019)
+    // 00:00 BRT = 03:00 UTC do mesmo dia
+    // Para obter a data atual em Brasília, subtraímos 3 horas do UTC
+    const brasiliaTime = new Date(now.getTime() - (3 * 60 * 60 * 1000))
+    
+    // Início do dia atual em Brasília (00:00:00 BRT = 03:00:00 UTC)
+    const todayStart = new Date(Date.UTC(
+      brasiliaTime.getUTCFullYear(),
+      brasiliaTime.getUTCMonth(),
+      brasiliaTime.getUTCDate(),
+      3, 0, 0, 0 // 03:00 UTC = 00:00 BRT
+    ))
+    
+    // Fim do dia atual em Brasília (23:59:59.999 BRT = 02:59:59.999 UTC do dia seguinte)
+    const todayEnd = new Date(Date.UTC(
+      brasiliaTime.getUTCFullYear(),
+      brasiliaTime.getUTCMonth(),
+      brasiliaTime.getUTCDate() + 1,
+      2, 59, 59, 999 // 02:59:59.999 UTC = 23:59:59.999 BRT
+    ))
+    
+    // Início da semana em Brasília (domingo à meia-noite)
+    const weekStartBrasilia = new Date(brasiliaTime)
+    weekStartBrasilia.setUTCDate(brasiliaTime.getUTCDate() - brasiliaTime.getUTCDay())
+    const weekStart = new Date(Date.UTC(
+      weekStartBrasilia.getUTCFullYear(),
+      weekStartBrasilia.getUTCMonth(),
+      weekStartBrasilia.getUTCDate(),
+      3, 0, 0, 0 // 03:00 UTC = 00:00 BRT
+    ))
+    
+    // Início do mês em Brasília
+    const monthStart = new Date(Date.UTC(
+      brasiliaTime.getUTCFullYear(),
+      brasiliaTime.getUTCMonth(),
+      1,
+      3, 0, 0, 0 // 03:00 UTC = 00:00 BRT
+    ))
+    
+    console.log(`[Dashboard Stats] Períodos calculados:`)
+    console.log(`  - Hoje (Brasília): ${todayStart.toISOString()} até ${todayEnd.toISOString()}`)
+    console.log(`  - Semana (Brasília): ${weekStart.toISOString()}`)
+    console.log(`  - Mês (Brasília): ${monthStart.toISOString()}`)
 
     // Buscar resultados de simulados (coleção permanente)
     const resultsSnapshot = await db
@@ -78,18 +118,48 @@ export async function GET(request: NextRequest) {
     let monthCount = 0
     let totalCount = 0
 
+    console.log(`[Dashboard Stats] Calculando estatísticas para usuário ${authUser.uid}`)
+    console.log(`[Dashboard Stats] Início do dia (Brasília): ${todayStart.toISOString()}`)
+    console.log(`[Dashboard Stats] Total de resultados: ${resultsSnapshot.size}`)
+
     resultsSnapshot.forEach((doc) => {
       const data = doc.data()
-      const createdAt = convertToDate(data.createdAt)
+      const createdAt = convertToDate(data.createdAt) // Timestamp em UTC
       
       // Contar questões respondidas neste resultado (acertos + erros)
       const questionsAnswered = (data.correctCount || 0) + (data.incorrectCount || 0)
       
       totalCount += questionsAnswered
-      if (createdAt >= todayStart) todayCount += questionsAnswered
+      
+      // Verificar se é de hoje comparando timestamp UTC com o período do dia em Brasília
+      // createdAt está em UTC, comparar diretamente com todayStart (03:00 UTC) e todayEnd (02:59:59.999 UTC do dia seguinte)
+      const isToday = createdAt >= todayStart && createdAt < todayEnd
+      
+      if (isToday) {
+        todayCount += questionsAnswered
+        // Converter para BRT para log
+        const createdAtBrasilia = new Date(createdAt.getTime() - (3 * 60 * 60 * 1000))
+        console.log(`[Dashboard Stats] Resultado ${doc.id}: ${questionsAnswered} questões de hoje`)
+        console.log(`  - createdAt UTC: ${createdAt.toISOString()}`)
+        console.log(`  - createdAt BRT: ${createdAtBrasilia.toISOString().replace('Z', '')} (${createdAtBrasilia.getUTCFullYear()}-${String(createdAtBrasilia.getUTCMonth() + 1).padStart(2, '0')}-${String(createdAtBrasilia.getUTCDate()).padStart(2, '0')})`)
+      } else {
+        // Log para debug de resultados que não são de hoje
+        const createdAtBrasilia = new Date(createdAt.getTime() - (3 * 60 * 60 * 1000))
+        const createdAtDateBrasilia = `${createdAtBrasilia.getUTCFullYear()}-${String(createdAtBrasilia.getUTCMonth() + 1).padStart(2, '0')}-${String(createdAtBrasilia.getUTCDate()).padStart(2, '0')}`
+        const todayDateBrasilia = `${brasiliaTime.getUTCFullYear()}-${String(brasiliaTime.getUTCMonth() + 1).padStart(2, '0')}-${String(brasiliaTime.getUTCDate()).padStart(2, '0')}`
+        if (createdAtDateBrasilia !== todayDateBrasilia) {
+          console.log(`[Dashboard Stats] Resultado ${doc.id}: ${questionsAnswered} questões NÃO são de hoje`)
+          console.log(`  - Data do resultado (BRT): ${createdAtDateBrasilia}`)
+          console.log(`  - Data de hoje (BRT): ${todayDateBrasilia}`)
+        }
+      }
+      
+      // Para semana e mês, comparar diretamente com timestamps UTC (já convertidos para início do dia em Brasília)
       if (createdAt >= weekStart) weekCount += questionsAnswered
       if (createdAt >= monthStart) monthCount += questionsAnswered
     })
+    
+    console.log(`[Dashboard Stats] Estatísticas finais - Hoje: ${todayCount}, Semana: ${weekCount}, Mês: ${monthCount}, Total: ${totalCount}`)
 
     // Calcular desempenho geral
     let totalCorrect = 0
@@ -109,14 +179,28 @@ export async function GET(request: NextRequest) {
       ? Math.round((totalCorrect / totalQuestionsAnswered) * 100)
       : 0
 
-    // Calcular evolução semanal (últimos 7 dias)
+    // Calcular evolução semanal (últimos 7 dias) em horário de Brasília
     const weeklyData = []
     for (let i = 6; i >= 0; i--) {
-      const date = new Date(now)
-      date.setDate(now.getDate() - i)
-      date.setHours(0, 0, 0, 0)
-      const nextDay = new Date(date)
-      nextDay.setDate(date.getDate() + 1)
+      // Calcular data do dia em Brasília
+      const dayBrasilia = new Date(brasiliaTime)
+      dayBrasilia.setUTCDate(brasiliaTime.getUTCDate() - i)
+      
+      // Início do dia em Brasília (00:00 BRT = 03:00 UTC)
+      const date = new Date(Date.UTC(
+        dayBrasilia.getUTCFullYear(),
+        dayBrasilia.getUTCMonth(),
+        dayBrasilia.getUTCDate(),
+        3, 0, 0, 0
+      ))
+      
+      // Próximo dia em Brasília
+      const nextDay = new Date(Date.UTC(
+        dayBrasilia.getUTCFullYear(),
+        dayBrasilia.getUTCMonth(),
+        dayBrasilia.getUTCDate() + 1,
+        3, 0, 0, 0
+      ))
 
       // Buscar resultados desse dia
       let dayCorrect = 0

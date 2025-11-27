@@ -185,10 +185,23 @@ export default function GeneratorPage() {
   useEffect(() => {
     if (!freeLimits || isPremium) return
 
-    // Calcular meia-noite de hoje (UTC) para sempre ter um valor atualizado
+    // Calcular meia-noite de hoje em Brasília (UTC-3) para sempre ter um valor atualizado
     const calculateResetTime = () => {
       const now = new Date()
-      const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999))
+      
+      // Calcular data atual em Brasília
+      // UTC-3 significa que quando são 00:00 em Brasília, são 03:00 UTC
+      // Então, para obter a data em Brasília, subtraímos 3 horas do UTC
+      const brasiliaTime = new Date(now.getTime() - (3 * 60 * 60 * 1000))
+      
+      // Fim do dia em Brasília (23:59:59.999 BRT = 02:59:59.999 UTC do dia seguinte)
+      const endOfDay = new Date(Date.UTC(
+        brasiliaTime.getUTCFullYear(),
+        brasiliaTime.getUTCMonth(),
+        brasiliaTime.getUTCDate() + 1,
+        2, 59, 59, 999 // 02:59:59.999 UTC = 23:59:59.999 BRT
+      ))
+      
       return endOfDay.getTime()
     }
 

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminApp, isUserPremium } from '@/lib/firebase-admin'
 import { verifyFirebaseToken } from '@/lib/middleware-auth'
-import * as admin from 'firebase-admin'
 
 /**
  * POST /api/user/results
@@ -122,8 +121,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Criar documento de resultado
+    // Usar Date simples como no history, para salvar como timestamp simples
+    // O Firestore converterá automaticamente para timestamp no formato correto
     const now = new Date()
-    const firestoreTimestamp = admin.firestore.Timestamp.fromDate(now)
+    
     const resultData = removeUndefinedFields({
       userId: authUser.uid,
       questions: processedQuestions,
@@ -136,8 +137,8 @@ export async function POST(request: NextRequest) {
       unansweredCount,
       percentage,
       subjects,
-      createdAt: firestoreTimestamp,
-      updatedAt: firestoreTimestamp,
+      createdAt: now,
+      updatedAt: now,
     })
 
     const docRef = await db.collection('results').add(resultData)

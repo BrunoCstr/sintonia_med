@@ -56,28 +56,102 @@ export default function GeneratorPage() {
 
   useEffect(() => {
     const checkFreeLimits = async () => {
+      // Só verificar limites se o usuário não for premium
       if (!user || isPremium) {
         setCheckingLimits(false)
+        setFreeLimits(null)
         return
       }
 
       try {
-        const response = await fetch('/api/user/check-free-limits')
+        setCheckingLimits(true)
+        const response = await fetch('/api/user/check-free-limits', {
+          credentials: 'include',
+        })
+        
         if (response.ok) {
           const data = await response.json()
+          
+          // Se for premium, não definir limites
+          if (data.isPremium) {
+            setFreeLimits(null)
+            setCheckingLimits(false)
+            return
+          }
+          
+          // Garantir valores padrão se não vierem na resposta
+          const now = Date.now()
+          const endOfDay = new Date()
+          endOfDay.setUTCHours(23, 59, 59, 999)
+          endOfDay.setUTCMilliseconds(999)
+          const timeUntilMidnight = Math.max(0, endOfDay.getTime() - now)
+          
           setFreeLimits({
-            canGenerate: data.canGenerate,
+            canGenerate: data.canGenerate ?? (data.remainingQuestions > 0),
             maxQuestionsPerDay: data.maxQuestionsPerDay || 5,
-            questionsGeneratedToday: data.questionsGeneratedToday || 0,
-            remainingQuestions: data.remainingQuestions || 5,
-            resetTime: data.resetTime,
-            timeUntilReset: data.timeUntilReset,
-            reason: data.reason,
+            questionsGeneratedToday: data.questionsGeneratedToday ?? 0,
+            remainingQuestions: data.remainingQuestions ?? Math.max(0, 5 - (data.questionsGeneratedToday || 0)),
+            resetTime: data.resetTime || endOfDay.getTime(),
+            timeUntilReset: data.timeUntilReset || timeUntilMidnight,
+            reason: data.reason || null,
           })
-          setTimeUntilReset(data.timeUntilReset)
+          setTimeUntilReset(data.timeUntilReset || timeUntilMidnight)
+        } else {
+          // Em caso de erro, definir valores padrão para mostrar o contador
+          console.error(`[Free Limits] Erro ao verificar limitações: ${response.status}`)
+          let errorData: any = {}
+          
+          try {
+            const text = await response.text()
+            if (text) {
+              errorData = JSON.parse(text)
+            }
+          } catch (parseError) {
+            console.error('[Free Limits] Erro ao parsear resposta de erro:', parseError)
+          }
+          
+          console.error('[Free Limits] Detalhes do erro:', errorData)
+          
+          // Se o erro não for de autenticação, definir valores padrão
+          if (response.status !== 401) {
+            const now = Date.now()
+            const endOfDay = new Date()
+            endOfDay.setUTCHours(23, 59, 59, 999)
+            endOfDay.setUTCMilliseconds(999)
+            const timeUntilMidnight = Math.max(0, endOfDay.getTime() - now)
+            
+            // Em caso de erro 500, ainda assim mostrar valores padrão para permitir uso
+            setFreeLimits({
+              canGenerate: true,
+              maxQuestionsPerDay: 5,
+              questionsGeneratedToday: 0,
+              remainingQuestions: 5,
+              resetTime: endOfDay.getTime(),
+              timeUntilReset: timeUntilMidnight,
+              reason: null,
+            })
+            setTimeUntilReset(timeUntilMidnight)
+          }
         }
       } catch (error) {
         console.error('Erro ao verificar limitações:', error)
+        // Em caso de erro de rede, ainda assim definir valores padrão para mostrar o contador
+        const now = Date.now()
+        const endOfDay = new Date()
+        endOfDay.setUTCHours(23, 59, 59, 999)
+        endOfDay.setUTCMilliseconds(999)
+        const timeUntilMidnight = Math.max(0, endOfDay.getTime() - now)
+        
+        setFreeLimits({
+          canGenerate: true,
+          maxQuestionsPerDay: 5,
+          questionsGeneratedToday: 0,
+          remainingQuestions: 5,
+          resetTime: endOfDay.getTime(),
+          timeUntilReset: timeUntilMidnight,
+          reason: null,
+        })
+        setTimeUntilReset(timeUntilMidnight)
       } finally {
         setCheckingLimits(false)
       }
@@ -100,28 +174,38 @@ export default function GeneratorPage() {
         clearInterval(interval)
         window.removeEventListener('focus', handleFocus)
       }
+    } else if (!user && !loading) {
+      // Se não houver usuário, limpar os limites
+      setFreeLimits(null)
+      setCheckingLimits(false)
     }
   }, [user, loading, isPremium])
 
   // Atualizar contador de tempo a cada segundo
   useEffect(() => {
-    if (!freeLimits || isPremium || !freeLimits.resetTime) return
+    if (!freeLimits || isPremium) return
 
-    const interval = setInterval(() => {
+    // Calcular meia-noite de hoje (UTC) para sempre ter um valor atualizado
+    const calculateResetTime = () => {
+      const now = new Date()
+      const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999))
+      return endOfDay.getTime()
+    }
+
+    // Função para atualizar o contador
+    const updateCounter = () => {
       const now = Date.now()
-      const remaining = freeLimits.resetTime - now
-      setTimeUntilReset(Math.max(0, remaining))
-      
-      // Se chegou a meia-noite, recarregar limites
-      if (remaining <= 0) {
-        setFreeLimits(prev => prev ? {
-          ...prev,
-          canGenerate: true,
-          questionsGeneratedToday: 0,
-          remainingQuestions: prev.maxQuestionsPerDay,
-          timeUntilReset: 24 * 60 * 60 * 1000, // 24 horas
-        } : null)
-      }
+      const resetTime = calculateResetTime()
+      const remaining = Math.max(0, resetTime - now)
+      setTimeUntilReset(remaining)
+    }
+
+    // Atualizar imediatamente
+    updateCounter()
+
+    // Atualizar a cada segundo
+    const interval = setInterval(() => {
+      updateCounter()
     }, 1000)
 
     return () => clearInterval(interval)
@@ -312,7 +396,7 @@ export default function GeneratorPage() {
         </div>
 
         {/* Contador de Limites do Plano Free */}
-        {!isPremium && freeLimits && (
+        {!isPremium && (
           <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -320,81 +404,93 @@ export default function GeneratorPage() {
                 Limite Diário - Plano Free
               </CardTitle>
               <CardDescription>
-                Você pode gerar até {freeLimits.maxQuestionsPerDay} questões por dia
+                {freeLimits ? (
+                  `Você pode gerar até ${freeLimits.maxQuestionsPerDay} questões por dia`
+                ) : (
+                  'Carregando informações de limite...'
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Questões geradas hoje</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {freeLimits.questionsGeneratedToday} / {freeLimits.maxQuestionsPerDay}
-                  </p>
+              {checkingLimits && !freeLimits ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Questões restantes</p>
-                  <p className={`text-2xl font-bold ${freeLimits.remainingQuestions > 0 ? 'text-success' : 'text-destructive'}`}>
-                    {freeLimits.remainingQuestions}
-                  </p>
-                </div>
-              </div>
+              ) : freeLimits ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Questões geradas hoje</p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {freeLimits.questionsGeneratedToday} / {freeLimits.maxQuestionsPerDay}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Questões restantes</p>
+                      <p className={`text-2xl font-bold ${freeLimits.remainingQuestions > 0 ? 'text-success' : 'text-destructive'}`}>
+                        {freeLimits.remainingQuestions}
+                      </p>
+                    </div>
+                  </div>
               
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Progresso diário</span>
-                  <span className="font-medium">
-                    {Math.round((freeLimits.questionsGeneratedToday / freeLimits.maxQuestionsPerDay) * 100)}%
-                  </span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{
-                      width: `${Math.min(100, (freeLimits.questionsGeneratedToday / freeLimits.maxQuestionsPerDay) * 100)}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              {freeLimits.remainingQuestions === 0 && timeUntilReset !== null && (
-                <div className="rounded-lg border border-warning/20 bg-warning/5 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="h-4 w-4 text-warning" />
-                    <p className="text-sm font-semibold text-warning">Limite diário atingido</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Progresso diário</span>
+                      <span className="font-medium">
+                        {Math.round((freeLimits.questionsGeneratedToday / freeLimits.maxQuestionsPerDay) * 100)}%
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{
+                          width: `${Math.min(100, (freeLimits.questionsGeneratedToday / freeLimits.maxQuestionsPerDay) * 100)}%`,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    O limite será resetado em:
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-primary" />
-                    <span className="text-lg font-mono font-bold text-primary">
-                      {formatTimeRemaining(timeUntilReset)}
-                    </span>
-                  </div>
-                </div>
-              )}
 
-              {freeLimits.remainingQuestions > 0 && timeUntilReset !== null && (
-                <div className="rounded-lg border border-muted bg-muted/30 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Próximo reset em:</span>
-                    <span className="text-sm font-mono font-medium text-foreground">
-                      {formatTimeRemaining(timeUntilReset)}
-                    </span>
-                  </div>
-                </div>
-              )}
+                  {freeLimits.remainingQuestions === 0 && timeUntilReset !== null && (
+                    <div className="rounded-lg border border-warning/20 bg-warning/5 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="h-4 w-4 text-warning" />
+                        <p className="text-sm font-semibold text-warning">Limite diário atingido</p>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        O limite será resetado em:
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        <span className="text-lg font-mono font-bold text-primary">
+                          {formatTimeRemaining(timeUntilReset)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
-              {freeLimits.remainingQuestions > 0 && (
-                <div className="pt-2">
-                  <Link href="/plans">
-                    <Button variant="outline" className="w-full cursor-pointer" size="sm">
-                      <Crown className="mr-2 h-4 w-4" />
-                      Assine Premium para gerar questões ilimitadas
-                    </Button>
-                  </Link>
-                </div>
-              )}
+                  {freeLimits.remainingQuestions > 0 && timeUntilReset !== null && (
+                    <div className="rounded-lg border border-muted bg-muted/30 p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Próximo reset em:</span>
+                        <span className="text-sm font-mono font-medium text-foreground">
+                          {formatTimeRemaining(timeUntilReset)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {freeLimits.remainingQuestions > 0 && (
+                    <div className="pt-2">
+                      <Link href="/plans">
+                        <Button variant="outline" className="w-full cursor-pointer" size="sm">
+                          <Crown className="mr-2 h-4 w-4" />
+                          Assine Premium para gerar questões ilimitadas
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </>
+              ) : null}
             </CardContent>
           </Card>
         )}
@@ -642,7 +738,7 @@ export default function GeneratorPage() {
                 parseInt(questionCount) === 0 || 
                 selectedSubjects.length === 0 || 
                 !difficulty ||
-                (!isPremium && freeLimits && (freeLimits.remainingQuestions === 0 || parseInt(questionCount) > freeLimits.remainingQuestions))
+                (!isPremium && freeLimits ? (freeLimits.remainingQuestions === 0 || parseInt(questionCount) > freeLimits.remainingQuestions) : false)
               }
               className="cursor-pointer"
             >

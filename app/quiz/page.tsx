@@ -180,9 +180,16 @@ export default function QuizPage() {
       if (user) {
         try {
         // Calcular tempo gasto (se houver timer)
-        const timeSpent = timeLeft !== null && filters.timeLimit 
-          ? filters.timeLimit * 60 - timeLeft 
-          : null
+        let timeSpent: number | null = null
+        if (timeLeft !== null && filters?.timeLimit && typeof filters.timeLimit === 'number') {
+          const totalSeconds = filters.timeLimit * 60
+          const remainingSeconds = typeof timeLeft === 'number' ? timeLeft : 0
+          const spent = totalSeconds - remainingSeconds
+          // Garantir que o tempo gasto seja válido (não negativo, não NaN)
+          if (spent >= 0 && !isNaN(spent) && isFinite(spent)) {
+            timeSpent = Math.round(spent)
+          }
+        }
 
         // Função helper para remover campos undefined antes de enviar
         const removeUndefinedFields = (obj: any): any => {
@@ -215,17 +222,28 @@ export default function QuizPage() {
             questions: cleanedQuestions,
             answers,
             filters,
-            timeSpent,
+            timeSpent: timeSpent !== null && timeSpent !== undefined ? Number(timeSpent) : null,
           }),
         })
 
-        if (!resultsResponse.ok) {
-          const errorData = await resultsResponse.json()
-          console.error('Erro ao salvar resultado:', errorData)
-          throw new Error(errorData.error || 'Erro ao salvar resultado')
+        // Ler a resposta uma única vez
+        const responseText = await resultsResponse.text()
+        let resultsData
+
+        try {
+          resultsData = JSON.parse(responseText)
+        } catch (parseError) {
+          console.error('Erro ao parsear resposta:', parseError)
+          console.error('Resposta recebida:', responseText)
+          throw new Error('Resposta inválida do servidor')
         }
 
-        const resultsData = await resultsResponse.json()
+        if (!resultsResponse.ok) {
+          console.error('Erro ao salvar resultado:', resultsData)
+          const errorMessage = resultsData?.error || `Erro ao salvar resultado (status ${resultsResponse.status})`
+          throw new Error(errorMessage)
+        }
+
         console.log('Resultado salvo com sucesso:', resultsData.id)
 
         // Salvar questões respondidas no histórico do Firestore
@@ -375,9 +393,11 @@ export default function QuizPage() {
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
                 {currentQuestion.subject}
               </span>
-              <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
-                {currentQuestion.period}
-              </span>
+              {currentQuestion.period && currentQuestion.period.trim() && (
+                <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
+                  {currentQuestion.period}
+                </span>
+              )}
               {currentQuestion.isOfficial && (
                 <span className="rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success">
                   Oficial

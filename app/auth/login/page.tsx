@@ -38,6 +38,12 @@ function LoginForm() {
 
     try {
       await signIn(email, password)
+      // Marcar que o usuário acabou de fazer login para mostrar o dialog de planos
+      // Limpar flag anterior para garantir que aparece mesmo se já viu antes
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('plansWelcomeShown')
+        sessionStorage.setItem('justLoggedIn', 'true')
+      }
       router.push(redirect)
     } catch (err: any) {
       // Tratar erro específico de e-mail não verificado

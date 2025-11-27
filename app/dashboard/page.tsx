@@ -51,15 +51,47 @@ export default function DashboardPage() {
       // Verificar se o modal já foi mostrado nesta sessão
       if (typeof window !== 'undefined') {
         const hasSeenInSession = sessionStorage.getItem('plansWelcomeShown') === 'true'
+        const justLoggedIn = sessionStorage.getItem('justLoggedIn') === 'true'
         
-        if (!hasSeenInSession) {
-          // Mostrar apenas uma vez por sessão após login
+        // Se acabou de fazer login (incluindo primeiro login após cadastro), mostrar o dialog
+        if (justLoggedIn) {
+          sessionStorage.removeItem('justLoggedIn')
           const timer = setTimeout(() => {
             setShowPlansDialog(true)
             sessionStorage.setItem('plansWelcomeShown', 'true')
           }, 1500)
-          
           return () => clearTimeout(timer)
+        }
+        
+        // Se não viu ainda nesta sessão e não acabou de fazer login, mostrar também
+        // Isso garante que novos usuários vejam o dialog mesmo se a flag justLoggedIn não foi setada
+        if (!hasSeenInSession) {
+          // Verificar se é um novo usuário (criado hoje)
+          let isNewUser = false
+          if (userProfile.createdAt) {
+            try {
+              const userCreatedAt = typeof userProfile.createdAt === 'string' 
+                ? new Date(userProfile.createdAt) 
+                : userProfile.createdAt instanceof Date 
+                  ? userProfile.createdAt 
+                  : null
+              
+              if (userCreatedAt && !isNaN(userCreatedAt.getTime())) {
+                isNewUser = (Date.now() - userCreatedAt.getTime()) < 24 * 60 * 60 * 1000 // Criado nas últimas 24h
+              }
+            } catch (e) {
+              console.error('Erro ao verificar data de criação:', e)
+            }
+          }
+          
+          // Mostrar para novos usuários ou se nunca viu o dialog
+          if (isNewUser || !hasSeenInSession) {
+            const timer = setTimeout(() => {
+              setShowPlansDialog(true)
+              sessionStorage.setItem('plansWelcomeShown', 'true')
+            }, 1500)
+            return () => clearTimeout(timer)
+          }
         }
       }
     } else if (isPremium) {

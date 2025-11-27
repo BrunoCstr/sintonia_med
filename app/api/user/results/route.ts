@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminApp, isUserPremium } from '@/lib/firebase-admin'
 import { verifyFirebaseToken } from '@/lib/middleware-auth'
+import * as admin from 'firebase-admin'
 
 /**
  * POST /api/user/results
@@ -111,22 +112,32 @@ export async function POST(request: NextRequest) {
       isPremium: userIsPremium,
     })
 
+    // Validar e normalizar timeSpent
+    let normalizedTimeSpent: number | null = null
+    if (timeSpent !== null && timeSpent !== undefined) {
+      const timeSpentNum = typeof timeSpent === 'number' ? timeSpent : parseFloat(String(timeSpent))
+      if (!isNaN(timeSpentNum) && isFinite(timeSpentNum) && timeSpentNum >= 0) {
+        normalizedTimeSpent = Math.round(timeSpentNum)
+      }
+    }
+
     // Criar documento de resultado
     const now = new Date()
+    const firestoreTimestamp = admin.firestore.Timestamp.fromDate(now)
     const resultData = removeUndefinedFields({
       userId: authUser.uid,
       questions: processedQuestions,
       answers,
       filters: filters || {},
-      timeSpent: timeSpent || null,
+      timeSpent: normalizedTimeSpent,
       questionsCount: questions.length,
       correctCount,
       incorrectCount,
       unansweredCount,
       percentage,
       subjects,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: firestoreTimestamp,
+      updatedAt: firestoreTimestamp,
     })
 
     const docRef = await db.collection('results').add(resultData)
@@ -134,12 +145,48 @@ export async function POST(request: NextRequest) {
     console.log('Resultado salvo com sucesso:', docRef.id)
 
     // Garantir que createdAt e updatedAt sejam objetos Date válidos
-    const createdAtDate = resultData.createdAt instanceof Date 
-      ? resultData.createdAt 
-      : new Date(resultData.createdAt)
-    const updatedAtDate = resultData.updatedAt instanceof Date 
-      ? resultData.updatedAt 
-      : new Date(resultData.updatedAt)
+    let createdAtDate: Date
+    let updatedAtDate: Date
+    
+    try {
+      if (resultData.createdAt instanceof Date) {
+        createdAtDate = resultData.createdAt
+      } else if (resultData.createdAt?.toDate && typeof resultData.createdAt.toDate === 'function') {
+        createdAtDate = resultData.createdAt.toDate()
+      } else if (resultData.createdAt?.seconds) {
+        createdAtDate = new Date(resultData.createdAt.seconds * 1000)
+      } else {
+        createdAtDate = new Date(resultData.createdAt || now)
+      }
+      
+      // Validar se a data é válida
+      if (isNaN(createdAtDate.getTime())) {
+        createdAtDate = now
+      }
+    } catch (error) {
+      console.error('Erro ao converter createdAt:', error)
+      createdAtDate = now
+    }
+    
+    try {
+      if (resultData.updatedAt instanceof Date) {
+        updatedAtDate = resultData.updatedAt
+      } else if (resultData.updatedAt?.toDate && typeof resultData.updatedAt.toDate === 'function') {
+        updatedAtDate = resultData.updatedAt.toDate()
+      } else if (resultData.updatedAt?.seconds) {
+        updatedAtDate = new Date(resultData.updatedAt.seconds * 1000)
+      } else {
+        updatedAtDate = new Date(resultData.updatedAt || now)
+      }
+      
+      // Validar se a data é válida
+      if (isNaN(updatedAtDate.getTime())) {
+        updatedAtDate = now
+      }
+    } catch (error) {
+      console.error('Erro ao converter updatedAt:', error)
+      updatedAtDate = now
+    }
 
     return NextResponse.json({ 
       success: true, 
@@ -153,8 +200,20 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('Erro ao salvar resultado:', error)
+    console.error('Stack trace:', error.stack)
+    
+    // Fornecer mais detalhes do erro em desenvolvimento
+    const errorMessage = error.message || 'Erro ao salvar resultado'
+    const errorDetails = process.env.NODE_ENV === 'development' 
+      ? { 
+          message: errorMessage,
+          stack: error.stack,
+          name: error.name
+        }
+      : { message: errorMessage }
+    
     return NextResponse.json(
-      { error: error.message || 'Erro ao salvar resultado' },
+      { error: errorMessage, details: errorDetails },
       { status: 500 }
     )
   }

@@ -42,11 +42,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Para usuários Free, verificar limite
+    // Usar UTC para evitar problemas de timezone
     const now = new Date()
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    startOfDay.setHours(0, 0, 0, 0)
+    const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0))
     const endOfDay = new Date(startOfDay)
-    endOfDay.setDate(endOfDay.getDate() + 1)
+    endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
     // Converter para Firestore Timestamp
     const startTimestamp = admin.firestore.Timestamp.fromDate(startOfDay)

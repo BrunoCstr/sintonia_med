@@ -79,6 +79,8 @@ export default function QuizPage() {
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [showNoQuestionsDialog, setShowNoQuestionsDialog] = useState(false)
+  const [showTimeUpDialog, setShowTimeUpDialog] = useState(false)
+  const [allowNegativeTime, setAllowNegativeTime] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const router = useRouter()
 
@@ -190,7 +192,10 @@ export default function QuizPage() {
         if (timeLeft !== null && filters?.timeLimit && typeof filters.timeLimit === 'number') {
           const totalSeconds = filters.timeLimit * 60
           const remainingSeconds = typeof timeLeft === 'number' ? timeLeft : 0
-          const spent = totalSeconds - remainingSeconds
+          // Se o tempo for negativo, o tempo gasto é o tempo limite + o tempo negativo (em valor absoluto)
+          const spent = remainingSeconds < 0 
+            ? totalSeconds + Math.abs(remainingSeconds)
+            : totalSeconds - remainingSeconds
           // Garantir que o tempo gasto seja válido (não negativo, não NaN)
           if (spent >= 0 && !isNaN(spent) && isFinite(spent)) {
             timeSpent = Math.round(spent)
@@ -289,26 +294,45 @@ export default function QuizPage() {
   }, [questions, answers, user, router, timeLeft, isFinishing])
 
   useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) return
+    if (timeLeft === null) return
+    
+    // Pausar o timer se o dialog de tempo esgotado estiver aberto
+    if (showTimeUpDialog) return
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev === null || prev <= 1) {
-          // Finalizar quando o tempo acabar
-          handleFinish()
+        if (prev === null) return null
+        
+        // Se o tempo chegou a 0 e ainda não mostrou o dialog, mostrar o dialog
+        if (prev === 0 && !allowNegativeTime) {
+          setShowTimeUpDialog(true)
           return 0
         }
-        return prev - 1
+        
+        // Se permitir tempo negativo, continuar contando
+        if (allowNegativeTime) {
+          return prev - 1
+        }
+        
+        // Se ainda tem tempo, continuar contando normalmente
+        if (prev > 0) {
+          return prev - 1
+        }
+        
+        return prev
       })
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [timeLeft, handleFinish])
+  }, [timeLeft, allowNegativeTime, showTimeUpDialog])
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
+    const isNegative = seconds < 0
+    const absSeconds = Math.abs(seconds)
+    const mins = Math.floor(absSeconds / 60)
+    const secs = absSeconds % 60
+    const sign = isNegative ? '-' : ''
+    return `${sign}${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   if (loading) {
@@ -371,6 +395,7 @@ export default function QuizPage() {
             {timeLeft !== null && (
               <div className={cn(
                 "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
+                timeLeft < 0 ? "bg-destructive/20 text-destructive" : 
                 timeLeft < 60 ? "bg-destructive/10 text-destructive" : "bg-muted"
               )}>
                 <Clock className="h-4 w-4" />
@@ -536,6 +561,35 @@ export default function QuizPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Continuar</AlertDialogCancel>
             <AlertDialogAction onClick={handleFinish}>Finalizar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Time Up Dialog */}
+      <AlertDialog open={showTimeUpDialog} onOpenChange={setShowTimeUpDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>O tempo acabou</AlertDialogTitle>
+            <AlertDialogDescription>
+              O tempo do simulado chegou ao fim. Deseja continuar respondendo as questões?
+              <br />
+              <br />
+              Você respondeu {answeredCount} de {questions.length} questões.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowTimeUpDialog(false)
+              handleFinish()
+            }}>
+              Finalizar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setShowTimeUpDialog(false)
+              setAllowNegativeTime(true)
+            }}>
+              Continuar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

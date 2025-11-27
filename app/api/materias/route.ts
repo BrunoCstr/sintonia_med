@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminApp } from '@/lib/firebase-admin'
 import { verifyFirebaseToken } from '@/lib/middleware-auth'
-import type { Sistema, MedicalArea } from '@/lib/types'
+import type { Materia } from '@/lib/types'
 
 /**
- * GET /api/medical-areas
- * Lista sistemas ativos (usuários autenticados)
- * Mantido o endpoint para compatibilidade, mas agora usa a coleção 'sistemas'
+ * GET /api/materias
+ * Lista matérias ativas de um sistema (usuários autenticados)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -23,32 +22,40 @@ export async function GET(request: NextRequest) {
 
     const app = getAdminApp()
     const db = app.firestore()
+    const sistemaId = request.nextUrl.searchParams.get('sistemaId')
 
-    // Buscar APENAS da coleção 'sistemas' (sem fallback)
-    const areasSnapshot = await db
-      .collection('sistemas')
+    if (!sistemaId) {
+      return NextResponse.json(
+        { error: 'sistemaId é obrigatório' },
+        { status: 400 }
+      )
+    }
+
+    // Buscar apenas matérias ativas do sistema
+    const materiasSnapshot = await db
+      .collection('materias')
+      .where('sistemaId', '==', sistemaId)
       .where('ativo', '==', true)
       .orderBy('nome', 'asc')
       .get()
 
-    const areas = areasSnapshot.docs.map((doc) => {
+    const materias = materiasSnapshot.docs.map((doc) => {
       const data = doc.data()
       return {
         id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-      } as Sistema
+        nome: data.nome,
+        sistemaId: data.sistemaId,
+        ativo: data.ativo,
+      } as Partial<Materia>
     })
 
-    return NextResponse.json({ areas })
+    return NextResponse.json({ materias })
   } catch (error: any) {
-    console.error('Erro ao buscar sistemas:', error)
+    console.error('Erro ao buscar matérias:', error)
     return NextResponse.json(
-      { error: error.message || 'Erro ao buscar sistemas' },
+      { error: error.message || 'Erro ao buscar matérias' },
       { status: 500 }
     )
   }
 }
-
 

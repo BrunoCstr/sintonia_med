@@ -195,12 +195,37 @@ service cloud.firestore {
       allow delete: if isAdminMaster();
     }
     
-    // Medical Areas collection
+    // Sistemas collection (renomeado de medical_areas)
+    match /sistemas/{sistemaId} {
+      // Leitura: todos autenticados podem ler sistemas
+      // A query já filtra por ativo == true, então permitimos leitura para autenticados
+      allow read: if isAuthenticated();
+      
+      // Criação: apenas admins podem criar sistemas
+      allow create: if isAdmin() &&
+                       // Validar campos obrigatórios
+                       'nome' in request.resource.data &&
+                       'ativo' in request.resource.data &&
+                       'createdAt' in request.resource.data &&
+                       'updatedAt' in request.resource.data &&
+                       'createdBy' in request.resource.data;
+      
+      // Atualização: apenas admins podem atualizar sistemas
+      allow update: if isAdmin() &&
+                       // Validar que campos obrigatórios não foram removidos
+                       'nome' in request.resource.data &&
+                       'ativo' in request.resource.data &&
+                       'updatedAt' in request.resource.data;
+      
+      // Exclusão: apenas admins podem excluir sistemas
+      allow delete: if isAdmin();
+    }
+    
+    // Medical Areas collection (mantido para compatibilidade)
     match /medical_areas/{areaId} {
-      // Leitura: todos autenticados podem ler áreas ativas, admins podem ler todas
-      allow read: if isAuthenticated() && (
-        resource.data.ativo == true || isAdmin()
-      );
+      // Leitura: todos autenticados podem ler áreas
+      // A query já filtra por ativo == true, então permitimos leitura para autenticados
+      allow read: if isAuthenticated();
       
       // Criação: apenas admins podem criar áreas médicas
       allow create: if isAdmin() &&
@@ -219,6 +244,34 @@ service cloud.firestore {
                        'updatedAt' in request.resource.data;
       
       // Exclusão: apenas admins podem excluir áreas médicas
+      allow delete: if isAdmin();
+    }
+    
+    // Matérias collection (subdivisões dentro dos sistemas)
+    match /materias/{materiaId} {
+      // Leitura: todos autenticados podem ler matérias
+      // A query já filtra por ativo == true e sistemaId, então permitimos leitura para autenticados
+      allow read: if isAuthenticated();
+      
+      // Criação: apenas admins podem criar matérias
+      allow create: if isAdmin() &&
+                       // Validar campos obrigatórios
+                       'nome' in request.resource.data &&
+                       'sistemaId' in request.resource.data &&
+                       'ativo' in request.resource.data &&
+                       'createdAt' in request.resource.data &&
+                       'updatedAt' in request.resource.data &&
+                       'createdBy' in request.resource.data;
+      
+      // Atualização: apenas admins podem atualizar matérias
+      allow update: if isAdmin() &&
+                       // Validar que campos obrigatórios não foram removidos
+                       'nome' in request.resource.data &&
+                       'sistemaId' in request.resource.data &&
+                       'ativo' in request.resource.data &&
+                       'updatedAt' in request.resource.data;
+      
+      // Exclusão: apenas admins podem excluir matérias
       allow delete: if isAdmin();
     }
     

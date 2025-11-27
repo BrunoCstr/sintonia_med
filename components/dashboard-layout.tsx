@@ -45,8 +45,8 @@ const adminNavigation = [
     roles: ['admin_master', 'admin_questoes'],
   },
   {
-    name: 'Áreas Médicas',
-    href: '/admin/medical-areas',
+    name: 'Sistemas',
+    href: '/admin/sistemas',
     icon: Stethoscope,
     roles: ['admin_master', 'admin_questoes'],
   },

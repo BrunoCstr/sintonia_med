@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Brain, Clock, Filter, AlertCircle, Crown } from 'lucide-react'
-import type { MedicalArea } from '@/lib/types'
+import type { Sistema, MedicalArea } from '@/lib/types'
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import Link from 'next/link'
@@ -25,16 +25,19 @@ export default function GeneratorPage() {
   const { isAdminMaster, isAdminQuestoes } = useRole()
   const { isPremium } = usePremium()
   const router = useRouter()
-  const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([])
+  const [sistemas, setSistemas] = useState<MedicalArea[]>([])
+  const [materias, setMaterias] = useState<Record<string, any[]>>({}) // Matérias por sistema
   const [loadingAreas, setLoadingAreas] = useState(true)
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([])
-  const [difficulty, setDifficulty] = useState('')
+  const [selectedSistemas, setSelectedSistemas] = useState<string[]>([])
+  const [selectedMaterias, setSelectedMaterias] = useState<string[]>([])
+  const [selectedDisciplinas, setSelectedDisciplinas] = useState<string[]>(['SOI', 'HAM', 'IESC', 'CI']) // Pré-marcado em todos (quando período é "all")
+  const [difficulty, setDifficulty] = useState('all') // Pré-marcado em todos
   const [officialOnly, setOfficialOnly] = useState(false)
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('all') // Pré-marcado em todos
   const [questionCount, setQuestionCount] = useState('5')
   const [timed, setTimed] = useState(false)
   const [timeLimit, setTimeLimit] = useState('30')
-  const [errors, setErrors] = useState<{ subjects?: string; difficulty?: string; limit?: string }>({})
+  const [errors, setErrors] = useState<{ sistemas?: string; limit?: string }>({})
   const [freeLimits, setFreeLimits] = useState<{ 
     canGenerate: boolean
     maxQuestionsPerDay: number
@@ -256,65 +259,148 @@ export default function GeneratorPage() {
   }
 
   useEffect(() => {
-    const loadMedicalAreas = async () => {
+    const loadSistemas = async () => {
       try {
         setLoadingAreas(true)
         
-        // Buscar diretamente do Firestore usando Firebase Client SDK
-        const areasQuery = query(
-          collection(db, 'medical_areas'),
-          where('ativo', '==', true),
-          orderBy('nome', 'asc')
-        )
-        
-        const querySnapshot = await getDocs(areasQuery)
-        const areas: MedicalArea[] = []
-        
-        querySnapshot.forEach((doc) => {
-          const data = doc.data()
-          areas.push({
-            id: doc.id,
-            nome: data.nome,
-            descricao: data.descricao,
-            ativo: data.ativo,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
-            createdBy: data.createdBy || '',
-          })
+        // Usar API para buscar sistemas (a API já tem lógica para buscar de 'sistemas' primeiro)
+        const response = await fetch('/api/medical-areas', {
+          credentials: 'include',
         })
         
-        console.log('Áreas médicas carregadas:', areas.length)
-        setMedicalAreas(areas)
-        // Marcar todas as matérias por padrão
-        const allAreaNames = areas.map(area => area.nome)
-        setSelectedSubjects(allAreaNames)
-      } catch (error) {
-        console.error('Erro ao carregar áreas médicas:', error)
-        // Tentar via API como fallback
-        try {
-          const response = await fetch('/api/medical-areas', {
-            credentials: 'include',
-          })
-          if (response.ok) {
-            const data = await response.json()
-            setMedicalAreas(data.areas || [])
-          }
-        } catch (apiError) {
-          console.error('Erro ao carregar via API:', apiError)
+        if (!response.ok) {
+          throw new Error('Erro ao carregar sistemas')
         }
+        
+        const data = await response.json()
+        const areas = data.areas || []
+        
+        console.log('✅ Sistemas carregados:', areas.length)
+        console.log('Sistemas:', areas.map(a => ({ id: a.id, nome: a.nome })))
+        setSistemas(areas)
+        
+        // Marcar todos os sistemas por padrão
+        const allSistemaNames = areas.map((area: MedicalArea) => area.nome)
+        setSelectedSistemas(allSistemaNames)
+        
+        // Carregar matérias (submatérias) para cada sistema via API pública
+        const materiasMap: Record<string, any[]> = {}
+        const todasMaterias: string[] = []
+        
+        console.log('📚 Carregando matérias para', areas.length, 'sistemas...')
+        
+        for (const sistema of areas) {
+          try {
+            const materiasResponse = await fetch(`/api/materias?sistemaId=${sistema.id}`, {
+              credentials: 'include',
+            })
+            
+            if (materiasResponse.ok) {
+              const materiasData = await materiasResponse.json()
+              const sistemaMaterias = materiasData.materias || []
+              materiasMap[sistema.id] = sistemaMaterias
+              
+              console.log(`  ✓ Sistema "${sistema.nome}" (${sistema.id}): ${sistemaMaterias.length} matérias`)
+              
+              // Coletar todas as matérias para marcar por padrão
+              sistemaMaterias.forEach((m: any) => {
+                if (!todasMaterias.includes(m.nome)) {
+                  todasMaterias.push(m.nome)
+                }
+              })
+            } else {
+              const errorText = await materiasResponse.text()
+              console.warn(`  ✗ Sistema "${sistema.nome}" (${sistema.id}): Erro ${materiasResponse.status} - ${errorText}`)
+              materiasMap[sistema.id] = []
+            }
+          } catch (error: any) {
+            console.error(`  ✗ Erro ao carregar matérias do sistema "${sistema.nome}" (${sistema.id}):`, error.message)
+            materiasMap[sistema.id] = []
+          }
+        }
+        
+        setMaterias(materiasMap)
+        // Marcar todas as matérias por padrão
+        setSelectedMaterias(todasMaterias)
+        
+        console.log('✅ Matérias carregadas:', Object.keys(materiasMap).length, 'sistemas com matérias')
+        console.log('✅ Total de matérias únicas:', todasMaterias.length)
+        console.log('✅ Matérias por sistema:', Object.entries(materiasMap).map(([id, mats]) => ({
+          sistemaId: id,
+          sistemaNome: areas.find(a => a.id === id)?.nome,
+          materias: mats.length
+        })))
+      } catch (error) {
+        console.error('Erro ao carregar sistemas:', error)
       } finally {
         setLoadingAreas(false)
       }
     }
 
     if (user) {
-      loadMedicalAreas()
+      loadSistemas()
     }
   }, [user])
+  
+  // Atualizar disciplinas disponíveis baseado no período selecionado
+  useEffect(() => {
+    if (selectedPeriod === 'all' || !selectedPeriod) {
+      // Se todos os períodos estão selecionados, mostrar todas as disciplinas
+      setSelectedDisciplinas(['SOI', 'HAM', 'IESC', 'CI'])
+    } else {
+      const periodNum = parseInt(selectedPeriod.charAt(0))
+      if (periodNum >= 1 && periodNum <= 5) {
+        setSelectedDisciplinas(['SOI', 'HAM', 'IESC'])
+      } else if (periodNum >= 6 && periodNum <= 8) {
+        setSelectedDisciplinas(['CI', 'HAM', 'IESC'])
+      } else {
+        setSelectedDisciplinas(['SOI', 'HAM', 'IESC', 'CI'])
+      }
+    }
+  }, [selectedPeriod])
 
-  const toggleSubject = (subject: string) => {
-    setSelectedSubjects((prev) =>
-      prev.includes(subject) ? prev.filter((s) => s !== subject) : [...prev, subject]
+  const toggleSistema = (sistemaNome: string) => {
+    setSelectedSistemas((prev) => {
+      const newSelected = prev.includes(sistemaNome) 
+        ? prev.filter((s) => s !== sistemaNome) 
+        : [...prev, sistemaNome]
+      
+      // Se desmarcou o sistema, desmarcar todas as matérias desse sistema
+      if (!newSelected.includes(sistemaNome)) {
+        const sistema = sistemas.find(s => s.nome === sistemaNome)
+        if (sistema) {
+          const sistemaMaterias = materias[sistema.id] || []
+          setSelectedMaterias(prevMaterias => 
+            prevMaterias.filter(m => !sistemaMaterias.some(sm => sm.nome === m))
+          )
+        }
+      } else {
+        // Se marcou o sistema, marcar todas as matérias desse sistema
+        const sistema = sistemas.find(s => s.nome === sistemaNome)
+        if (sistema) {
+          const sistemaMaterias = materias[sistema.id] || []
+          setSelectedMaterias(prevMaterias => {
+            const novasMaterias = sistemaMaterias
+              .map(m => m.nome)
+              .filter(m => !prevMaterias.includes(m))
+            return [...prevMaterias, ...novasMaterias]
+          })
+        }
+      }
+      
+      return newSelected
+    })
+  }
+  
+  const toggleMateria = (materiaNome: string) => {
+    setSelectedMaterias((prev) =>
+      prev.includes(materiaNome) ? prev.filter((m) => m !== materiaNome) : [...prev, materiaNome]
+    )
+  }
+  
+  const toggleDisciplina = (disciplina: string) => {
+    setSelectedDisciplinas((prev) =>
+      prev.includes(disciplina) ? prev.filter((d) => d !== disciplina) : [...prev, disciplina]
     )
   }
 
@@ -322,18 +408,13 @@ export default function GeneratorPage() {
     // Reset errors
     setErrors({})
 
-    // Validate subjects
-    if (selectedSubjects.length === 0) {
-      setErrors((prev) => ({ ...prev, subjects: 'Selecione pelo menos uma matéria' }))
-    }
-
-    // Validate difficulty
-    if (!difficulty) {
-      setErrors((prev) => ({ ...prev, difficulty: 'Selecione a dificuldade' }))
+    // Validate sistemas
+    if (selectedSistemas.length === 0) {
+      setErrors((prev) => ({ ...prev, sistemas: 'Selecione pelo menos um sistema' }))
     }
 
     // If there are errors, don't proceed
-    if (selectedSubjects.length === 0 || !difficulty) {
+    if (selectedSistemas.length === 0) {
       return
     }
 
@@ -390,12 +471,15 @@ export default function GeneratorPage() {
       easy: 'facil',
       medium: 'medio',
       hard: 'dificil',
+      all: '', // Todos
     }
 
     const filters = {
       period: selectedPeriod === 'all' ? '' : (selectedPeriod || userProfile?.period || ''),
-      areas: selectedSubjects, // Usar áreas ao invés de subjects
-      difficulty: difficultyMap[difficulty] || difficulty,
+      areas: selectedSistemas, // Sistemas selecionados
+      subareas: selectedMaterias.length > 0 ? selectedMaterias : undefined, // Matérias selecionadas
+      disciplinas: selectedDisciplinas.length > 0 ? selectedDisciplinas : undefined, // Disciplinas selecionadas
+      difficulty: difficulty === 'all' ? '' : (difficultyMap[difficulty] || difficulty),
       officialOnly, // Flag para filtrar questões oficiais
       count: parseInt(questionCount),
       timed,
@@ -540,88 +624,7 @@ export default function GeneratorPage() {
           </CardHeader>
 
           <CardContent className="space-y-6">
-            <div className="space-y-3">
-              <Label>
-                Matérias <span className="text-destructive">*</span>
-              </Label>
-              {loadingAreas ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                </div>
-              ) : medicalAreas.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nenhuma área médica disponível no momento.
-                </p>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {medicalAreas.map((area) => (
-                      <div key={area.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={area.id}
-                          checked={selectedSubjects.includes(area.nome)}
-                          onCheckedChange={() => {
-                            toggleSubject(area.nome)
-                            // Clear error when subject is selected
-                            if (errors.subjects && selectedSubjects.length === 0) {
-                              setErrors((prev) => ({ ...prev, subjects: undefined }))
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor={area.id}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          {area.nome}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                  {errors.subjects && (
-                    <p className="text-sm text-destructive">{errors.subjects}</p>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>
-                Dificuldade <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={difficulty}
-                onValueChange={(value) => {
-                  setDifficulty(value)
-                  // Clear error when difficulty is selected
-                  if (errors.difficulty) {
-                    setErrors((prev) => ({ ...prev, difficulty: undefined }))
-                  }
-                }}
-              >
-                <SelectTrigger className={errors.difficulty ? 'border-destructive' : ''}>
-                  <SelectValue placeholder="Selecione a dificuldade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="easy">Fácil</SelectItem>
-                  <SelectItem value="medium">Média</SelectItem>
-                  <SelectItem value="hard">Difícil</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.difficulty && (
-                <p className="text-sm text-destructive">{errors.difficulty}</p>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <Label>Apenas Questões Oficiais</Label>
-                <p className="text-sm text-muted-foreground">
-                  Incluir somente questões de provas oficiais
-                </p>
-              </div>
-              <Switch checked={officialOnly} onCheckedChange={setOfficialOnly} />
-            </div>
-
+            {/* Primeiro Filtro: Período */}
             <div className="space-y-2">
               <Label>Período</Label>
               <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -629,7 +632,7 @@ export default function GeneratorPage() {
                   <SelectValue placeholder="Selecione o período" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os períodos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="1º Período">1º Período</SelectItem>
                   <SelectItem value="2º Período">2º Período</SelectItem>
                   <SelectItem value="3º Período">3º Período</SelectItem>
@@ -638,16 +641,145 @@ export default function GeneratorPage() {
                   <SelectItem value="6º Período">6º Período</SelectItem>
                   <SelectItem value="7º Período">7º Período</SelectItem>
                   <SelectItem value="8º Período">8º Período</SelectItem>
-                  <SelectItem value="Formado">Formado</SelectItem>
                 </SelectContent>
               </Select>
-              {userProfile?.period && selectedPeriod !== userProfile.period && selectedPeriod !== 'all' && (
-                <p className="text-xs text-muted-foreground">
-                  Seu período cadastrado é: <span className="font-medium">{userProfile.period}</span>
+            </div>
+
+            {/* Segundo Filtro: Disciplina */}
+            <div className="space-y-3">
+              <Label>Disciplina</Label>
+              <div className="grid grid-cols-4 gap-3">
+                {(() => {
+                  const periodNum = selectedPeriod === 'all' || !selectedPeriod 
+                    ? null 
+                    : parseInt(selectedPeriod.charAt(0))
+                  
+                  // Se todos os períodos, mostrar todas as disciplinas
+                  const disciplinasDisponiveis = 
+                    selectedPeriod === 'all' || !selectedPeriod
+                      ? ['SOI', 'HAM', 'IESC', 'CI']
+                      : (periodNum && periodNum >= 1 && periodNum <= 5)
+                        ? ['SOI', 'HAM', 'IESC']
+                        : ['CI', 'HAM', 'IESC']
+                  
+                  return disciplinasDisponiveis.map((disc) => (
+                    <div key={disc} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`disciplina-${disc}`}
+                        checked={selectedDisciplinas.includes(disc)}
+                        onCheckedChange={() => toggleDisciplina(disc)}
+                      />
+                      <label
+                        htmlFor={`disciplina-${disc}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {disc}
+                      </label>
+                    </div>
+                  ))
+                })()}
+              </div>
+            </div>
+
+            {/* Terceiro Filtro: Sistemas */}
+            <div className="space-y-3">
+              <Label>
+                Sistemas <span className="text-destructive">*</span>
+              </Label>
+              {loadingAreas ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : sistemas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum sistema disponível no momento.
                 </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {sistemas.map((sistema) => (
+                      <div key={sistema.id} className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={sistema.id}
+                            checked={selectedSistemas.includes(sistema.nome)}
+                            onCheckedChange={() => {
+                              toggleSistema(sistema.nome)
+                              if (errors.sistemas && selectedSistemas.length === 0) {
+                                setErrors((prev) => ({ ...prev, sistemas: undefined }))
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={sistema.id}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {sistema.nome}
+                          </label>
+                        </div>
+                        {/* Matérias do sistema (submatérias - checkboxes menores) */}
+                        {selectedSistemas.includes(sistema.nome) && (
+                          <>
+                            {materias[sistema.id] && materias[sistema.id].length > 0 ? (
+                              <div className="ml-6 space-y-1 border-l-2 border-muted pl-3 mt-2">
+                                {materias[sistema.id].map((materia) => (
+                                  <div key={materia.id} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`materia-${materia.id}`}
+                                      checked={selectedMaterias.includes(materia.nome)}
+                                      onCheckedChange={() => toggleMateria(materia.nome)}
+                                      className="h-3 w-3 checkbox-materia"
+                                    />
+                                    <label
+                                      htmlFor={`materia-${materia.id}`}
+                                      className="text-xs font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                    >
+                                      {materia.nome}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="ml-6 text-xs text-muted-foreground italic mt-1">
+                                Nenhuma matéria cadastrada
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {errors.sistemas && (
+                    <p className="text-sm text-destructive">{errors.sistemas}</p>
+                  )}
+                </>
               )}
             </div>
 
+            {/* Quarto Filtro: Matéria - já está integrado acima nos sistemas */}
+
+            {/* Quinto Filtro: Dificuldade */}
+            <div className="space-y-2">
+              <Label>Dificuldade</Label>
+              <Select
+                value={difficulty}
+                onValueChange={(value) => {
+                  setDifficulty(value)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a dificuldade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="easy">Fácil</SelectItem>
+                  <SelectItem value="medium">Média</SelectItem>
+                  <SelectItem value="hard">Difícil</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sexto Filtro: Número de Questões */}
             <div className="space-y-2">
               <Label>Número de Questões</Label>
               <Select 
@@ -690,6 +822,17 @@ export default function GeneratorPage() {
                     : 'Limite diário atingido'}
                 </p>
               )}
+            </div>
+
+            {/* Sétimo Filtro: Switch de Questão Oficial */}
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label>Apenas Questões Oficiais</Label>
+                <p className="text-sm text-muted-foreground">
+                  Incluir somente questões de provas oficiais
+                </p>
+              </div>
+              <Switch checked={officialOnly} onCheckedChange={setOfficialOnly} />
             </div>
           </CardContent>
         </Card>
@@ -779,7 +922,7 @@ export default function GeneratorPage() {
               <p className="text-sm text-muted-foreground">
                 {questionCount} questões{' '}
                 {timed && `em ${timeLimit} minutos`}
-                {selectedSubjects.length > 0 && ` de ${selectedSubjects.length} matéria(s)`}
+                {selectedSistemas.length > 0 && ` de ${selectedSistemas.length} sistema(s)`}
               </p>
             </div>
             <Button
@@ -788,8 +931,7 @@ export default function GeneratorPage() {
               disabled={
                 checkingLimits ||
                 parseInt(questionCount) === 0 || 
-                selectedSubjects.length === 0 || 
-                !difficulty ||
+                selectedSistemas.length === 0 ||
                 (!isPremium && freeLimits ? (freeLimits.remainingQuestions === 0 || parseInt(questionCount) > freeLimits.remainingQuestions) : false)
               }
               className="cursor-pointer"

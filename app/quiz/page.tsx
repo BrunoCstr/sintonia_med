@@ -99,6 +99,12 @@ export default function QuizPage() {
         if (filters.areas && filters.areas.length > 0) {
           params.append('areas', filters.areas.join(','))
         }
+        if (filters.subareas && filters.subareas.length > 0) {
+          params.append('subareas', filters.subareas.join(','))
+        }
+        if (filters.disciplinas && filters.disciplinas.length > 0) {
+          params.append('disciplinas', filters.disciplinas.join(','))
+        }
         if (filters.difficulty) {
           params.append('dificuldade', filters.difficulty)
         }

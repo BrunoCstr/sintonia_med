@@ -20,7 +20,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import type { MedicalArea } from '@/lib/types'
+import type { MedicalArea, Materia } from '@/lib/types'
 
 export default function NewQuestionPage() {
   const router = useRouter()
@@ -29,6 +29,8 @@ export default function NewQuestionPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
   const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([])
+  const [materias, setMaterias] = useState<Materia[]>([])
+  const [loadingMaterias, setLoadingMaterias] = useState(false)
   const [formData, setFormData] = useState({
     enunciado: '',
     imagemUrl: '',
@@ -41,6 +43,7 @@ export default function NewQuestionPage() {
     comentarioGabarito: '',
     area: '',
     subarea: '',
+    disciplina: '',
     dificuldade: '',
     period: '',
     oficial: false,
@@ -51,7 +54,7 @@ export default function NewQuestionPage() {
       try {
         const response = await fetch('/api/admin/medical-areas')
         if (!response.ok) {
-          throw new Error('Erro ao carregar áreas médicas')
+          throw new Error('Erro ao carregar sistemas')
         }
 
         const data = await response.json()
@@ -59,12 +62,57 @@ export default function NewQuestionPage() {
         const activeAreas = (data.areas || []).filter((area: MedicalArea) => area.ativo)
         setMedicalAreas(activeAreas)
       } catch (error) {
-        console.error('Erro ao carregar áreas médicas:', error)
+        console.error('Erro ao carregar sistemas:', error)
       }
     }
 
     loadMedicalAreas()
   }, [])
+
+  // Carregar matérias quando o sistema for selecionado
+  const [previousArea, setPreviousArea] = useState<string>('')
+  useEffect(() => {
+    const loadMaterias = async () => {
+      if (!formData.area) {
+        setMaterias([])
+        setPreviousArea('')
+        return
+      }
+
+      // Encontrar o ID do sistema selecionado pelo nome
+      const selectedSistema = medicalAreas.find((area) => area.nome === formData.area)
+      if (!selectedSistema) {
+        setMaterias([])
+        setPreviousArea('')
+        return
+      }
+
+      // Se o sistema mudou, limpar a matéria selecionada
+      if (previousArea && previousArea !== formData.area) {
+        setFormData((prev) => ({ ...prev, subarea: '' }))
+      }
+
+      setLoadingMaterias(true)
+      try {
+        const response = await fetch(`/api/admin/materias?sistemaId=${selectedSistema.id}`)
+        if (!response.ok) {
+          throw new Error('Erro ao carregar matérias')
+        }
+
+        const data = await response.json()
+        setMaterias(data.materias || [])
+        setPreviousArea(formData.area)
+      } catch (error) {
+        console.error('Erro ao carregar matérias:', error)
+        setMaterias([])
+      } finally {
+        setLoadingMaterias(false)
+      }
+    }
+
+    loadMaterias()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.area, medicalAreas.length])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -131,14 +179,14 @@ export default function NewQuestionPage() {
       return 'O comentário do gabarito é obrigatório'
     }
 
-    // Validar área
+    // Validar sistema
     if (!formData.area.trim()) {
-      return 'A área é obrigatória'
+      return 'O sistema é obrigatório'
     }
 
-    // Validar subárea
+    // Validar matéria
     if (!formData.subarea.trim()) {
-      return 'A subárea é obrigatória'
+      return 'A matéria é obrigatória'
     }
 
     // Validar dificuldade
@@ -149,6 +197,11 @@ export default function NewQuestionPage() {
     // Validar período
     if (!formData.period.trim()) {
       return 'O período é obrigatório'
+    }
+
+    // Validar disciplina
+    if (!formData.disciplina || formData.disciplina === 'none' || !['SOI', 'HAM', 'IESC', 'CI'].includes(formData.disciplina)) {
+      return 'A disciplina é obrigatória'
     }
 
     return null
@@ -421,67 +474,7 @@ export default function NewQuestionPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="area">Área <span className="text-destructive">*</span></Label>
-                <Select
-                  value={formData.area}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, area: value })
-                  }
-                  required
-                >
-                  <SelectTrigger id="area">
-                    <SelectValue placeholder="Selecione a área" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {medicalAreas.length === 0 ? (
-                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        Nenhuma área disponível
-                      </div>
-                    ) : (
-                      medicalAreas.map((area) => (
-                        <SelectItem key={area.id} value={area.nome}>
-                          {area.nome}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="subarea">Subárea <span className="text-destructive">*</span></Label>
-                <Input
-                  id="subarea"
-                  placeholder="Ex: Síndrome Coronariana Aguda"
-                  value={formData.subarea}
-                  onChange={(e) =>
-                    setFormData({ ...formData, subarea: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dificuldade">Dificuldade <span className="text-destructive">*</span></Label>
-                <Select
-                  value={formData.dificuldade}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, dificuldade: value })
-                  }
-                  required
-                >
-                  <SelectTrigger id="dificuldade">
-                    <SelectValue placeholder="Selecione a dificuldade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="facil">Fácil</SelectItem>
-                    <SelectItem value="medio">Médio</SelectItem>
-                    <SelectItem value="dificil">Difícil</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
+              {/* 1. Período */}
               <div className="space-y-2">
                 <Label htmlFor="period">Período <span className="text-destructive">*</span></Label>
                 <Select
@@ -504,11 +497,123 @@ export default function NewQuestionPage() {
                     <SelectItem value="6º Período">6º Período</SelectItem>
                     <SelectItem value="7º Período">7º Período</SelectItem>
                     <SelectItem value="8º Período">8º Período</SelectItem>
-                    <SelectItem value="Formado">Formado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* 2. Disciplina */}
+              <div className="space-y-2">
+                <Label htmlFor="disciplina">Disciplina <span className="text-destructive">*</span></Label>
+                <Select
+                  value={formData.disciplina}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, disciplina: value })
+                  }
+                  required
+                >
+                  <SelectTrigger id="disciplina">
+                    <SelectValue placeholder="Selecione a disciplina" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SOI">SOI</SelectItem>
+                    <SelectItem value="HAM">HAM</SelectItem>
+                    <SelectItem value="IESC">IESC</SelectItem>
+                    <SelectItem value="CI">CI</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 3. Sistema */}
+              <div className="space-y-2">
+                <Label htmlFor="area">Sistema <span className="text-destructive">*</span></Label>
+                <Select
+                  value={formData.area}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, area: value })
+                  }
+                  required
+                >
+                  <SelectTrigger id="area">
+                    <SelectValue placeholder="Selecione o sistema" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {medicalAreas.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        Nenhum sistema disponível
+                      </div>
+                    ) : (
+                      medicalAreas.map((area) => (
+                        <SelectItem key={area.id} value={area.nome}>
+                          {area.nome}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 4. Matéria */}
+              <div className="space-y-2">
+                <Label htmlFor="subarea">Matéria <span className="text-destructive">*</span></Label>
+                <Select
+                  value={formData.subarea}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, subarea: value })
+                  }
+                  disabled={!formData.area || loadingMaterias}
+                  required
+                >
+                  <SelectTrigger id="subarea">
+                    <SelectValue 
+                      placeholder={
+                        !formData.area 
+                          ? "Selecione primeiro o sistema" 
+                        : loadingMaterias 
+                          ? "Carregando matérias..." 
+                          : "Selecione a matéria"
+                      } 
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {materias.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        {!formData.area 
+                          ? "Selecione um sistema primeiro" 
+                          : "Nenhuma matéria disponível"}
+                      </div>
+                    ) : (
+                      materias.map((materia) => (
+                        <SelectItem key={materia.id} value={materia.nome}>
+                          {materia.nome}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 5. Dificuldade */}
+              <div className="space-y-2">
+                <Label htmlFor="dificuldade">Dificuldade <span className="text-destructive">*</span></Label>
+                <Select
+                  value={formData.dificuldade}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, dificuldade: value })
+                  }
+                  required
+                >
+                  <SelectTrigger id="dificuldade">
+                    <SelectValue placeholder="Selecione a dificuldade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="facil">Fácil</SelectItem>
+                    <SelectItem value="medio">Médio</SelectItem>
+                    <SelectItem value="dificil">Difícil</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 6. Questão Oficial */}
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div className="space-y-0.5">
                   <Label htmlFor="oficial">Questão Oficial</Label>

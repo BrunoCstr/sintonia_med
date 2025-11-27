@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminApp } from '@/lib/firebase-admin'
 import { verifyFirebaseToken } from '@/lib/middleware-auth'
-import type { Sistema, MedicalArea } from '@/lib/types'
+import type { Materia } from '@/lib/types'
 
 /**
- * PUT /api/admin/medical-areas/[id]
- * Atualiza um sistema (apenas admins)
- * Mantido o endpoint para compatibilidade, mas agora usa a coleção 'sistemas'
+ * PUT /api/admin/materias/[id]
+ * Atualiza uma matéria (apenas admins)
  */
 export async function PUT(
   request: NextRequest,
@@ -26,41 +25,44 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const { nome, descricao, ativo } = body
+    const { nome, ativo } = body
 
     const app = getAdminApp()
     const db = app.firestore()
 
-    // Verificar se o sistema existe (APENAS em 'sistemas')
-    const areaRef = db.collection('sistemas').doc(id)
-    const areaDoc = await areaRef.get()
+    // Verificar se a matéria existe
+    const materiaRef = db.collection('materias').doc(id)
+    const materiaDoc = await materiaRef.get()
 
-    if (!areaDoc.exists) {
+    if (!materiaDoc.exists) {
       return NextResponse.json(
-        { error: 'Sistema não encontrado' },
+        { error: 'Matéria não encontrada' },
         { status: 404 }
       )
     }
+
+    const materiaData = materiaDoc.data()!
 
     // Validação
     if (nome !== undefined) {
       if (!nome || typeof nome !== 'string' || !nome.trim()) {
         return NextResponse.json(
-          { error: 'O nome do sistema é obrigatório' },
+          { error: 'O nome da matéria é obrigatório' },
           { status: 400 }
         )
       }
 
-      // Verificar se já existe outro sistema com o mesmo nome (APENAS em 'sistemas')
-      const existingArea = await db
-        .collection('sistemas')
+      // Verificar se já existe outra matéria com o mesmo nome no mesmo sistema
+      const existingMateria = await db
+        .collection('materias')
+        .where('sistemaId', '==', materiaData.sistemaId)
         .where('nome', '==', nome.trim())
         .limit(1)
         .get()
 
-      if (!existingArea.empty && existingArea.docs[0].id !== id) {
+      if (!existingMateria.empty && existingMateria.docs[0].id !== id) {
         return NextResponse.json(
-          { error: 'Já existe um sistema com este nome' },
+          { error: 'Já existe uma matéria com este nome neste sistema' },
           { status: 400 }
         )
       }
@@ -74,42 +76,38 @@ export async function PUT(
     if (nome !== undefined) {
       updateData.nome = nome.trim()
     }
-    if (descricao !== undefined) {
-      updateData.descricao = descricao?.trim() || null
-    }
     if (ativo !== undefined) {
       updateData.ativo = ativo
     }
 
-    // Atualizar sistema
-    await areaRef.update(updateData)
+    // Atualizar matéria
+    await materiaRef.update(updateData)
 
-    // Buscar sistema atualizado
-    const updatedDoc = await areaRef.get()
+    // Buscar matéria atualizada
+    const updatedDoc = await materiaRef.get()
     const updatedData = updatedDoc.data()!
 
     return NextResponse.json({
       success: true,
-      area: {
+      materia: {
         id: updatedDoc.id,
         ...updatedData,
         createdAt: updatedData.createdAt?.toDate() || new Date(),
         updatedAt: updatedData.updatedAt?.toDate() || new Date(),
-      } as Sistema,
+      } as Materia,
     })
   } catch (error: any) {
-    console.error('Erro ao atualizar sistema:', error)
+    console.error('Erro ao atualizar matéria:', error)
     return NextResponse.json(
-      { error: error.message || 'Erro ao atualizar sistema' },
+      { error: error.message || 'Erro ao atualizar matéria' },
       { status: 500 }
     )
   }
 }
 
 /**
- * DELETE /api/admin/medical-areas/[id]
- * Deleta um sistema (apenas admins)
- * Mantido o endpoint para compatibilidade, mas agora usa a coleção 'sistemas'
+ * DELETE /api/admin/materias/[id]
+ * Deleta uma matéria (apenas admins)
  */
 export async function DELETE(
   request: NextRequest,
@@ -132,43 +130,41 @@ export async function DELETE(
     const app = getAdminApp()
     const db = app.firestore()
 
-    // Verificar se o sistema existe (APENAS em 'sistemas')
-    const areaRef = db.collection('sistemas').doc(id)
-    const areaDoc = await areaRef.get()
+    // Verificar se a matéria existe
+    const materiaRef = db.collection('materias').doc(id)
+    const materiaDoc = await materiaRef.get()
 
-    if (!areaDoc.exists) {
+    if (!materiaDoc.exists) {
       return NextResponse.json(
-        { error: 'Sistema não encontrado' },
+        { error: 'Matéria não encontrada' },
         { status: 404 }
       )
     }
 
-    // Verificar se há questões usando este sistema
+    // Verificar se há questões usando esta matéria
     const questionsSnapshot = await db
       .collection('questions')
-      .where('area', '==', areaDoc.data()!.nome)
+      .where('subarea', '==', materiaDoc.data()!.nome)
       .limit(1)
       .get()
 
     if (!questionsSnapshot.empty) {
       return NextResponse.json(
-        { error: 'Não é possível excluir este sistema pois existem questões associadas a ele' },
+        { error: 'Não é possível excluir esta matéria pois existem questões associadas a ela' },
         { status: 400 }
       )
     }
 
-    // Deletar sistema
-    await areaRef.delete()
+    // Deletar matéria
+    await materiaRef.delete()
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error('Erro ao deletar sistema:', error)
+    console.error('Erro ao deletar matéria:', error)
     return NextResponse.json(
-      { error: error.message || 'Erro ao deletar sistema' },
+      { error: error.message || 'Erro ao deletar matéria' },
       { status: 500 }
     )
   }
 }
-
-
 

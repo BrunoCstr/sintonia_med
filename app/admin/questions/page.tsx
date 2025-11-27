@@ -100,7 +100,7 @@ export default function QuestionsListPage() {
       try {
         const response = await fetch("/api/admin/medical-areas");
         if (!response.ok) {
-          throw new Error("Erro ao carregar áreas médicas");
+          throw new Error("Erro ao carregar sistemas");
         }
 
         const data = await response.json();
@@ -110,7 +110,7 @@ export default function QuestionsListPage() {
         );
         setMedicalAreas(activeAreas);
       } catch (error) {
-        console.error("Erro ao carregar áreas médicas:", error);
+        console.error("Erro ao carregar sistemas:", error);
       }
     };
 
@@ -265,7 +265,7 @@ export default function QuestionsListPage() {
                 <SelectValue placeholder="Área" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas as áreas</SelectItem>
+                <SelectItem value="all">Todas os sistemas</SelectItem>
                 {medicalAreas.map((area) => (
                   <SelectItem key={area.id} value={area.nome}>
                     {area.nome}
@@ -303,7 +303,6 @@ export default function QuestionsListPage() {
                 <SelectItem value="6º Período">6º Período</SelectItem>
                 <SelectItem value="7º Período">7º Período</SelectItem>
                 <SelectItem value="8º Período">8º Período</SelectItem>
-                <SelectItem value="Formado">Formado</SelectItem>
               </SelectContent>
             </Select>
 

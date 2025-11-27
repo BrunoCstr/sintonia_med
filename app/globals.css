@@ -198,3 +198,8 @@
 .prose u {
   @apply underline;
 }
+
+/* Esconder ícone de check nos checkboxes das submatérias */
+.checkbox-materia [data-state="checked"] svg {
+  display: none;
+}

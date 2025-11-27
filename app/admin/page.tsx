@@ -226,9 +226,9 @@ export default function AdminDashboardPage() {
             >
               <Stethoscope className="h-8 w-8 text-primary" />
               <div>
-                <div className="font-medium">Áreas Médicas</div>
+                <div className="font-medium">Sistemas</div>
                 <div className="text-sm text-muted-foreground">
-                  Gerenciar áreas e subáreas médicas
+                  Gerenciar sistemas e matérias (subdivisões)
                 </div>
               </div>
             </a>

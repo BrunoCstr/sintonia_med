@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const areas = searchParams.get('areas')?.split(',').filter(Boolean) || []
     const subareas = searchParams.get('subareas')?.split(',').filter(Boolean) || []
+    const disciplinas = searchParams.get('disciplinas')?.split(',').filter(Boolean) || []
     const dificuldade = searchParams.get('dificuldade') || ''
     const tipo = searchParams.get('tipo') || ''
     const period = searchParams.get('period') || ''
@@ -54,7 +55,8 @@ export async function GET(request: NextRequest) {
     let query: FirebaseFirestore.Query = db.collection('questions').where('ativo', '==', true)
 
     // Aplicar filtros
-    if (dificuldade && ['facil', 'medio', 'dificil'].includes(dificuldade)) {
+    // Se dificuldade for vazia ou 'all', não filtrar por dificuldade
+    if (dificuldade && dificuldade.trim() !== '' && ['facil', 'medio', 'dificil'].includes(dificuldade)) {
       query = query.where('dificuldade', '==', dificuldade)
     }
 
@@ -82,6 +84,18 @@ export async function GET(request: NextRequest) {
 
     if (subareas.length > 0) {
       questions = questions.filter((q) => subareas.includes(q.subarea))
+    }
+
+    // Filtrar por disciplinas (SOI, HAM, IESC, CI)
+    if (disciplinas.length > 0) {
+      questions = questions.filter((q) => {
+        const questionDisciplina = (q as any).disciplina
+        // Se a questão não tiver disciplina, incluir apenas se nenhuma disciplina específica foi selecionada
+        if (!questionDisciplina) {
+          return false // Excluir questões sem disciplina quando disciplinas específicas são selecionadas
+        }
+        return disciplinas.includes(questionDisciplina)
+      })
     }
 
     // Filtrar questões oficiais (campo oficial === true)

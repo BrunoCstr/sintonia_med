@@ -27,8 +27,9 @@ export interface Question {
   alternativaE: string
   alternativaCorreta: 'A' | 'B' | 'C' | 'D' | 'E'
   comentarioGabarito: string // Gabarito comentado (premium)
-  area: string
-  subarea: string
+  area: string // Sistema (renomeado de área médica)
+  subarea: string // Matéria (subdivisão dentro do sistema)
+  disciplina?: string // SOI, HAM, IESC, CI
   dificuldade: 'facil' | 'medio' | 'dificil'
   tipo?: string // Mantido para compatibilidade com questões antigas
   period?: string // Novo campo: período da questão
@@ -69,8 +70,8 @@ export interface Subscription {
   manuallyGranted: boolean
 }
 
-// Medical Area types
-export interface MedicalArea {
+// Sistema types (renomeado de MedicalArea)
+export interface Sistema {
   id: string
   nome: string
   descricao?: string
@@ -78,4 +79,19 @@ export interface MedicalArea {
   createdAt: Date
   updatedAt: Date
   createdBy: string
+  materias?: Materia[] // Subdivisões dentro do sistema
 }
+
+// Materia types (subdivisões dentro dos sistemas)
+export interface Materia {
+  id: string
+  nome: string
+  sistemaId: string
+  ativo: boolean
+  createdAt: Date
+  updatedAt: Date
+  createdBy: string
+}
+
+// Mantido para compatibilidade com código antigo (deprecated)
+export type MedicalArea = Sistema

@@ -33,7 +33,10 @@ export async function GET(request: NextRequest) {
 
     for (const doc of reportsSnapshot.docs) {
       const data = doc.data()
-      questionIds.add(data.questionId)
+      // Só adicionar questionId ao set se não for null
+      if (data.questionId) {
+        questionIds.add(data.questionId)
+      }
 
       // Converter Timestamp para Date
       let createdAt: Date
@@ -154,7 +157,9 @@ export async function GET(request: NextRequest) {
     // Adicionar questionText aos reports
     const reportsWithQuestionText = reports.map((report) => ({
       ...report,
-      questionText: questionTexts[report.questionId] || 'Questão não encontrada',
+      questionText: report.questionId 
+        ? (questionTexts[report.questionId] || 'Questão não encontrada')
+        : 'Suporte',
     }))
 
     return NextResponse.json({

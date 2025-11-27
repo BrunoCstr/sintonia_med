@@ -6,19 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
+import { ReportDialog } from '@/components/report-dialog'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, XCircle, Circle, ChevronDown, Flag, BarChart3, Home, RefreshCw, Lock, Crown, Sparkles, ArrowRight } from 'lucide-react'
 import { type Question } from '@/lib/mock-data'
@@ -33,11 +22,6 @@ export default function ResultsPage() {
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set())
   const [showReportDialog, setShowReportDialog] = useState(false)
   const [reportQuestionId, setReportQuestionId] = useState<string | null>(null)
-  const [reportTypes, setReportTypes] = useState<string[]>([])
-  const [reportDescription, setReportDescription] = useState('')
-  const [reportFile, setReportFile] = useState<File | null>(null)
-  const [reportFilePreview, setReportFilePreview] = useState<string | null>(null)
-  const [isSubmittingReport, setIsSubmittingReport] = useState(false)
   const router = useRouter()
   const { userProfile } = useAuth()
   const { isPremium } = usePremium()
@@ -83,90 +67,7 @@ export default function ResultsPage() {
 
   const handleReport = (questionId: string) => {
     setReportQuestionId(questionId)
-    setReportTypes([])
-    setReportDescription('')
-    setReportFile(null)
-    setReportFilePreview(null)
     setShowReportDialog(true)
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // Validar tipo de arquivo
-    if (!file.type.startsWith('image/')) {
-      alert('Por favor, selecione uma imagem válida')
-      return
-    }
-
-    // Validar tamanho (máximo 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 5MB')
-      return
-    }
-
-    setReportFile(file)
-
-    // Criar preview
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setReportFilePreview(reader.result as string)
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const removeFile = () => {
-    setReportFile(null)
-    setReportFilePreview(null)
-  }
-
-  const submitReport = async () => {
-    if (!reportQuestionId || reportTypes.length === 0 || !reportDescription.trim()) {
-      alert('Por favor, preencha todos os campos obrigatórios')
-      return
-    }
-
-    setIsSubmittingReport(true)
-
-    try {
-      const formData = new FormData()
-      formData.append('questionId', reportQuestionId)
-      formData.append('texto', reportDescription)
-      formData.append('tipos', JSON.stringify(reportTypes))
-
-      if (reportFile) {
-        formData.append('file', reportFile)
-      }
-
-      const response = await fetch('/api/reports', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao enviar relatório')
-      }
-
-      const data = await response.json()
-      console.log('Report enviado com sucesso:', data)
-
-      // Limpar formulário
-      setReportTypes([])
-      setReportDescription('')
-      setReportFile(null)
-      setReportFilePreview(null)
-      setShowReportDialog(false)
-
-      alert('Relatório enviado com sucesso! Agradecemos sua contribuição.')
-    } catch (error: any) {
-      console.error('Erro ao enviar report:', error)
-      alert(error.message || 'Erro ao enviar relatório. Tente novamente.')
-    } finally {
-      setIsSubmittingReport(false)
-    }
   }
 
   return (
@@ -523,102 +424,11 @@ export default function ResultsPage() {
       </div>
 
       {/* Report Dialog */}
-      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Relatar Problema</DialogTitle>
-            <DialogDescription>
-              Encontrou algum erro nesta questão? Nos ajude a melhorar!
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <Label>Tipo de problema</Label>
-              {[
-                'Duas alternativas corretas',
-                'Gabarito trocado',
-                'Sem coerência resposta-texto',
-                'Outro',
-              ].map((type) => (
-                <div key={type} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={type}
-                    checked={reportTypes.includes(type)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setReportTypes((prev) => [...prev, type])
-                      } else {
-                        setReportTypes((prev) => prev.filter((t) => t !== type))
-                      }
-                    }}
-                  />
-                  <label htmlFor={type} className="text-sm leading-none">
-                    {type}
-                  </label>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Descrição do problema</Label>
-              <Textarea
-                id="description"
-                placeholder="Descreva o problema encontrado..."
-                value={reportDescription}
-                onChange={(e) => setReportDescription(e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="file">Anexar imagem (opcional)</Label>
-              <div className="space-y-2">
-                {reportFilePreview ? (
-                  <div className="relative rounded-lg border p-2">
-                    <img
-                      src={reportFilePreview}
-                      alt="Preview"
-                      className="max-h-32 w-full object-contain"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={removeFile}
-                      className="absolute right-2 top-2 cursor-pointer"
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="file"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="cursor-pointer"
-                    />
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Formatos aceitos: JPG, PNG, GIF (máximo 5MB)
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReportDialog(false)} className="cursor-pointer">
-              Cancelar
-            </Button>
-            <Button className="cursor-pointer" onClick={submitReport} disabled={reportTypes.length === 0 || !reportDescription.trim() || isSubmittingReport}>
-              {isSubmittingReport ? 'Enviando...' : 'Enviar Relatório'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReportDialog
+        open={showReportDialog}
+        onOpenChange={setShowReportDialog}
+        questionId={reportQuestionId || undefined}
+      />
     </div>
   )
 }

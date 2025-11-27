@@ -16,12 +16,13 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
-import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope, Ticket } from 'lucide-react'
+import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope, Ticket, Bug } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import { RoleGuard } from '@/components/role-guard'
+import { ReportDialog } from '@/components/report-dialog'
 
 const navigation = [
   { name: 'Página Inicial', href: '/dashboard', icon: Home },
@@ -71,6 +72,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showReportDialog, setShowReportDialog] = useState(false)
   
   const isAdminRoute = pathname?.startsWith('/admin')
   
@@ -101,7 +103,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="flex h-20 items-center justify-between px-6 lg:px-8">
           <div className="flex items-center gap-6">
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -233,6 +235,17 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               </Button>
             )}
 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowReportDialog(true)}
+              className="gap-2 cursor-pointer"
+              title="Suporte"
+            >
+              <Bug className="h-4 w-4" />
+              <span className="hidden sm:inline">Suporte</span>
+            </Button>
+
             <Button variant="ghost" size="icon" onClick={toggleTheme} className="cursor-pointer">
               {theme === 'light' ? (
                 <Moon className="h-5 w-5" />
@@ -317,6 +330,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </main>
+
+      {/* Report Dialog */}
+      <ReportDialog
+        open={showReportDialog}
+        onOpenChange={setShowReportDialog}
+        questionId={null}
+      />
     </div>
   )
 }

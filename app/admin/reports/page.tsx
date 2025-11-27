@@ -106,11 +106,17 @@ export default function ReportsPage() {
     }
   }
 
+  const stripImagesFromHtml = (html: string) => {
+    // Remove tags de imagem do HTML
+    return html.replace(/<img[^>]*>/gi, '')
+  }
+
   const filteredReports = reports.filter((report) => {
+    const questionText = report.questionId ? report.questionText : 'Suporte'
     const matchesSearch =
       report.texto.toLowerCase().includes(searchTerm.toLowerCase()) ||
       report.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      report.questionText.toLowerCase().includes(searchTerm.toLowerCase())
+      (questionText && questionText.toLowerCase().includes(searchTerm.toLowerCase()))
 
     const matchesStatus = statusFilter === 'all' || report.status === statusFilter
 
@@ -211,7 +217,7 @@ export default function ReportsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Questão</TableHead>
+                    <TableHead>Tipo</TableHead>
                     <TableHead>Reportado por</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead>Data</TableHead>
@@ -224,11 +230,13 @@ export default function ReportsPage() {
                   <TableRow key={report.id}>
                     <TableCell className="max-w-xs">
                       <p className="truncate text-sm font-medium">
-                        {report.questionText}
+                        {report.questionId ? report.questionText : 'Suporte'}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        ID: {report.questionId}
-                      </p>
+                      {report.questionId && (
+                        <p className="text-xs text-muted-foreground">
+                          ID: {report.questionId}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell>
                       <p className="text-sm font-medium">{report.userName}</p>
@@ -237,7 +245,17 @@ export default function ReportsPage() {
                       </p>
                     </TableCell>
                     <TableCell className="max-w-md">
-                      <p className="truncate text-sm">{report.texto}</p>
+                      <div 
+                        className="prose prose-sm max-w-none text-sm line-clamp-2"
+                        dangerouslySetInnerHTML={{ __html: stripImagesFromHtml(report.texto) }}
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                        }}
+                      />
                       {report.imagemUrl && (
                         <p className="mt-1 text-xs text-muted-foreground">
                           📎 Contém anexo
@@ -267,6 +285,23 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
+      <style jsx global>{`
+        .prose img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 0.5rem;
+          margin: 0.5rem 0;
+        }
+        .prose p {
+          margin: 0.25rem 0;
+        }
+        .prose p:first-child {
+          margin-top: 0;
+        }
+        .prose p:last-child {
+          margin-bottom: 0;
+        }
+      `}</style>
     </>
   )
 }

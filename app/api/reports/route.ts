@@ -20,15 +20,15 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData()
-    const questionId = formData.get('questionId') as string
+    const questionId = formData.get('questionId') as string | null
     const texto = formData.get('texto') as string
     const tipos = formData.get('tipos') as string // JSON array string
     const file = formData.get('file') as File | null
 
     // Validações
-    if (!questionId || !texto) {
+    if (!texto || !texto.trim()) {
       return NextResponse.json(
-        { error: 'questionId e texto são obrigatórios' },
+        { error: 'O texto é obrigatório' },
         { status: 400 }
       )
     }
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     const now = new Date()
 
     const reportData = {
-      questionId,
+      questionId: questionId || null, // Permite null para bugs gerais
       userId: authUser.uid,
       userName,
       userEmail,

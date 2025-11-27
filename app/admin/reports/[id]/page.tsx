@@ -257,32 +257,48 @@ export default function ReportDetailsPage() {
         </Card>
       </div>
 
-      {/* Questão Reportada */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Questão Reportada</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg bg-muted p-4">
-            <p className="mb-2 text-sm text-muted-foreground">
-              ID: {report.questionId}
-            </p>
-            <p className="text-sm whitespace-pre-wrap break-words">
-              {report.questionText}
-            </p>
-          </div>
-          <Button variant="outline" size="sm" asChild className="cursor-pointer">
-            <a
-              href={`/admin/questions/${report.questionId}/edit`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Editar Questão
-              <ExternalLink className="ml-2 h-4 w-4" />
-            </a>
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Questão Reportada ou Tipo de Report */}
+      {report.questionId ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Questão Reportada</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg bg-muted p-4">
+              <p className="mb-2 text-sm text-muted-foreground">
+                ID: {report.questionId}
+              </p>
+              <p className="text-sm whitespace-pre-wrap break-words">
+                {report.questionText}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" asChild className="cursor-pointer">
+              <a
+                href={`/admin/questions/${report.questionId}/edit`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Editar Questão
+                <ExternalLink className="ml-2 h-4 w-4" />
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Tipo de Report</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg bg-muted p-4">
+              <p className="text-sm font-medium">Suporte</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Report de bug geral (sem questão específica)
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Descrição do Problema */}
       <Card>
@@ -291,10 +307,32 @@ export default function ReportDetailsPage() {
         </CardHeader>
         <CardContent>
           <div className="rounded-lg bg-muted p-4">
-            <p className="text-sm whitespace-pre-wrap break-words">
-              {report.texto}
-            </p>
+            <div 
+              className="prose prose-sm max-w-none text-sm break-words"
+              dangerouslySetInnerHTML={{ __html: report.texto }}
+              style={{
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere',
+              }}
+            />
           </div>
+          <style jsx global>{`
+            .prose img {
+              max-width: 100%;
+              height: auto;
+              border-radius: 0.5rem;
+              margin: 0.5rem 0;
+            }
+            .prose p {
+              margin: 0.5rem 0;
+            }
+            .prose p:first-child {
+              margin-top: 0;
+            }
+            .prose p:last-child {
+              margin-bottom: 0;
+            }
+          `}</style>
         </CardContent>
       </Card>
 

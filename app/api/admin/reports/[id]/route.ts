@@ -38,16 +38,18 @@ export async function GET(
 
     const data = reportDoc.data()!
 
-    // Buscar texto da questão
-    let questionText = 'Questão não encontrada'
-    try {
-      const questionDoc = await db.collection('questions').doc(data.questionId).get()
-      if (questionDoc.exists) {
-        const questionData = questionDoc.data()!
-        questionText = questionData.texto || questionData.enunciado || questionText
+    // Buscar texto da questão (só se houver questionId)
+    let questionText = data.questionId ? 'Questão não encontrada' : 'Bug geral (sem questão específica)'
+    if (data.questionId) {
+      try {
+        const questionDoc = await db.collection('questions').doc(data.questionId).get()
+        if (questionDoc.exists) {
+          const questionData = questionDoc.data()!
+          questionText = questionData.texto || questionData.enunciado || questionText
+        }
+      } catch (error) {
+        console.error('Erro ao buscar questão:', error)
       }
-    } catch (error) {
-      console.error('Erro ao buscar questão:', error)
     }
 
     // Converter datas

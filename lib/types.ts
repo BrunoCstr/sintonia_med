@@ -45,7 +45,7 @@ export interface Question {
 // Report types
 export interface Report {
   id: string
-  questionId: string
+  questionId: string | null // Permite null para bugs gerais
   userId: string
   userName: string
   userEmail: string

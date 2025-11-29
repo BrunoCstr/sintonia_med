@@ -161,16 +161,20 @@ export default function NewQuestionPage() {
       return 'O enunciado é obrigatório'
     }
 
-    // Validar alternativas
-    const alternativas = ['alternativaA', 'alternativaB', 'alternativaC', 'alternativaD', 'alternativaE']
-    for (const alt of alternativas) {
+    // Validar alternativas (A, B, C, D são obrigatórias, E é opcional)
+    const alternativasObrigatorias = ['alternativaA', 'alternativaB', 'alternativaC', 'alternativaD']
+    for (const alt of alternativasObrigatorias) {
       if (!formData[alt as keyof typeof formData]?.toString().trim()) {
         return `A alternativa ${alt.replace('alternativa', '')} é obrigatória`
       }
     }
 
-    // Validar alternativa correta
-    if (!formData.alternativaCorreta || !['A', 'B', 'C', 'D', 'E'].includes(formData.alternativaCorreta)) {
+    // Validar alternativa correta (E só pode ser selecionada se estiver preenchida)
+    const alternativasValidas = formData.alternativaE?.trim() 
+      ? ['A', 'B', 'C', 'D', 'E'] 
+      : ['A', 'B', 'C', 'D']
+    
+    if (!formData.alternativaCorreta || !alternativasValidas.includes(formData.alternativaCorreta)) {
       return 'Selecione a alternativa correta'
     }
 
@@ -391,27 +395,37 @@ export default function NewQuestionPage() {
             <CardHeader>
               <CardTitle>Alternativas <span className="text-destructive">*</span></CardTitle>
               <CardDescription>
-                Digite as cinco alternativas da questão
+                Digite as alternativas da questão (A, B, C, D são obrigatórias, E é opcional)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {['A', 'B', 'C', 'D', 'E'].map((letter) => (
                 <div key={letter} className="space-y-2">
                   <Label htmlFor={`alternativa${letter}`}>
-                    Alternativa {letter} <span className="text-destructive">*</span>
+                    Alternativa {letter} {letter !== 'E' && <span className="text-destructive">*</span>}
                   </Label>
                   <Textarea
                     id={`alternativa${letter}`}
                     placeholder={`Texto da alternativa ${letter}`}
                     value={(formData[`alternativa${letter}` as keyof typeof formData] as string) || ''}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        [`alternativa${letter}`]: e.target.value,
-                      })
-                    }
+                    onChange={(e) => {
+                      const newValue = e.target.value
+                      // Se a alternativa E foi removida e estava selecionada como correta, limpar a seleção
+                      if (letter === 'E' && !newValue.trim() && formData.alternativaCorreta === 'E') {
+                        setFormData({
+                          ...formData,
+                          [`alternativa${letter}`]: newValue,
+                          alternativaCorreta: '',
+                        })
+                      } else {
+                        setFormData({
+                          ...formData,
+                          [`alternativa${letter}`]: newValue,
+                        })
+                      }
+                    }}
                     rows={2}
-                    required
+                    required={letter !== 'E'}
                   />
                 </div>
               ))}
@@ -435,7 +449,9 @@ export default function NewQuestionPage() {
                 required
               >
                 <div className="flex gap-4">
-                  {['A', 'B', 'C', 'D', 'E'].map((letter) => (
+                  {['A', 'B', 'C', 'D', 'E'].filter((letter) => 
+                    letter !== 'E' || formData.alternativaE?.trim()
+                  ).map((letter) => (
                     <div key={letter} className="flex items-center space-x-2">
                       <RadioGroupItem value={letter} id={`correct-${letter}`} />
                       <Label htmlFor={`correct-${letter}`}>{letter}</Label>

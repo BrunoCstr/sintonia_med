@@ -220,16 +220,15 @@ export async function PUT(
       }
     }
 
-    // Validar e atualizar alternativas
-    const alternativas = [
+    // Validar e atualizar alternativas (A, B, C, D são obrigatórias, E é opcional)
+    const alternativasObrigatorias = [
       { key: 'alternativaA', value: alternativaA, letter: 'A' },
       { key: 'alternativaB', value: alternativaB, letter: 'B' },
       { key: 'alternativaC', value: alternativaC, letter: 'C' },
       { key: 'alternativaD', value: alternativaD, letter: 'D' },
-      { key: 'alternativaE', value: alternativaE, letter: 'E' },
     ]
 
-    for (const alt of alternativas) {
+    for (const alt of alternativasObrigatorias) {
       if (alt.value !== undefined) {
         if (!alt.value || typeof alt.value !== 'string' || !alt.value.trim()) {
           return NextResponse.json(
@@ -241,9 +240,29 @@ export async function PUT(
       }
     }
 
-    // Validar e atualizar alternativa correta
+    // Alternativa E é opcional
+    let alternativaEValida = false
+    if (alternativaE !== undefined) {
+      if (alternativaE && typeof alternativaE === 'string' && alternativaE.trim()) {
+        updateData.alternativaE = alternativaE.trim()
+        alternativaEValida = true
+      } else {
+        // Se a alternativa E foi removida, limpar o campo
+        updateData.alternativaE = ''
+        alternativaEValida = false
+      }
+    } else {
+      // Se não está sendo atualizada, verificar o valor atual
+      alternativaEValida = currentData.alternativaE && typeof currentData.alternativaE === 'string' && currentData.alternativaE.trim() ? true : false
+    }
+
+    // Validar e atualizar alternativa correta (E só pode ser selecionada se estiver preenchida)
     if (alternativaCorreta !== undefined) {
-      if (!alternativaCorreta || !['A', 'B', 'C', 'D', 'E'].includes(alternativaCorreta)) {
+      const alternativasValidas = alternativaEValida 
+        ? ['A', 'B', 'C', 'D', 'E'] 
+        : ['A', 'B', 'C', 'D']
+      
+      if (!alternativaCorreta || !alternativasValidas.includes(alternativaCorreta)) {
         return NextResponse.json(
           { error: 'Selecione a alternativa correta' },
           { status: 400 }

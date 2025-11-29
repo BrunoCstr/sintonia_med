@@ -110,17 +110,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const alternativas = [alternativaA, alternativaB, alternativaC, alternativaD, alternativaE]
-    for (let i = 0; i < alternativas.length; i++) {
-      if (!alternativas[i] || typeof alternativas[i] !== 'string' || !alternativas[i].trim()) {
+    // Validar alternativas obrigatórias (A, B, C, D)
+    const alternativasObrigatorias = [
+      { value: alternativaA, letter: 'A' },
+      { value: alternativaB, letter: 'B' },
+      { value: alternativaC, letter: 'C' },
+      { value: alternativaD, letter: 'D' },
+    ]
+
+    for (const alt of alternativasObrigatorias) {
+      if (!alt.value || typeof alt.value !== 'string' || !alt.value.trim()) {
         return NextResponse.json(
-          { error: `A alternativa ${String.fromCharCode(65 + i)} é obrigatória` },
+          { error: `A alternativa ${alt.letter} é obrigatória` },
           { status: 400 }
         )
       }
     }
 
-    if (!alternativaCorreta || !['A', 'B', 'C', 'D', 'E'].includes(alternativaCorreta)) {
+    // Alternativa E é opcional
+    const alternativaEValida = alternativaE && typeof alternativaE === 'string' && alternativaE.trim()
+
+    // Validar alternativa correta (E só pode ser selecionada se estiver preenchida)
+    const alternativasValidas = alternativaEValida 
+      ? ['A', 'B', 'C', 'D', 'E'] 
+      : ['A', 'B', 'C', 'D']
+    
+    if (!alternativaCorreta || !alternativasValidas.includes(alternativaCorreta)) {
       return NextResponse.json(
         { error: 'Selecione a alternativa correta' },
         { status: 400 }
@@ -194,7 +209,7 @@ export async function POST(request: NextRequest) {
       alternativaB,
       alternativaC,
       alternativaD,
-      alternativaE,
+      alternativaE: alternativaEValida ? alternativaE.trim() : '',
       alternativaCorreta,
       comentarioGabarito,
       area,

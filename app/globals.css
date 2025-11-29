@@ -203,3 +203,74 @@
 .checkbox-materia [data-state="checked"] svg {
   display: none;
 }
+
+/* Custom scrollbar styles */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-track-transparent {
+  scrollbar-color: oklch(var(--primary) / 0.3) transparent;
+}
+
+/* Webkit scrollbar (Chrome, Safari, Edge) */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: oklch(0.50 0.20 15 / 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.50 0.20 15 / 0.5);
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: oklch(0.50 0.20 15 / 0.4);
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.50 0.20 15 / 0.6);
+}
+
+/* Scrollbar horizontal mais fina para chips */
+.scrollbar-thin-horizontal {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin-horizontal::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+}
+
+.scrollbar-thin-horizontal::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 2px;
+}
+
+.scrollbar-thin-horizontal::-webkit-scrollbar-thumb {
+  background: oklch(0.50 0.20 15 / 0.3);
+  border-radius: 2px;
+  transition: background 0.2s ease;
+}
+
+.scrollbar-thin-horizontal::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.50 0.20 15 / 0.5);
+}
+
+.dark .scrollbar-thin-horizontal::-webkit-scrollbar-thumb {
+  background: oklch(0.50 0.20 15 / 0.4);
+}
+
+.dark .scrollbar-thin-horizontal::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.50 0.20 15 / 0.6);
+}

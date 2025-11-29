@@ -14,7 +14,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Brain, Clock, Filter, AlertCircle, Crown } from 'lucide-react'
+import { Brain, Clock, Filter, AlertCircle, Crown, X, ChevronDown, Check } from 'lucide-react'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Badge } from '@/components/ui/badge'
 import type { Sistema, MedicalArea } from '@/lib/types'
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -276,7 +278,7 @@ export default function GeneratorPage() {
         const areas = data.areas || []
         
         console.log('✅ Sistemas carregados:', areas.length)
-        console.log('Sistemas:', areas.map(a => ({ id: a.id, nome: a.nome })))
+        console.log('Sistemas:', areas.map((a: MedicalArea) => ({ id: a.id, nome: a.nome })))
         setSistemas(areas)
         
         // Marcar todos os sistemas por padrão
@@ -327,7 +329,7 @@ export default function GeneratorPage() {
         console.log('✅ Total de matérias únicas:', todasMaterias.length)
         console.log('✅ Matérias por sistema:', Object.entries(materiasMap).map(([id, mats]) => ({
           sistemaId: id,
-          sistemaNome: areas.find(a => a.id === id)?.nome,
+          sistemaNome: areas.find((a: MedicalArea) => a.id === id)?.nome,
           materias: mats.length
         })))
       } catch (error) {
@@ -682,10 +684,93 @@ export default function GeneratorPage() {
             </div>
 
             {/* Terceiro Filtro: Sistemas */}
-            <div className="space-y-3">
-              <Label>
-                Sistemas <span className="text-destructive">*</span>
-              </Label>
+            <div className="space-y-4 pb-2">
+              <div className="flex items-center justify-between">
+                <Label>
+                  Sistemas <span className="text-destructive">*</span>
+                </Label>
+                {sistemas.length > 0 && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        const allSistemaNames = sistemas.map(s => s.nome)
+                        setSelectedSistemas(allSistemaNames)
+                        // Marcar todas as matérias
+                        const todasMaterias: string[] = []
+                        sistemas.forEach(sistema => {
+                          const sistemaMaterias = materias[sistema.id] || []
+                          sistemaMaterias.forEach(m => {
+                            if (!todasMaterias.includes(m.nome)) {
+                              todasMaterias.push(m.nome)
+                            }
+                          })
+                        })
+                        setSelectedMaterias(todasMaterias)
+                      }}
+                    >
+                      Selecionar todos
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setSelectedSistemas([])
+                        setSelectedMaterias([])
+                      }}
+                    >
+                      Limpar
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Chips dos sistemas selecionados */}
+              {selectedSistemas.length > 0 && (
+                <div 
+                  className={`flex gap-2 p-3 rounded-lg bg-muted/50 border border-border/50 ${
+                    selectedSistemas.length > 5 
+                      ? 'overflow-x-auto overflow-y-hidden scrollbar-thin-horizontal scrollbar-track-transparent scrollbar-thumb-primary/30 hover:scrollbar-thumb-primary/50' 
+                      : 'flex-wrap'
+                  }`}
+                  style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: 'oklch(0.50 0.20 15 / 0.3) transparent'
+                  }}
+                >
+                  {selectedSistemas.map((sistemaNome) => {
+                    const sistema = sistemas.find(s => s.nome === sistemaNome)
+                    const sistemaMaterias = sistema ? (materias[sistema.id] || []) : []
+                    const materiasDoSistema = sistemaMaterias.map(m => m.nome)
+                    const materiasSelecionadas = selectedMaterias.filter(m => materiasDoSistema.includes(m))
+                    
+                    return (
+                      <Badge
+                        key={sistemaNome}
+                        variant="secondary"
+                        className={`pl-2 pr-1 py-1 gap-1 cursor-pointer hover:bg-secondary/80 transition-colors ${
+                          selectedSistemas.length > 5 ? 'shrink-0' : ''
+                        }`}
+                        onClick={() => toggleSistema(sistemaNome)}
+                      >
+                        <span className="text-xs">{sistemaNome}</span>
+                        {sistemaMaterias.length > 0 && (
+                          <span className="text-[10px] text-muted-foreground ml-1">
+                            ({materiasSelecionadas.length}/{sistemaMaterias.length})
+                          </span>
+                        )}
+                        <X className="h-3 w-3 ml-1 hover:text-destructive" />
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
+
               {loadingAreas ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -696,58 +781,168 @@ export default function GeneratorPage() {
                 </p>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {sistemas.map((sistema) => (
-                      <div key={sistema.id} className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={sistema.id}
-                            checked={selectedSistemas.includes(sistema.nome)}
-                            onCheckedChange={() => {
-                              toggleSistema(sistema.nome)
-                              if (errors.sistemas && selectedSistemas.length === 0) {
-                                setErrors((prev) => ({ ...prev, sistemas: undefined }))
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={sistema.id}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  <div 
+                    className={`space-y-3 pb-4 ${
+                      sistemas.length > 5 
+                        ? 'max-h-[320px] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-primary/30 hover:scrollbar-thumb-primary/50' 
+                        : ''
+                    }`}
+                    style={{
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: 'oklch(0.50 0.20 15 / 0.3) transparent'
+                    }}
+                  >
+                    <Accordion type="multiple" className="w-full">
+                      {sistemas.map((sistema, index) => {
+                        const sistemaMaterias = materias[sistema.id] || []
+                        const materiasDoSistema = sistemaMaterias.map(m => m.nome)
+                        const materiasSelecionadas = selectedMaterias.filter(m => materiasDoSistema.includes(m))
+                        const isSelected = selectedSistemas.includes(sistema.nome)
+                        const allMateriasSelected = sistemaMaterias.length > 0 && materiasSelecionadas.length === sistemaMaterias.length
+                        const someMateriasSelected = materiasSelecionadas.length > 0 && materiasSelecionadas.length < sistemaMaterias.length
+                        const isLast = index === sistemas.length - 1
+
+                        return (
+                          <AccordionItem
+                            key={sistema.id}
+                            value={sistema.id}
+                            className={`rounded-lg border px-4 py-1 transition-all !border-b ${!isLast ? 'mb-2' : 'mb-0'} ${
+                              isSelected 
+                                ? 'border-primary/50 bg-primary/5' 
+                                : 'border-border hover:border-primary/30'
+                            }`}
                           >
-                            {sistema.nome}
-                          </label>
-                        </div>
-                        {/* Matérias do sistema (submatérias - checkboxes menores) */}
-                        {selectedSistemas.includes(sistema.nome) && (
-                          <>
-                            {materias[sistema.id] && materias[sistema.id].length > 0 ? (
-                              <div className="ml-6 space-y-1 border-l-2 border-muted pl-3 mt-2">
-                                {materias[sistema.id].map((materia) => (
-                                  <div key={materia.id} className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={`materia-${materia.id}`}
-                                      checked={selectedMaterias.includes(materia.nome)}
-                                      onCheckedChange={() => toggleMateria(materia.nome)}
-                                      className="h-3 w-3 checkbox-materia"
-                                    />
-                                    <label
-                                      htmlFor={`materia-${materia.id}`}
-                                      className="text-xs font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              id={sistema.id}
+                              checked={isSelected}
+                              onCheckedChange={() => {
+                                toggleSistema(sistema.nome)
+                                if (errors.sistemas && selectedSistemas.length === 0) {
+                                  setErrors((prev) => ({ ...prev, sistemas: undefined }))
+                                }
+                              }}
+                              className="shrink-0"
+                            />
+                            <AccordionTrigger className="flex-1 hover:no-underline py-3">
+                              <div className="flex items-center gap-3 w-full pr-2">
+                                <span className={`font-medium ${isSelected ? 'text-primary' : ''}`}>
+                                  {sistema.nome}
+                                </span>
+                                {sistemaMaterias.length > 0 && (
+                                  <Badge 
+                                    variant={allMateriasSelected ? "default" : someMateriasSelected ? "secondary" : "outline"}
+                                    className="text-[10px] px-2 py-0 ml-auto"
+                                  >
+                                    {materiasSelecionadas.length}/{sistemaMaterias.length}
+                                  </Badge>
+                                )}
+                              </div>
+                            </AccordionTrigger>
+                          </div>
+                          <AccordionContent>
+                            {sistemaMaterias.length > 0 ? (
+                              <div className="space-y-3 pt-2 pb-2">
+                                {/* Botões de seleção rápida para matérias */}
+                                <div className="flex gap-2 mb-3">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 text-[10px] px-2"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      // Marcar todas as matérias deste sistema
+                                      const novasMaterias = sistemaMaterias
+                                        .map(m => m.nome)
+                                        .filter(m => !selectedMaterias.includes(m))
+                                      setSelectedMaterias(prev => [...prev, ...novasMaterias])
+                                      // Garantir que o sistema está selecionado
+                                      if (!selectedSistemas.includes(sistema.nome)) {
+                                        setSelectedSistemas(prev => [...prev, sistema.nome])
+                                      }
+                                    }}
+                                  >
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Todas
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 text-[10px] px-2"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      // Desmarcar todas as matérias deste sistema
+                                      setSelectedMaterias(prev => 
+                                        prev.filter(m => !materiasDoSistema.includes(m))
+                                      )
+                                    }}
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Nenhuma
+                                  </Button>
+                                </div>
+                                
+                                {/* Grid de matérias com scroll customizado */}
+                                <div 
+                                  className={`grid grid-cols-1 sm:grid-cols-2 gap-2 pr-1 ${
+                                    sistemaMaterias.length > 5 
+                                      ? 'max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-primary/30 hover:scrollbar-thumb-primary/50' 
+                                      : ''
+                                  }`}
+                                  style={{
+                                    scrollbarWidth: 'thin',
+                                    scrollbarColor: 'hsl(var(--primary) / 0.3) transparent'
+                                  }}
+                                >
+                                  {sistemaMaterias.map((materia) => (
+                                    <div 
+                                      key={materia.id} 
+                                      className={`flex items-center gap-2 p-2 rounded-md transition-colors cursor-pointer ${
+                                        selectedMaterias.includes(materia.nome)
+                                          ? 'bg-primary/10 border border-primary/20'
+                                          : 'hover:bg-muted/50 border border-transparent'
+                                      }`}
+                                      onClick={() => {
+                                        toggleMateria(materia.nome)
+                                        // Se está marcando uma matéria e o sistema não está selecionado, selecionar
+                                        if (!selectedMaterias.includes(materia.nome) && !selectedSistemas.includes(sistema.nome)) {
+                                          setSelectedSistemas(prev => [...prev, sistema.nome])
+                                        }
+                                      }}
                                     >
-                                      {materia.nome}
-                                    </label>
-                                  </div>
-                                ))}
+                                      <Checkbox
+                                        id={`materia-${materia.id}`}
+                                        checked={selectedMaterias.includes(materia.nome)}
+                                        onCheckedChange={() => {
+                                          toggleMateria(materia.nome)
+                                          if (!selectedMaterias.includes(materia.nome) && !selectedSistemas.includes(sistema.nome)) {
+                                            setSelectedSistemas(prev => [...prev, sistema.nome])
+                                          }
+                                        }}
+                                        className="h-4 w-4 shrink-0"
+                                      />
+                                      <label
+                                        htmlFor={`materia-${materia.id}`}
+                                        className="text-sm leading-none cursor-pointer flex-1"
+                                      >
+                                        {materia.nome}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             ) : (
-                              <div className="ml-6 text-xs text-muted-foreground italic mt-1">
-                                Nenhuma matéria cadastrada
+                              <div className="text-xs text-muted-foreground italic py-2">
+                                Nenhuma matéria cadastrada para este sistema
                               </div>
                             )}
-                          </>
-                        )}
-                      </div>
-                    ))}
+                          </AccordionContent>
+                        </AccordionItem>
+                        )
+                      })}
+                    </Accordion>
                   </div>
                   {errors.sistemas && (
                     <p className="text-sm text-destructive">{errors.sistemas}</p>

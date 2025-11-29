@@ -69,12 +69,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { nome, descricao, ativo = true } = body
+    const { nome, descricao, periodo, ativo = true } = body
 
     // Validação
     if (!nome || typeof nome !== 'string' || !nome.trim()) {
       return NextResponse.json(
         { error: 'O nome do sistema é obrigatório' },
+        { status: 400 }
+      )
+    }
+
+    if (!periodo || typeof periodo !== 'string' || !periodo.trim()) {
+      return NextResponse.json(
+        { error: 'O período do sistema é obrigatório' },
         { status: 400 }
       )
     }
@@ -100,6 +107,7 @@ export async function POST(request: NextRequest) {
     const areaData = {
       nome: nome.trim(),
       descricao: descricao?.trim() || null,
+      periodo: periodo.trim(),
       ativo: ativo !== false,
       createdAt: new Date(),
       updatedAt: new Date(),

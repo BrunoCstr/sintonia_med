@@ -26,7 +26,7 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const { nome, descricao, ativo } = body
+    const { nome, descricao, periodo, ativo } = body
 
     const app = getAdminApp()
     const db = app.firestore()
@@ -66,6 +66,15 @@ export async function PUT(
       }
     }
 
+    if (periodo !== undefined) {
+      if (!periodo || typeof periodo !== 'string' || !periodo.trim()) {
+        return NextResponse.json(
+          { error: 'O período do sistema é obrigatório' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Preparar dados para atualização
     const updateData: any = {
       updatedAt: new Date(),
@@ -76,6 +85,9 @@ export async function PUT(
     }
     if (descricao !== undefined) {
       updateData.descricao = descricao?.trim() || null
+    }
+    if (periodo !== undefined) {
+      updateData.periodo = periodo.trim()
     }
     if (ativo !== undefined) {
       updateData.ativo = ativo

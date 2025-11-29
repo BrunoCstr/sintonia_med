@@ -75,6 +75,7 @@ export interface Sistema {
   id: string
   nome: string
   descricao?: string
+  periodo: string // Período do sistema (obrigatório)
   ativo: boolean
   createdAt: Date
   updatedAt: Date

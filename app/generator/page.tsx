@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useRole } from '@/lib/hooks/use-role'
@@ -344,6 +344,17 @@ export default function GeneratorPage() {
     }
   }, [user])
   
+  // Filtrar sistemas baseado no período selecionado
+  const filteredSistemas = useMemo(() => {
+    if (selectedPeriod === 'all' || !selectedPeriod) {
+      return sistemas
+    }
+    // Filtrar sistemas que correspondem ao período selecionado ou "Todos os períodos"
+    return sistemas.filter(
+      (sistema) => sistema.periodo === selectedPeriod || sistema.periodo === 'Todos os períodos'
+    )
+  }, [sistemas, selectedPeriod])
+
   // Atualizar disciplinas disponíveis baseado no período selecionado
   useEffect(() => {
     if (selectedPeriod === 'all' || !selectedPeriod) {
@@ -360,6 +371,24 @@ export default function GeneratorPage() {
       }
     }
   }, [selectedPeriod])
+
+  // Atualizar sistemas selecionados quando o período mudar
+  useEffect(() => {
+    if (selectedPeriod === 'all' || !selectedPeriod) {
+      // Se "Todos" está selecionado, selecionar todos os sistemas disponíveis
+      const allSistemaNames = sistemas.map(s => s.nome)
+      setSelectedSistemas(allSistemaNames)
+    } else {
+      // Filtrar apenas sistemas do período selecionado
+      const sistemasDoPeriodo = filteredSistemas.map(s => s.nome)
+      // Manter apenas sistemas que estão no período selecionado e selecionar todos se nenhum estiver selecionado
+      setSelectedSistemas((prev) => {
+        const filtered = prev.filter(nome => sistemasDoPeriodo.includes(nome))
+        // Se não há sistemas selecionados do período, selecionar todos do período
+        return filtered.length > 0 ? filtered : sistemasDoPeriodo
+      })
+    }
+  }, [selectedPeriod, filteredSistemas, sistemas])
 
   const toggleSistema = (sistemaNome: string) => {
     setSelectedSistemas((prev) => {
@@ -689,7 +718,7 @@ export default function GeneratorPage() {
                 <Label>
                   Sistemas <span className="text-destructive">*</span>
                 </Label>
-                {sistemas.length > 0 && (
+                {filteredSistemas.length > 0 && (
                   <div className="flex gap-2">
                     <Button
                       type="button"
@@ -697,11 +726,11 @@ export default function GeneratorPage() {
                       size="sm"
                       className="h-7 text-xs"
                       onClick={() => {
-                        const allSistemaNames = sistemas.map(s => s.nome)
+                        const allSistemaNames = filteredSistemas.map(s => s.nome)
                         setSelectedSistemas(allSistemaNames)
-                        // Marcar todas as matérias
+                        // Marcar todas as matérias dos sistemas filtrados
                         const todasMaterias: string[] = []
-                        sistemas.forEach(sistema => {
+                        filteredSistemas.forEach(sistema => {
                           const sistemaMaterias = materias[sistema.id] || []
                           sistemaMaterias.forEach(m => {
                             if (!todasMaterias.includes(m.nome)) {
@@ -744,7 +773,7 @@ export default function GeneratorPage() {
                   }}
                 >
                   {selectedSistemas.map((sistemaNome) => {
-                    const sistema = sistemas.find(s => s.nome === sistemaNome)
+                    const sistema = filteredSistemas.find(s => s.nome === sistemaNome)
                     const sistemaMaterias = sistema ? (materias[sistema.id] || []) : []
                     const materiasDoSistema = sistemaMaterias.map(m => m.nome)
                     const materiasSelecionadas = selectedMaterias.filter(m => materiasDoSistema.includes(m))
@@ -779,11 +808,15 @@ export default function GeneratorPage() {
                 <p className="text-sm text-muted-foreground">
                   Nenhum sistema disponível no momento.
                 </p>
+              ) : filteredSistemas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum sistema disponível para o período selecionado.
+                </p>
               ) : (
                 <>
                   <div 
                     className={`space-y-3 pb-4 ${
-                      sistemas.length > 5 
+                      filteredSistemas.length > 5 
                         ? 'max-h-[320px] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-primary/30 hover:scrollbar-thumb-primary/50' 
                         : ''
                     }`}
@@ -793,14 +826,14 @@ export default function GeneratorPage() {
                     }}
                   >
                     <Accordion type="multiple" className="w-full">
-                      {sistemas.map((sistema, index) => {
+                      {filteredSistemas.map((sistema, index) => {
                         const sistemaMaterias = materias[sistema.id] || []
                         const materiasDoSistema = sistemaMaterias.map(m => m.nome)
                         const materiasSelecionadas = selectedMaterias.filter(m => materiasDoSistema.includes(m))
                         const isSelected = selectedSistemas.includes(sistema.nome)
                         const allMateriasSelected = sistemaMaterias.length > 0 && materiasSelecionadas.length === sistemaMaterias.length
                         const someMateriasSelected = materiasSelecionadas.length > 0 && materiasSelecionadas.length < sistemaMaterias.length
-                        const isLast = index === sistemas.length - 1
+                        const isLast = index === filteredSistemas.length - 1
 
                         return (
                           <AccordionItem

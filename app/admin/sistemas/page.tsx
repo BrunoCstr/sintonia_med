@@ -22,10 +22,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Search, X } from 'lucide-react'
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import type { MedicalArea, Materia } from '@/lib/types'
 import { DataTablePagination } from '@/components/data-table-pagination'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function MedicalAreasPage() {
   const [areas, setAreas] = useState<MedicalArea[]>([])
@@ -34,15 +35,53 @@ export default function MedicalAreasPage() {
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(15)
+  
+  // Filtros
+  const [searchFilter, setSearchFilter] = useState('')
+  const [periodoFilter, setPeriodoFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
 
-  // Paginar as áreas
+  // Filtrar áreas antes da paginação
+  const filteredAreas = useMemo(() => {
+    let filtered = [...areas]
+
+    // Filtro de busca (nome ou descrição)
+    if (searchFilter.trim()) {
+      const searchLower = searchFilter.toLowerCase().trim()
+      filtered = filtered.filter(
+        (area) =>
+          area.nome.toLowerCase().includes(searchLower) ||
+          (area.descricao && area.descricao.toLowerCase().includes(searchLower))
+      )
+    }
+
+    // Filtro de período
+    if (periodoFilter !== 'all') {
+      filtered = filtered.filter((area) => area.periodo === periodoFilter)
+    }
+
+    // Filtro de status
+    if (statusFilter !== 'all') {
+      const isActive = statusFilter === 'ativo'
+      filtered = filtered.filter((area) => area.ativo === isActive)
+    }
+
+    return filtered
+  }, [areas, searchFilter, periodoFilter, statusFilter])
+
+  // Paginar as áreas filtradas
   const paginatedAreas = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
-    return areas.slice(startIndex, endIndex)
-  }, [areas, currentPage, itemsPerPage])
+    return filteredAreas.slice(startIndex, endIndex)
+  }, [filteredAreas, currentPage, itemsPerPage])
 
-  const totalPages = Math.ceil(areas.length / itemsPerPage)
+  const totalPages = Math.ceil(filteredAreas.length / itemsPerPage)
+  
+  // Resetar página quando filtros mudarem
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchFilter, periodoFilter, statusFilter])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isMateriaDialogOpen, setIsMateriaDialogOpen] = useState(false)
   const [editingArea, setEditingArea] = useState<MedicalArea | null>(null)
@@ -51,6 +90,7 @@ export default function MedicalAreasPage() {
   const [formData, setFormData] = useState({
     nome: '',
     descricao: '',
+    periodo: '',
     ativo: true,
   })
   const [materiaFormData, setMateriaFormData] = useState({
@@ -213,6 +253,7 @@ export default function MedicalAreasPage() {
       setFormData({
         nome: area.nome,
         descricao: area.descricao || '',
+        periodo: area.periodo || '',
         ativo: area.ativo,
       })
     } else {
@@ -220,6 +261,7 @@ export default function MedicalAreasPage() {
       setFormData({
         nome: '',
         descricao: '',
+        periodo: '',
         ativo: true,
       })
     }
@@ -232,6 +274,7 @@ export default function MedicalAreasPage() {
     setFormData({
       nome: '',
       descricao: '',
+      periodo: '',
       ativo: true,
     })
   }
@@ -241,6 +284,11 @@ export default function MedicalAreasPage() {
 
     if (!formData.nome.trim()) {
       alert('O nome do sistema é obrigatório')
+      return
+    }
+
+    if (!formData.periodo) {
+      alert('O período do sistema é obrigatório')
       return
     }
 
@@ -348,6 +396,33 @@ export default function MedicalAreasPage() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="periodo">
+                    Período <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={formData.periodo}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, periodo: value })
+                    }
+                    required
+                  >
+                    <SelectTrigger id="periodo">
+                      <SelectValue placeholder="Selecione o período" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Todos os períodos">Todos os períodos</SelectItem>
+                      <SelectItem value="1º Período">1º Período</SelectItem>
+                      <SelectItem value="2º Período">2º Período</SelectItem>
+                      <SelectItem value="3º Período">3º Período</SelectItem>
+                      <SelectItem value="4º Período">4º Período</SelectItem>
+                      <SelectItem value="5º Período">5º Período</SelectItem>
+                      <SelectItem value="6º Período">6º Período</SelectItem>
+                      <SelectItem value="7º Período">7º Período</SelectItem>
+                      <SelectItem value="8º Período">8º Período</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="descricao">Descrição (opcional)</Label>
                   <Textarea
                     id="descricao"
@@ -445,6 +520,71 @@ export default function MedicalAreasPage() {
 
       {/* Areas Table */}
       <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle>Sistemas</CardTitle>
+              <CardDescription>
+                {filteredAreas.length === areas.length
+                  ? `Total: ${areas.length} sistema${areas.length !== 1 ? 's' : ''}`
+                  : `Mostrando ${filteredAreas.length} de ${areas.length} sistema${areas.length !== 1 ? 's' : ''}`}
+              </CardDescription>
+            </div>
+            {/* Filtros */}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              {/* Filtro de busca */}
+              <div className="relative flex-1 md:min-w-[250px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome ou descrição..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  className="pl-9 pr-9"
+                />
+                {searchFilter && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+                    onClick={() => setSearchFilter('')}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              
+              {/* Filtro de período */}
+              <Select value={periodoFilter} onValueChange={setPeriodoFilter}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os períodos</SelectItem>
+                  <SelectItem value="1º Período">1º Período</SelectItem>
+                  <SelectItem value="2º Período">2º Período</SelectItem>
+                  <SelectItem value="3º Período">3º Período</SelectItem>
+                  <SelectItem value="4º Período">4º Período</SelectItem>
+                  <SelectItem value="5º Período">5º Período</SelectItem>
+                  <SelectItem value="6º Período">6º Período</SelectItem>
+                  <SelectItem value="7º Período">7º Período</SelectItem>
+                  <SelectItem value="8º Período">8º Período</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Filtro de status */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full md:w-[150px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="ativo">Ativo</SelectItem>
+                  <SelectItem value="inativo">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
         <CardContent className="px-6 py-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -454,6 +594,10 @@ export default function MedicalAreasPage() {
             <div className="py-12 text-center text-muted-foreground">
               Nenhum sistema cadastrado
             </div>
+          ) : filteredAreas.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              Nenhum sistema encontrado com os filtros aplicados
+            </div>
           ) : (
             <>
               <Table>
@@ -461,6 +605,7 @@ export default function MedicalAreasPage() {
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
                     <TableHead>Nome</TableHead>
+                    <TableHead>Período</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
@@ -488,6 +633,9 @@ export default function MedicalAreasPage() {
                           </Button>
                         </TableCell>
                         <TableCell className="font-medium">{area.nome}</TableCell>
+                        <TableCell className="text-sm">
+                          {area.periodo || '-'}
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {area.descricao || '-'}
                         </TableCell>
@@ -534,7 +682,7 @@ export default function MedicalAreasPage() {
                       </TableRow>
                       {isExpanded && (
                         <TableRow>
-                          <TableCell colSpan={5} className="bg-muted/30">
+                          <TableCell colSpan={6} className="bg-muted/30">
                             <div className="space-y-2 py-4">
                               <div className="flex items-center justify-between px-4">
                                 <h4 className="text-sm font-semibold">Matérias (Subdivisões)</h4>
@@ -602,13 +750,13 @@ export default function MedicalAreasPage() {
                   })}
                 </TableBody>
               </Table>
-              {areas.length > 0 && (
+              {filteredAreas.length > 0 && (
                 <div className="border-t px-6 py-4">
                   <DataTablePagination
                     currentPage={currentPage}
                     totalPages={totalPages}
                     itemsPerPage={itemsPerPage}
-                    totalItems={areas.length}
+                    totalItems={filteredAreas.length}
                     onPageChange={setCurrentPage}
                     onItemsPerPageChange={setItemsPerPage}
                   />

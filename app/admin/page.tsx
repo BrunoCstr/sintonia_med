@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileQuestion, Users, Flag, TrendingUp, Loader2, Stethoscope, CreditCard, Calendar } from 'lucide-react'
 import { useRole } from '@/lib/hooks/use-role'
+import { useTheme } from '@/lib/theme-provider'
 import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
@@ -18,17 +19,26 @@ interface AdminStats {
   usersWithSemesterPlan?: number
 }
 
-const PLAN_COLORS = {
-  free: '#FFFFF3', // Creme/Quase branco
+const PLAN_COLORS_LIGHT = {
+  free: '#E8E8D0', // Creme mais escuro para modo light
+  monthly: '#B00200', // Vermelho mais escuro
+  semester: '#7A0718', // Vermelho escuro mais escuro
+}
+
+const PLAN_COLORS_DARK = {
+  free: '#FFFFF3', // Creme/Quase branco para modo dark
   monthly: '#CF0300', // Vermelho claro
   semester: '#90091C', // Vermelho escuro/principal
 }
 
 export default function AdminDashboardPage() {
   const { userRole, isAdminMaster } = useRole()
+  const { theme } = useTheme()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  const PLAN_COLORS = theme === 'light' ? PLAN_COLORS_LIGHT : PLAN_COLORS_DARK
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -348,8 +358,30 @@ export default function AdminDashboardPage() {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) => `${name}: ${percent ? (percent * 100).toFixed(0) : 0}%`}
-                          outerRadius={100}
+                          label={({ name, percent, cx, cy, midAngle, innerRadius, outerRadius }) => {
+                            if (!cx || !cy || midAngle === undefined || innerRadius === undefined || outerRadius === undefined) {
+                              return null
+                            }
+                            const RADIAN = Math.PI / 180
+                            // Posicionar labels fora do gráfico
+                            const radius = outerRadius + 20
+                            const x = cx + radius * Math.cos(-midAngle * RADIAN)
+                            const y = cy + radius * Math.sin(-midAngle * RADIAN)
+                            
+                            return (
+                              <text 
+                                x={x} 
+                                y={y} 
+                                fill="#000000" 
+                                textAnchor={x > cx ? 'start' : 'end'} 
+                                dominantBaseline="central"
+                                style={{ fontSize: '12px', fontWeight: 500 }}
+                              >
+                                {`${name}: ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                              </text>
+                            )
+                          }}
+                          outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
                         >
@@ -360,7 +392,21 @@ export default function AdminDashboardPage() {
                         <Tooltip 
                           formatter={(value: number) => formatNumber(value)}
                         />
-                        <Legend />
+                        <Legend 
+                          content={({ payload }) => (
+                            <ul className="flex flex-wrap justify-center gap-4 mt-4">
+                              {payload?.map((entry, index) => (
+                                <li key={`legend-${index}`} className="flex items-center gap-2">
+                                  <span 
+                                    className="inline-block w-3 h-3 rounded"
+                                    style={{ backgroundColor: entry.color }}
+                                  />
+                                  <span className="text-black dark:text-white">{entry.value}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (

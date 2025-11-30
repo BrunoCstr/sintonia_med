@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Target, CheckCircle, Award, Brain, BookOpen, GraduationCap, Stethoscope } from 'lucide-react'
+import { ArrowRight, Target, CheckCircle, Award, Brain, BookOpen, GraduationCap, Stethoscope, BarChart3, History, FileText, Users } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
@@ -63,17 +63,23 @@ export default function WelcomePage() {
                 transition={{ duration: 0.6, delay: 0.2 }}
                 className="space-y-4"
               >
-                <h1 className="text-balance text-5xl font-bold leading-tight tracking-tight text-foreground lg:text-7xl">
-                  Estude medicina com{' '}
+                <h1 className="text-balance text-4xl font-bold leading-tight tracking-tight text-foreground lg:text-5xl">
+                  Domine os temas essenciais estudando por questões no formato{' '}
                   <span className="relative inline-block">
-                    <span className="relative z-10 text-primary">inteligência</span>
+                    <span className="relative z-10 text-primary">PBL</span>
                     <span className="absolute bottom-2 left-0 h-3 w-full bg-primary/20" />
                   </span>
+                  {' '} prática que gera resultado.
                 </h1>
                 
-                <p className="text-pretty text-lg text-muted-foreground lg:text-xl">
-                  Mais de <strong className="text-foreground">5.000 questões comentadas</strong> das principais provas do país. Simulados personalizados, análise de desempenho e evolução constante.
-                </p>
+                <div className="space-y-3">
+                  <p className="text-pretty text-lg text-muted-foreground lg:text-xl">
+                    O banco de questões independente, pensado para estudantes de medicina das instituições do grupo Afya.
+                  </p>
+                  <p className="text-pretty text-lg text-muted-foreground lg:text-xl">
+                    Questões comentadas, simulados personalizados e análise de desempenho e evolução.
+                  </p>
+                </div>
               </motion.div>
 
               <motion.div 
@@ -256,12 +262,12 @@ export default function WelcomePage() {
           
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[
-              { icon: Target, title: 'Simulados Personalizados', description: 'Crie provas sob medida com filtros de período, matéria, dificuldade e quantidade. Modo cronometrado para simular o dia da prova.', color: 'primary' },
-              { icon: Target, title: 'Gabarito Comentado', description: 'Todas as questões com explicações detalhadas. Entenda o raciocínio por trás de cada alternativa correta e incorreta.', color: 'secondary' },
-              { icon: Target, title: 'Dashboard Inteligente', description: 'Acompanhe seu progresso com gráficos detalhados. Identifique pontos fracos e otimize seus estudos com dados reais.', color: 'accent' },
-              { icon: Target, title: 'Histórico Completo', description: 'Revise todos os seus simulados anteriores. Compare desempenho e veja sua evolução ao longo do tempo.', color: 'chart-4' },
-              { icon: Target, title: 'Questões Oficiais', description: 'Banco atualizado com questões das principais provas: REVALIDA, ENARE, residências e concursos médicos.', color: 'success' },
-              { icon: Target, title: 'Comunidade Ativa', description: 'Comente, tire dúvidas e interaja com outros estudantes. Aprendizado colaborativo que multiplica resultados.', color: 'primary' },
+              { icon: Target, title: 'Simulados Personalizados', description: 'Crie provas sob medida com filtros de período, matéria, dificuldade e quantidade. Modo cronometrado para simular o dia da prova.' },
+              { icon: FileText, title: 'Gabarito Comentado', description: 'Todas as questões com explicações detalhadas. Entenda o raciocínio por trás de cada alternativa correta e incorreta.' },
+              { icon: BarChart3, title: 'Dashboard Inteligente', description: 'Acompanhe seu progresso com gráficos detalhados. Identifique pontos fracos e otimize seus estudos com dados reais.' },
+              { icon: History, title: 'Histórico Completo', description: 'Revise todos os seus simulados anteriores. Compare desempenho e veja sua evolução ao longo do tempo.' },
+              { icon: BookOpen, title: 'Questões Revisadas', description: 'Banco de dados construído com rigor acadêmico e revisado por monitores e professores para assegurar confiabilidade e consistência.' },
+              { icon: Users, title: 'Comunidade Ativa', description: 'Comente, tire dúvidas e interaja com outros estudantes. Aprendizado colaborativo que multiplica resultados.' },
             ].map((feature, index) => (
               <motion.div
                 key={index}
@@ -272,8 +278,8 @@ export default function WelcomePage() {
                 whileHover={{ y: -5 }}
                 className="group rounded-2xl border bg-background p-8 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5"
               >
-                <div className={`mb-4 inline-flex rounded-xl bg-${feature.color}/10 p-4 transition-colors group-hover:bg-${feature.color} group-hover:text-${feature.color}-foreground`}>
-                  <feature.icon className="h-8 w-8" />
+                <div className="mb-4 inline-flex rounded-xl bg-primary/10 p-4 transition-colors group-hover:bg-primary">
+                  <feature.icon className="h-8 w-8 text-primary transition-colors group-hover:text-primary-foreground" />
                 </div>
                 <h3 className="mb-3 text-xl font-bold">{feature.title}</h3>
                 <p className="text-muted-foreground">{feature.description}</p>
@@ -355,7 +361,7 @@ export default function WelcomePage() {
         <div className="mx-auto max-w-4xl text-center">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-6 py-3 text-sm font-medium text-primary">
             <Award className="h-5 w-5" />
-            Aprovação garantida ou seu dinheiro de volta
+            Teste agora o banco de questões com o Plano Free
           </div>
           
           <h2 className="mb-6 text-balance text-4xl font-bold lg:text-5xl">
@@ -363,7 +369,7 @@ export default function WelcomePage() {
           </h2>
           
           <p className="mb-8 text-lg text-muted-foreground">
-            Não perca mais tempo com métodos de estudo ineficientes. Junte-se aos aprovados.
+          O seu estudo turbinado começa agora!
           </p>
           
           <Button asChild size="lg" className="gap-2 text-lg shadow-lg shadow-primary/20">
@@ -374,7 +380,7 @@ export default function WelcomePage() {
           </Button>
           
           <p className="mt-4 text-sm text-muted-foreground">
-            7 dias de garantia • Sem cartão de crédito
+           Sem fidelidade ou renovação automática, cancele quando desejar
           </p>
         </div>
       </section>
@@ -385,11 +391,11 @@ export default function WelcomePage() {
           <div className="grid gap-8 md:grid-cols-4">
             <div className="space-y-4">
               <Image 
-                src={theme === 'light' ? "/logo-sintoniamed-light.png" : "/logo-sintoniamed-dark.png"} 
+                src="/logo-sintoniamed-dark.png"
                 alt="SintoniaMed" 
-                width={200}
-                height={50}
-                className="h-10 w-auto"
+                width={300}
+                height={90}
+                className="h-16 w-auto lg:h-20"
               />
               <p className="text-sm opacity-80">
                 A plataforma completa para sua aprovação em medicina.
@@ -424,8 +430,13 @@ export default function WelcomePage() {
             </div>
           </div>
           
-          <div className="mt-12 border-t border-accent-foreground/10 pt-8 text-center text-sm opacity-80">
-            <p>&copy; 2025 SintoniaMed. Todos os direitos reservados.</p>
+          <div className="mt-12 border-t border-accent-foreground/10 pt-8 space-y-4">
+            <p className="text-center text-xs opacity-70 leading-relaxed max-w-4xl mx-auto">
+              Este site é uma plataforma independente, sem qualquer vínculo, parceria, autorização ou associação com a Afya ou com qualquer uma de suas instituições. Não utilizamos materiais oficiais, internos ou de propriedade intelectual da Afya.
+            </p>
+            <p className="text-center text-sm opacity-80">
+              &copy; 2025 SintoniaMed. Todos os direitos reservados.
+            </p>
           </div>
         </div>
       </footer>

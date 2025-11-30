@@ -199,7 +199,7 @@ export default function DashboardPage() {
               ) : (
                 <>
                   <div className="text-2xl font-bold">{stats.today}</div>
-                  <p className="text-xs text-muted-foreground">questões respondidas</p>
+                  <p className="text-xs text-muted-foreground">Questões respondidas</p>
                 </>
               )}
             </CardContent>
@@ -216,7 +216,7 @@ export default function DashboardPage() {
               ) : (
                 <>
                   <div className="text-2xl font-bold">{stats.week}</div>
-                  <p className="text-xs text-muted-foreground">questões respondidas</p>
+                  <p className="text-xs text-muted-foreground">Questões respondidas</p>
                 </>
               )}
             </CardContent>
@@ -233,7 +233,7 @@ export default function DashboardPage() {
               ) : (
                 <>
                   <div className="text-2xl font-bold">{stats.month}</div>
-                  <p className="text-xs text-muted-foreground">questões respondidas</p>
+                  <p className="text-xs text-muted-foreground">Questões respondidas</p>
                 </>
               )}
             </CardContent>
@@ -250,7 +250,7 @@ export default function DashboardPage() {
               ) : (
                 <>
                   <div className="text-2xl font-bold">{stats.total.toLocaleString('pt-BR')}</div>
-                  <p className="text-xs text-muted-foreground">questões respondidas</p>
+                  <p className="text-xs text-muted-foreground">Questões respondidas</p>
                 </>
               )}
             </CardContent>

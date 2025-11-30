@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Target, Zap, CheckCircle, TrendingUp, Award, Clock, BookOpen, Users } from 'lucide-react'
+import { ArrowRight, Target, CheckCircle, Award, Brain, BookOpen, GraduationCap, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
@@ -31,7 +31,7 @@ export default function WelcomePage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <section className="relative overflow-hidden px-4 py-16 lg:py-24">
+      <section className="relative flex min-h-screen items-center overflow-hidden px-4 py-12">
         <div className="absolute inset-0 -z-10">
           <div className="absolute right-0 top-0 h-[600px] w-[600px] rounded-full bg-primary/5 blur-3xl" />
           <div className="absolute bottom-0 left-0 h-[400px] w-[400px] rounded-full bg-secondary/5 blur-3xl" />
@@ -99,82 +99,139 @@ export default function WelcomePage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.6 }}
-                className="grid grid-cols-3 gap-6 pt-8"
+                className="flex items-center gap-8 pt-6"
               >
-                <motion.div 
-                  whileHover={{ scale: 1.05 }}
-                  className="space-y-1"
-                >
-                  <div className="text-3xl font-bold text-primary">5K+</div>
-                  <div className="text-sm text-muted-foreground">Questões</div>
-                </motion.div>
-                <motion.div 
-                  whileHover={{ scale: 1.05 }}
-                  className="space-y-1"
-                >
-                  <div className="text-3xl font-bold text-primary">98%</div>
-                  <div className="text-sm text-muted-foreground">Satisfação</div>
-                </motion.div>
-                <motion.div 
-                  whileHover={{ scale: 1.05 }}
-                  className="space-y-1"
-                >
-                  <div className="text-3xl font-bold text-primary">2K+</div>
-                  <div className="text-sm text-muted-foreground">Estudantes</div>
-                </motion.div>
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  <span className="text-lg font-bold text-primary">5K+</span>
+                  <span className="text-sm text-muted-foreground">questões</span>
+                </div>
+
+                <div className="h-4 w-px bg-border" />
+
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5 text-primary" />
+                  <span className="text-sm text-muted-foreground">
+                    Criadas por <span className="font-semibold text-foreground">Monitores e Professores</span>
+                  </span>
+                </div>
               </motion.div>
             </div>
 
-            {/* Right: Image with floating cards */}
+            {/* Right: Creative visual composition */}
             <motion.div 
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.3 }}
-              className="relative"
+              className="relative flex min-h-[400px] flex-col items-center justify-center lg:min-h-[500px]"
             >
-              <div className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-2xl">
-                <img
-                  src="/medical-student-studying-with-laptop-and-books-in-.jpg"
-                  alt="Estudante de medicina estudando"
-                  className="h-auto w-full object-cover"
-                />
+              {/* Floating decorative elements */}
+              <motion.div
+                animate={{ 
+                  y: [0, -15, 0],
+                  rotate: [0, 5, 0]
+                }}
+                transition={{ 
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="absolute -left-4 top-8 rounded-2xl border border-primary/20 bg-card/80 p-4 shadow-lg backdrop-blur-sm lg:left-0"
+              >
+                <Brain className="h-8 w-8 text-primary" />
+              </motion.div>
+
+              <motion.div
+                animate={{ 
+                  y: [0, 12, 0],
+                  rotate: [0, -5, 0]
+                }}
+                transition={{ 
+                  duration: 3.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.5
+                }}
+                className="absolute -right-4 top-16 rounded-2xl border border-primary/20 bg-card/80 p-4 shadow-lg backdrop-blur-sm lg:right-0"
+              >
+                <Stethoscope className="h-8 w-8 text-primary" />
+              </motion.div>
+
+              <motion.div
+                animate={{ 
+                  y: [0, 10, 0],
+                  rotate: [0, -3, 0]
+                }}
+                transition={{ 
+                  duration: 4.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 1
+                }}
+                className="absolute -left-2 bottom-24 rounded-2xl border border-primary/20 bg-card/80 p-4 shadow-lg backdrop-blur-sm lg:left-4"
+              >
+                <BookOpen className="h-8 w-8 text-primary" />
+              </motion.div>
+
+              <motion.div
+                animate={{ 
+                  y: [0, -12, 0],
+                  rotate: [0, 8, 0]
+                }}
+                transition={{ 
+                  duration: 3.8,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.8
+                }}
+                className="absolute -right-2 bottom-32 rounded-2xl border border-primary/20 bg-card/80 p-4 shadow-lg backdrop-blur-sm lg:right-4"
+              >
+                <GraduationCap className="h-8 w-8 text-primary" />
+              </motion.div>
+
+              {/* Main content */}
+              <div className="relative z-10 flex flex-col items-center space-y-8">
+                {/* Glow effect behind logo */}
+                <div className="absolute -inset-10 rounded-full bg-primary/10 blur-3xl" />
+                
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.6, delay: 0.5 }}
+                  className="relative"
+                >
+                  <Image 
+                    src={theme === 'light' ? "/logo-sintoniamed-light.png" : "/logo-sintoniamed-dark.png"} 
+                    alt="SintoniaMed" 
+                    width={420}
+                    height={130}
+                    className="relative z-10 h-auto w-full max-w-sm transition-transform hover:scale-105 lg:max-w-md"
+                    priority
+                  />
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.8 }}
+                  className="text-center"
+                >
+                  <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
+                    <span className="relative inline-block">
+                      <span className="relative z-10">O seu</span>
+                    </span>{' '}
+                    <span className="relative inline-block">
+                      <span className="relative z-10 text-primary">banco de questões</span>
+                      <motion.span 
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: 1 }}
+                        transition={{ duration: 0.8, delay: 1.2 }}
+                        className="absolute bottom-1 left-0 h-2 w-full origin-left bg-primary/20 lg:bottom-2 lg:h-3" 
+                      />
+                    </span>
+                  </h2>
+                </motion.div>
               </div>
-              
-              <motion.div 
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.8 }}
-                whileHover={{ scale: 1.05, y: -5 }}
-                className="absolute -bottom-6 -left-6 rounded-2xl border border-border bg-card p-4 shadow-xl"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-success/10 p-3">
-                    <TrendingUp className="h-6 w-6 text-success" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-foreground">+32%</div>
-                    <div className="text-sm text-muted-foreground">De acertos</div>
-                  </div>
-                </div>
-              </motion.div>
-              
-              <motion.div 
-                initial={{ opacity: 0, y: -50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 1 }}
-                whileHover={{ scale: 1.05, y: 5 }}
-                className="absolute -right-6 -top-6 rounded-2xl border border-border bg-card p-4 shadow-xl"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-primary/10 p-3">
-                    <Award className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-foreground">Top 10%</div>
-                    <div className="text-sm text-muted-foreground">Ranking</div>
-                  </div>
-                </div>
-              </motion.div>
             </motion.div>
           </div>
         </div>

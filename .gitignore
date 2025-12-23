@@ -18,6 +18,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # firebase service account (credentials)
 firebase-service-account.json

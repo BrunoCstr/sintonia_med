@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Shield } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useTheme } from '@/lib/theme-provider'
+import { auth } from '@/lib/firebase'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
@@ -21,6 +22,13 @@ function LoginForm() {
   const [showResendEmail, setShowResendEmail] = useState(false)
   const [resendingEmail, setResendingEmail] = useState(false)
   const [resendSuccess, setResendSuccess] = useState(false)
+  
+  // Estados para 2FA
+  const [requires2FA, setRequires2FA] = useState(false)
+  const [twoFactorCode, setTwoFactorCode] = useState('')
+  const [verifying2FA, setVerifying2FA] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  
   const { signIn, resendVerificationEmail } = useAuth()
   const { theme } = useTheme()
   const router = useRouter()
@@ -29,15 +37,51 @@ function LoginForm() {
   const accountCreated = searchParams.get('message') === 'account-created'
   const accountCreatedNoEmail = searchParams.get('message') === 'account-created-no-email'
 
+  const check2FAStatus = async (uid: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/admin/two-factor?requesterUid=${uid}`, {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        return false
+      }
+
+      const data = await response.json()
+      return data.enabled === true
+    } catch (error) {
+      console.error('Erro ao verificar status do 2FA:', error)
+      return false
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setShowResendEmail(false)
     setResendSuccess(false)
     setLoading(true)
+    setRequires2FA(false)
+    setTwoFactorCode('')
 
     try {
       await signIn(email, password)
+      
+      // Verificar se o usuário tem 2FA ativado
+      const currentUser = auth.currentUser
+      if (currentUser) {
+        const has2FA = await check2FAStatus(currentUser.uid)
+        
+        if (has2FA) {
+          // Requer código 2FA
+          setUserId(currentUser.uid)
+          setRequires2FA(true)
+          setLoading(false)
+          return
+        }
+      }
+
+      // Se não tem 2FA ou não é admin, continuar normalmente
       // Marcar que o usuário acabou de fazer login para mostrar o dialog de planos
       // Limpar flag anterior para garantir que aparece mesmo se já viu antes
       if (typeof window !== 'undefined') {
@@ -64,6 +108,58 @@ function LoginForm() {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!userId || !twoFactorCode) {
+      setError('Por favor, insira o código de autenticação de dois fatores.')
+      return
+    }
+
+    setVerifying2FA(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/admin/two-factor/verify', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uid: userId,
+          code: twoFactorCode,
+        }),
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        // Fazer logout se o código estiver incorreto
+        await auth.signOut()
+        throw new Error(errorData.error || 'Código inválido')
+      }
+
+      // Código válido, continuar com o login
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('plansWelcomeShown')
+        sessionStorage.setItem('justLoggedIn', 'true')
+      }
+      router.push(redirect)
+    } catch (err: any) {
+      // Garantir logout em caso de erro
+      try {
+        await auth.signOut()
+      } catch (signOutError) {
+        console.error('Erro ao fazer logout:', signOutError)
+      }
+      setError(err.message || 'Código inválido. Verifique e tente novamente.')
+      setTwoFactorCode('')
+      setRequires2FA(false)
+      setUserId(null)
+    } finally {
+      setVerifying2FA(false)
     }
   }
 
@@ -156,7 +252,7 @@ function LoginForm() {
             </CardDescription>
           </CardHeader>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={requires2FA ? handle2FASubmit : handleSubmit}>
             <CardContent className="space-y-4">
               {accountCreated && (
                 <div className="rounded-lg bg-success/10 p-3 text-sm text-success">
@@ -206,56 +302,120 @@ function LoginForm() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
+              {requires2FA ? (
+                <>
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-primary" />
+                      <p className="text-sm font-medium text-foreground">
+                        Autenticação de Dois Fatores
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Sua conta está protegida com autenticação de dois fatores. 
+                      Insira o código de 6 dígitos do seu aplicativo autenticador.
+                    </p>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute cursor-pointer right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="twoFactorCode">Código de Autenticação</Label>
+                    <Input
+                      id="twoFactorCode"
+                      type="text"
+                      placeholder="000000"
+                      value={twoFactorCode}
+                      onChange={(e) => {
+                        // Permitir apenas números e limitar a 6 dígitos
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 6)
+                        setTwoFactorCode(value)
+                      }}
+                      required
+                      disabled={verifying2FA}
+                      maxLength={6}
+                      className="text-center mb-5 text-2xl tracking-widest font-mono"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoFocus
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="seu@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={loading}
+                    />
+                  </div>
 
-              <div className="text-right">
-                <Link
-                  href="/auth/forgot-password"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Esqueceu a senha?
-                </Link>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Senha</Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        disabled={loading}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute cursor-pointer right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <Link
+                      href="/auth/forgot-password"
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Esqueceu a senha?
+                    </Link>
+                  </div>
+                </>
+              )}
             </CardContent>
 
             <CardFooter className="flex flex-col gap-4">
-              <Button type="submit" className="w-full cursor-pointer" disabled={loading}>
-                {loading ? 'Entrando...' : 'Entrar'}
+              <Button 
+                type="submit" 
+                className="w-full cursor-pointer" 
+                disabled={loading || verifying2FA || (requires2FA && twoFactorCode.length !== 6)}
+              >
+                {loading ? 'Entrando...' : verifying2FA ? 'Verificando...' : requires2FA ? 'Verificar Código' : 'Entrar'}
               </Button>
+              
+              {requires2FA && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    // Fazer logout e voltar para o formulário de login
+                    auth.signOut()
+                    setRequires2FA(false)
+                    setTwoFactorCode('')
+                    setUserId(null)
+                    setError('')
+                  }}
+                  className="w-full cursor-pointer"
+                  disabled={verifying2FA}
+                >
+                  Voltar
+                </Button>
+              )}
 
               <div className="text-center text-sm text-muted-foreground">
                 Não tem uma conta?{' '}

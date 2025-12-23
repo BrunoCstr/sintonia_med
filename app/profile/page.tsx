@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/auth-context'
+import { useRole } from '@/lib/hooks/use-role'
 import { User, Mail, Calendar, CreditCard, Edit2, Loader2, Check, Sparkles, TrendingUp, X, Camera } from 'lucide-react'
+import { TwoFactorSettings } from '@/components/admin/two-factor-settings'
 import { useRouter } from 'next/navigation'
 import { auth } from '@/lib/firebase'
 import { PaymentBrick } from '@/components/payment-brick'
@@ -64,6 +66,7 @@ const features = [
 export default function ProfilePage() {
   const router = useRouter()
   const { user, userProfile, refreshUserProfile } = useAuth()
+  const { isAnyAdmin } = useRole()
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null)
   const [checkingPlan, setCheckingPlan] = useState(true)
 
@@ -829,6 +832,9 @@ export default function ProfilePage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Two Factor Authentication - Only for Admins */}
+        {isAnyAdmin && <TwoFactorSettings />}
 
         {/* Account Stats */}
         <Card>

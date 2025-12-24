@@ -55,6 +55,41 @@ function LoginForm() {
     }
   }
 
+  // Verifica se o usuário já passou pelo 2FA nesta sessão do navegador
+  const check2FASessionVerified = async (uid: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/auth/2fa-session?uid=${uid}`, {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        return false
+      }
+
+      const data = await response.json()
+      return data.verified === true
+    } catch (error) {
+      console.error('Erro ao verificar sessão 2FA:', error)
+      return false
+    }
+  }
+
+  // Salva o UID como verificado na sessão do navegador
+  const save2FASessionVerified = async (uid: string): Promise<void> => {
+    try {
+      await fetch('/api/auth/2fa-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ uid }),
+        credentials: 'include',
+      })
+    } catch (error) {
+      console.error('Erro ao salvar sessão 2FA:', error)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -84,6 +119,20 @@ function LoginForm() {
         const has2FA = await check2FAStatus(currentUser.uid)
         
         if (has2FA) {
+          // Verificar se este usuário já passou pelo 2FA nesta sessão do navegador
+          const alreadyVerifiedInSession = await check2FASessionVerified(currentUser.uid)
+          
+          if (alreadyVerifiedInSession) {
+            // Usuário já passou pelo 2FA nesta sessão, pular verificação
+            console.log('✅ 2FA já verificado nesta sessão do navegador')
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('plansWelcomeShown')
+              sessionStorage.setItem('justLoggedIn', 'true')
+            }
+            router.push(redirect)
+            return
+          }
+          
           // Definir cookie de 2FA pendente para bloquear acesso até verificação
           // Isso corrige a vulnerabilidade de bypass via botão voltar do navegador
           try {
@@ -181,6 +230,10 @@ function LoginForm() {
       } catch (error) {
         console.error('Erro ao remover cookie 2FA pendente:', error)
       }
+
+      // Salvar UID no cookie de sessão para não pedir 2FA novamente nesta sessão
+      // O cookie expira quando o navegador é fechado
+      await save2FASessionVerified(userId)
 
       // Código válido, continuar com o login
       if (typeof window !== 'undefined') {

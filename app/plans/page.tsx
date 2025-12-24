@@ -222,14 +222,17 @@ export default function PlansPage() {
       const data = await response.json()
       
       // Se foi acesso gratuito (cupom 100%), atualizar o perfil e redirecionar para sucesso
-      if (data.freeAccess) {
+      // Também verificamos se amount <= 0 ou se não há preferenceId como proteção adicional
+      if (data.freeAccess || data.amount <= 0 || !data.preferenceId) {
+        // Resetar estado do botão antes de redirecionar
+        setSelectedPlan(null)
         // Atualizar o perfil do usuário para refletir o novo plano
         await refreshUserProfile()
         router.push('/payment/success?status=approved&free_access=true')
         return
       }
       
-      // Abrir checkout transparente
+      // Abrir checkout transparente (apenas se tiver preferenceId válido e amount > 0)
       setCheckoutData({
         preferenceId: data.preferenceId,
         amount: data.amount,

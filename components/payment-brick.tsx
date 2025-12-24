@@ -154,6 +154,16 @@ export function PaymentBrick({
     )
   }
 
+  // Proteção: não renderizar o brick se o amount for 0 ou inválido
+  // Isso pode acontecer com cupons de 100% que deveriam ser tratados antes
+  if (!amount || amount <= 0) {
+    return (
+      <div className="rounded-md bg-amber-500/10 p-4 text-amber-600">
+        Valor do pagamento inválido. Por favor, tente novamente ou entre em contato com o suporte.
+      </div>
+    )
+  }
+
   if (!publicKey || !isReady) {
     return (
       <div className="flex items-center justify-center py-12">

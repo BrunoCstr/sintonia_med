@@ -9,7 +9,7 @@ import * as admin from 'firebase-admin'
  * 
  * Body:
  * {
- *   plan: 'monthly' | 'semester',
+ *   plan: 'monthly' | 'semester' | 'lifetime',
  *   requesterUid: string
  * }
  */
@@ -29,9 +29,9 @@ export async function POST(
       )
     }
 
-    if (!plan || !['monthly', 'semester'].includes(plan)) {
+    if (!plan || !['monthly', 'semester', 'lifetime'].includes(plan)) {
       return NextResponse.json(
-        { error: 'Plano inválido. Use "monthly" ou "semester"' },
+        { error: 'Plano inválido. Use "monthly", "semester" ou "lifetime"' },
         { status: 400 }
       )
     }
@@ -74,15 +74,18 @@ export async function POST(
       editedAt: admin.firestore.FieldValue.serverTimestamp(),
     }
 
-    // Calcular data de expiração
+    // Calcular data de expiração (null para plano vitalício)
     const now = new Date()
-    const expiresAt = new Date(now)
+    let expiresAt: Date | null = null
     
     if (plan === 'monthly') {
+      expiresAt = new Date(now)
       expiresAt.setDate(expiresAt.getDate() + 30) // 30 dias
     } else if (plan === 'semester') {
+      expiresAt = new Date(now)
       expiresAt.setDate(expiresAt.getDate() + 180) // 180 dias (6 meses)
     }
+    // Para plano lifetime, expiresAt permanece null
 
     // Atualizar ou criar documento no Firestore
     const userRef = db.collection('users').doc(uid)
@@ -91,7 +94,7 @@ export async function POST(
     if (userDoc.exists) {
       await userRef.update({
         plan,
-        planExpiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        planExpiresAt: expiresAt ? admin.firestore.Timestamp.fromDate(expiresAt) : null,
         editedBy: editedBy.uid,
         editedByName: editedBy.name,
         editedByPhoto: editedBy.photoURL,
@@ -108,7 +111,7 @@ export async function POST(
         institution: '-',
         role: authUser.customClaims?.role || 'aluno',
         plan,
-        planExpiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        planExpiresAt: expiresAt ? admin.firestore.Timestamp.fromDate(expiresAt) : null,
         editedBy: editedBy.uid,
         editedByName: editedBy.name,
         editedByPhoto: editedBy.photoURL,
@@ -118,11 +121,17 @@ export async function POST(
       })
     }
 
+    const planNames: Record<string, string> = {
+      monthly: 'mensal',
+      semester: 'semestral',
+      lifetime: 'vitalício (cortesia)',
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Acesso ${plan === 'monthly' ? 'mensal' : 'semestral'} liberado com sucesso`,
+      message: `Acesso ${planNames[plan]} liberado com sucesso`,
       plan,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: expiresAt ? expiresAt.toISOString() : null,
     })
   } catch (error: any) {
     console.error('Erro ao liberar acesso:', error)

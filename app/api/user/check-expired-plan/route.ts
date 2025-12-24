@@ -35,10 +35,30 @@ export async function POST(request: NextRequest) {
     const planExpiresAt = userData?.planExpiresAt
 
     // Se não tem plano, retornar
-    if (!plan || !planExpiresAt) {
+    if (!plan) {
       return NextResponse.json({
         expired: false,
         plan: null,
+        planExpiresAt: null,
+      })
+    }
+
+    // Plano vitalício nunca expira
+    if (plan === 'lifetime') {
+      return NextResponse.json({
+        expired: false,
+        plan: 'lifetime',
+        planExpiresAt: null,
+        daysRemaining: null,
+        isLifetime: true,
+      })
+    }
+
+    // Se não tem data de expiração (mas tem plano), considerar ativo
+    if (!planExpiresAt) {
+      return NextResponse.json({
+        expired: false,
+        plan,
         planExpiresAt: null,
       })
     }

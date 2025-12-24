@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminApp } from '@/lib/firebase-admin'
+import { sendVerificationEmail } from '@/lib/email'
 
 /**
  * POST /api/auth/send-verification-email
- * Envia e-mail de verificação usando Firebase Admin SDK
- * 
- * IMPORTANTE: O Firebase Admin SDK gera o link mas NÃO envia o e-mail automaticamente.
- * Esta função retorna o link que deve ser usado pelo Client SDK para enviar o e-mail.
+ * Gera link de verificação e envia e-mail usando Nodemailer
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, uid, password } = body
+    const { email, uid } = body
 
     if (!email) {
       return NextResponse.json({ error: 'Email é obrigatório' }, { status: 400 })
@@ -50,15 +48,26 @@ export async function POST(request: NextRequest) {
       // Gerar link de verificação
       const link = await app.auth().generateEmailVerificationLink(userRecord.email!, actionCodeSettings)
       
-      // Retornar o link e instruções
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Link de verificação gerado com sucesso',
-        link: link,
-        email: userRecord.email,
-        // Instruções para o frontend usar o Client SDK
-        instructions: 'Use o Firebase Client SDK sendEmailVerification com este link, ou envie o link via serviço de e-mail customizado'
-      })
+      // Enviar e-mail usando Nodemailer
+      try {
+        await sendVerificationEmail(userRecord.email!, link)
+        return NextResponse.json({ 
+          success: true, 
+          message: 'E-mail de verificação enviado com sucesso',
+          email: userRecord.email,
+        })
+      } catch (emailError: any) {
+        console.error('Erro ao enviar e-mail:', emailError)
+        // Se falhar o envio do e-mail, ainda retornamos o link para o frontend usar como fallback
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Link de verificação gerado, mas houve erro ao enviar e-mail. Use o link fornecido.',
+          link: link,
+          email: userRecord.email,
+          emailError: emailError.message,
+          warning: 'Configure EMAIL_USER e EMAIL_PASSWORD nas variáveis de ambiente para envio automático'
+        })
+      }
     } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
         return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })

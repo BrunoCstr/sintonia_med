@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Check, Sparkles, TrendingUp, ArrowLeft, X } from 'lucide-react'
+import { Check, Sparkles, TrendingUp, ArrowLeft, X, ShieldCheck, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
 import { auth } from '@/lib/firebase'
+import { formatPrice } from '@/lib/utils'
 import { PaymentBrick } from '@/components/payment-brick'
 import {
   Dialog,
@@ -19,27 +20,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-const plans = [
-  {
-    id: 'monthly',
-    name: 'Plano Mensal',
-    price: 29.90,
-    originalPrice: null,
-    badge: 'Flexível',
-    badgeVariant: 'secondary' as const,
-    duration: '1 mês',
-  },
-  {
-    id: 'semester',
-    name: 'Plano Semestral',
-    price: 143.00,
-    originalPrice: 179.00,
-    badge: 'Mais Vendido',
-    badgeVariant: 'default' as const,
-    duration: '6 meses',
-    recommended: true,
-  },
-]
+interface Plan {
+  id: string
+  name: string
+  price: number
+  originalPrice: number | null
+  badge: string
+  badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline'
+  duration: string
+  durationMonths: number
+  recommended?: boolean
+}
 
 const features = [
   'Acesso ilimitado ao banco de questões',
@@ -52,6 +43,8 @@ const features = [
 ]
 
 export default function PlansPage() {
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(true)
   const [couponCode, setCouponCode] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<{ 
     code: string; 
@@ -63,7 +56,29 @@ export default function PlansPage() {
   const [checkoutData, setCheckoutData] = useState<{ preferenceId: string; amount: number } | null>(null)
   const [processingPayment, setProcessingPayment] = useState(false)
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, refreshUserProfile } = useAuth()
+
+  // Buscar planos do Firestore
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const response = await fetch('/api/plans')
+        const data = await response.json()
+        if (data.success && data.plans && data.plans.length > 0) {
+          setPlans(data.plans)
+        } else {
+          // Não há planos disponíveis
+          setPlans([])
+        }
+      } catch (error) {
+        console.error('Erro ao buscar planos:', error)
+        setPlans([])
+      } finally {
+        setLoadingPlans(false)
+      }
+    }
+    fetchPlans()
+  }, [])
 
   const getFriendlyPaymentError = (status?: string | null, statusDetail?: string | null) => {
     const detailMap: Record<string, string> = {
@@ -206,6 +221,14 @@ export default function PlansPage() {
 
       const data = await response.json()
       
+      // Se foi acesso gratuito (cupom 100%), atualizar o perfil e redirecionar para sucesso
+      if (data.freeAccess) {
+        // Atualizar o perfil do usuário para refletir o novo plano
+        await refreshUserProfile()
+        router.push('/payment/success?status=approved&free_access=true')
+        return
+      }
+      
       // Abrir checkout transparente
       setCheckoutData({
         preferenceId: data.preferenceId,
@@ -237,6 +260,26 @@ export default function PlansPage() {
         </div>
 
         {/* Plans Grid */}
+        {loadingPlans ? (
+          <div className="mb-8 flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : plans.length === 0 ? (
+          <Card className="mb-8 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30">
+            <CardContent className="py-12 text-center">
+              <ShieldCheck className="mx-auto h-16 w-16 text-amber-600 dark:text-amber-400 mb-4" />
+              <h3 className="text-2xl font-bold mb-2 text-amber-900 dark:text-amber-100">
+                Assinaturas Temporariamente Indisponíveis
+              </h3>
+              <p className="text-amber-800 dark:text-amber-300 mb-4">
+                Não há planos de assinatura disponíveis no momento.
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Entre em contato conosco para mais informações sobre planos e preços.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
         <div className="mb-8 grid gap-6 md:grid-cols-2">
           {plans.map((plan) => (
             <Card
@@ -262,19 +305,19 @@ export default function PlansPage() {
 
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  {plan.originalPrice && (
+                  {plan.originalPrice && plan.originalPrice > plan.price && (
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground line-through">
-                        R$ {plan.originalPrice.toFixed(2)}
+                        R$ {formatPrice(plan.originalPrice)}
                       </span>
                       <Badge variant="destructive" className="text-xs">
-                        20% OFF
+                        {Math.round(((plan.originalPrice - plan.price) / plan.originalPrice) * 100)}% OFF
                       </Badge>
                     </div>
                   )}
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold">
-                      R$ {calculatePrice(plan.price, plan.id).toFixed(2)}
+                      R$ {formatPrice(calculatePrice(plan.price, plan.id))}
                     </span>
                     {appliedCoupon && isCouponApplicableToPlan(plan.id) && (
                       <Badge variant="secondary" className="ml-2 text-xs">
@@ -287,7 +330,7 @@ export default function PlansPage() {
                   )}
                   {plan.id === 'semester' && (
                     <p className="text-sm text-muted-foreground">
-                      ou R$ {(calculatePrice(plan.price, plan.id) / 6).toFixed(2)}/mês
+                      ou R$ {formatPrice(calculatePrice(plan.price, plan.id) / 6)}/mês
                     </p>
                   )}
                   {appliedCoupon && !isCouponApplicableToPlan(plan.id) && (
@@ -332,6 +375,13 @@ export default function PlansPage() {
               </CardFooter>
             </Card>
           ))}
+        </div>
+        )}
+
+        {/* Payment Security Info */}
+        <div className="mb-6 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <span>Pagamento seguro via MercadoPago</span>
         </div>
 
         {/* Coupon Section */}
@@ -397,6 +447,11 @@ export default function PlansPage() {
               Complete o pagamento para ativar sua assinatura
             </DialogDescription>
           </DialogHeader>
+          
+          <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <span>Pagamento seguro via MercadoPago</span>
+          </div>
           
           {checkoutData && (
             <PaymentBrick

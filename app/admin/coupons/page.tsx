@@ -19,6 +19,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -30,12 +41,14 @@ import {
   CheckCircle, 
   XCircle,
   TrendingUp,
-  Calendar,
-  Users
+  Archive,
+  ArchiveRestore,
+  AlertTriangle
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { useRole } from '@/lib/hooks/use-role'
+import { formatPrice } from '@/lib/utils'
 import { DataTablePagination } from '@/components/data-table-pagination'
 
 interface Coupon {
@@ -43,6 +56,7 @@ interface Coupon {
   discount: number
   description: string | null
   active: boolean
+  archived?: boolean
   maxUses: number | null
   maxUsesPerUser: number | null
   validFrom: string
@@ -66,15 +80,22 @@ export default function CouponsPage() {
   const { user } = useAuth()
   const { isAdminMaster } = useRole()
   const [coupons, setCoupons] = useState<Coupon[]>([])
+  const [archivedCoupons, setArchivedCoupons] = useState<Coupon[]>([])
   const [stats, setStats] = useState<Record<string, CouponStats>>({})
   const [loading, setLoading] = useState(true)
+  const [loadingArchived, setLoadingArchived] = useState(false)
+  const [activeTab, setActiveTab] = useState('active')
   const [currentPage, setCurrentPage] = useState(1)
+  const [archivedCurrentPage, setArchivedCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(15)
+  const [archivedItemsPerPage, setArchivedItemsPerPage] = useState(15)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showStatsDialog, setShowStatsDialog] = useState(false)
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null)
   const [selectedStats, setSelectedStats] = useState<CouponStats | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [deleteConfirmCode, setDeleteConfirmCode] = useState<string | null>(null)
   
   // Form states
   const [formCode, setFormCode] = useState('')
@@ -95,10 +116,16 @@ export default function CouponsPage() {
     }
   }, [isAdminMaster])
 
+  useEffect(() => {
+    if (activeTab === 'archived' && archivedCoupons.length === 0) {
+      fetchArchivedCoupons()
+    }
+  }, [activeTab])
+
   const fetchCoupons = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/admin/coupons', {
+      const response = await fetch('/api/admin/coupons?archived=false', {
         credentials: 'include',
       })
 
@@ -126,6 +153,38 @@ export default function CouponsPage() {
       alert('Erro ao carregar cupons')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchArchivedCoupons = async () => {
+    try {
+      setLoadingArchived(true)
+      const response = await fetch('/api/admin/coupons?archived=true', {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao buscar cupons arquivados')
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        setArchivedCoupons(data.coupons || [])
+        
+        // Buscar estatísticas para cada cupom arquivado
+        const statsPromises = data.coupons.map((coupon: Coupon) => 
+          fetchCouponStats(coupon.code)
+        )
+        const statsResults = await Promise.all(statsPromises)
+        data.coupons.forEach((coupon: Coupon, index: number) => {
+          setStats(prev => ({ ...prev, [coupon.code]: statsResults[index] }))
+        })
+      }
+    } catch (err: any) {
+      console.error('Erro ao buscar cupons arquivados:', err)
+      alert('Erro ao carregar cupons arquivados')
+    } finally {
+      setLoadingArchived(false)
     }
   }
 
@@ -275,7 +334,86 @@ export default function CouponsPage() {
     }
   }
 
+  const handleArchive = async (code: string) => {
+    try {
+      setActionLoading(code)
+      const response = await fetch(`/api/admin/coupons/${code}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ archived: true }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao arquivar cupom')
+      }
+
+      // Atualizar listas
+      const archivedCoupon = coupons.find(c => c.code === code)
+      if (archivedCoupon) {
+        setCoupons(prev => prev.filter(c => c.code !== code))
+        setArchivedCoupons(prev => [{ ...archivedCoupon, archived: true }, ...prev])
+      }
+    } catch (error) {
+      console.error('Erro ao arquivar cupom:', error)
+      alert('Erro ao arquivar cupom. Tente novamente.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleUnarchive = async (code: string) => {
+    try {
+      setActionLoading(code)
+      const response = await fetch(`/api/admin/coupons/${code}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ archived: false }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao desarquivar cupom')
+      }
+
+      // Atualizar listas
+      const unarchivedCoupon = archivedCoupons.find(c => c.code === code)
+      if (unarchivedCoupon) {
+        setArchivedCoupons(prev => prev.filter(c => c.code !== code))
+        setCoupons(prev => [{ ...unarchivedCoupon, archived: false }, ...prev])
+      }
+    } catch (error) {
+      console.error('Erro ao desarquivar cupom:', error)
+      alert('Erro ao desarquivar cupom. Tente novamente.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const handleDelete = async (code: string) => {
+    try {
+      setActionLoading(code)
+      const response = await fetch(`/api/admin/coupons/${code}?permanent=true`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao excluir cupom')
+      }
+
+      // Remover da lista de arquivados
+      setArchivedCoupons(prev => prev.filter(c => c.code !== code))
+      setDeleteConfirmCode(null)
+    } catch (error) {
+      console.error('Erro ao excluir cupom:', error)
+      alert('Erro ao excluir cupom. Tente novamente.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleDeactivate = async (code: string) => {
     if (!confirm(`Tem certeza que deseja desativar o cupom ${code}?`)) {
       return
     }
@@ -324,14 +462,22 @@ export default function CouponsPage() {
     return coupon.active && !isExpired(coupon.validUntil)
   }
 
-  // Paginar os cupons
+  // Paginar os cupons ativos
   const paginatedCoupons = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     return coupons.slice(startIndex, endIndex)
   }, [coupons, currentPage, itemsPerPage])
 
+  // Paginar os cupons arquivados
+  const paginatedArchivedCoupons = useMemo(() => {
+    const startIndex = (archivedCurrentPage - 1) * archivedItemsPerPage
+    const endIndex = startIndex + archivedItemsPerPage
+    return archivedCoupons.slice(startIndex, endIndex)
+  }, [archivedCoupons, archivedCurrentPage, archivedItemsPerPage])
+
   const totalPages = Math.ceil(coupons.length / itemsPerPage)
+  const archivedTotalPages = Math.ceil(archivedCoupons.length / archivedItemsPerPage)
 
   if (!isAdminMaster) {
     return (
@@ -346,6 +492,167 @@ export default function CouponsPage() {
       </div>
     )
   }
+
+  const renderCouponsTable = (
+    couponsList: Coupon[],
+    isArchived: boolean,
+    currentPageValue: number,
+    totalPagesValue: number,
+    itemsPerPageValue: number,
+    totalItems: number,
+    onPageChange: (page: number) => void,
+    onItemsPerPageChange: (items: number) => void,
+    isLoading: boolean
+  ) => (
+    <Card>
+      <CardHeader>
+        <CardTitle>{isArchived ? 'Cupons Arquivados' : 'Cupons Cadastrados'}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : couponsList.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            {isArchived ? 'Nenhum cupom arquivado' : 'Nenhum cupom cadastrado'}
+          </div>
+        ) : (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Desconto</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Validade</TableHead>
+                  <TableHead>Usos</TableHead>
+                  <TableHead>Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {couponsList.map((coupon) => (
+                <TableRow key={coupon.code}>
+                  <TableCell className="font-mono font-medium">
+                    {coupon.code}
+                  </TableCell>
+                  <TableCell>{coupon.discount}%</TableCell>
+                  <TableCell>
+                    {isActive(coupon) ? (
+                      <Badge variant="default">
+                        <CheckCircle className="mr-1 h-3 w-3" />
+                        Ativo
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">
+                        <XCircle className="mr-1 h-3 w-3" />
+                        {isExpired(coupon.validUntil) ? 'Expirado' : 'Inativo'}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <div>{formatDate(coupon.validFrom)}</div>
+                      <div className="text-muted-foreground">
+                        até {formatDate(coupon.validUntil)}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {stats[coupon.code] ? (
+                      <div className="text-sm">
+                        <div>{stats[coupon.code].totalUses} usos</div>
+                        <div className="text-muted-foreground">
+                          {stats[coupon.code].uniqueUsers} usuários
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        className="cursor-pointer"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewStats(coupon)}
+                      >
+                        <TrendingUp className="h-4 w-4" />
+                      </Button>
+                      {isArchived ? (
+                        <>
+                          <Button
+                            className="cursor-pointer"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleUnarchive(coupon.code)}
+                            disabled={actionLoading === coupon.code}
+                          >
+                            {actionLoading === coupon.code ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ArchiveRestore className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            className="cursor-pointer text-destructive hover:text-destructive"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteConfirmCode(coupon.code)}
+                            disabled={actionLoading === coupon.code}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            className="cursor-pointer"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(coupon)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            className="cursor-pointer"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleArchive(coupon.code)}
+                            disabled={actionLoading === coupon.code}
+                          >
+                            {actionLoading === coupon.code ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Archive className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {totalItems > 0 && (
+              <div className="border-t px-6 py-4">
+                <DataTablePagination
+                  currentPage={currentPageValue}
+                  totalPages={totalPagesValue}
+                  itemsPerPage={itemsPerPageValue}
+                  totalItems={totalItems}
+                  onPageChange={onPageChange}
+                  onItemsPerPageChange={onItemsPerPageChange}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
 
   return (
     <div className="space-y-6">
@@ -362,122 +669,46 @@ export default function CouponsPage() {
         </Button>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Cupons Cadastrados</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {coupons.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                Nenhum cupom cadastrado
-              </div>
-            ) : (
-              <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Código</TableHead>
-                      <TableHead>Desconto</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Validade</TableHead>
-                      <TableHead>Usos</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedCoupons.map((coupon) => (
-                    <TableRow key={coupon.code}>
-                      <TableCell className="font-mono font-medium">
-                        {coupon.code}
-                      </TableCell>
-                      <TableCell>{coupon.discount}%</TableCell>
-                      <TableCell>
-                        {isActive(coupon) ? (
-                          <Badge variant="default">
-                            <CheckCircle className="mr-1 h-3 w-3" />
-                            Ativo
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">
-                            <XCircle className="mr-1 h-3 w-3" />
-                            {isExpired(coupon.validUntil) ? 'Expirado' : 'Inativo'}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{formatDate(coupon.validFrom)}</div>
-                          <div className="text-muted-foreground">
-                            até {formatDate(coupon.validUntil)}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {stats[coupon.code] ? (
-                          <div className="text-sm">
-                            <div>{stats[coupon.code].totalUses} usos</div>
-                            <div className="text-muted-foreground">
-                              {stats[coupon.code].uniqueUsers} usuários
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            className="cursor-pointer"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewStats(coupon)}
-                          >
-                            <TrendingUp className="h-4 w-4" />
-                          </Button>
-                          <Button
-                           className="cursor-pointer"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(coupon)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                           className="cursor-pointer"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(coupon.code)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {coupons.length > 0 && (
-                  <div className="border-t px-6 py-4">
-                    <DataTablePagination
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                      itemsPerPage={itemsPerPage}
-                      totalItems={coupons.length}
-                      onPageChange={setCurrentPage}
-                      onItemsPerPageChange={setItemsPerPage}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {/* Tabs for Active/Archived */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="active" className="cursor-pointer">
+            Ativos
+          </TabsTrigger>
+          <TabsTrigger value="archived" className="cursor-pointer">
+            <Archive className="mr-2 h-4 w-4" />
+            Arquivados
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active" className="mt-4">
+          {renderCouponsTable(
+            paginatedCoupons,
+            false,
+            currentPage,
+            totalPages,
+            itemsPerPage,
+            coupons.length,
+            setCurrentPage,
+            setItemsPerPage,
+            loading
+          )}
+        </TabsContent>
+
+        <TabsContent value="archived" className="mt-4">
+          {renderCouponsTable(
+            paginatedArchivedCoupons,
+            true,
+            archivedCurrentPage,
+            archivedTotalPages,
+            archivedItemsPerPage,
+            archivedCoupons.length,
+            setArchivedCurrentPage,
+            setArchivedItemsPerPage,
+            loadingArchived
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Create/Edit Dialog */}
       <Dialog open={showCreateDialog || showEditDialog} onOpenChange={(open) => {
@@ -699,12 +930,12 @@ export default function CouponsPage() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-2xl font-bold">
-                    R$ {selectedStats.totalDiscountApproved.toFixed(2)}
+                    R$ {formatPrice(selectedStats.totalDiscountApproved)}
                   </div>
                   <div className="text-sm text-muted-foreground">Total de Desconto Aplicado (Aprovados)</div>
                   {selectedStats.totalDiscount > selectedStats.totalDiscountApproved && (
                     <div className="text-xs text-muted-foreground mt-1">
-                      R$ {selectedStats.totalDiscount.toFixed(2)} total (incluindo não aprovados)
+                      R$ {formatPrice(selectedStats.totalDiscount)} total (incluindo não aprovados)
                     </div>
                   )}
                 </CardContent>
@@ -717,7 +948,36 @@ export default function CouponsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmCode} onOpenChange={(open) => !open && setDeleteConfirmCode(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Excluir Cupom Permanentemente
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O cupom <strong>{deleteConfirmCode}</strong> será 
+              excluído permanentemente do sistema, incluindo todo o histórico de uso.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteConfirmCode && handleDelete(deleteConfirmCode)}
+            >
+              {actionLoading === deleteConfirmCode ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
-

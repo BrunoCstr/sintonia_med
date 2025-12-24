@@ -64,6 +64,17 @@ function LoginForm() {
     setRequires2FA(false)
     setTwoFactorCode('')
 
+    // Limpar qualquer cookie de 2FA pendente residual de um login anterior
+    // Isso evita que um login novo seja bloqueado por um 2FA pendente antigo
+    try {
+      await fetch('/api/auth/set-2fa-pending', {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+    } catch (error) {
+      // Ignorar erro - é apenas uma limpeza preventiva
+    }
+
     try {
       await signIn(email, password)
       
@@ -73,6 +84,17 @@ function LoginForm() {
         const has2FA = await check2FAStatus(currentUser.uid)
         
         if (has2FA) {
+          // Definir cookie de 2FA pendente para bloquear acesso até verificação
+          // Isso corrige a vulnerabilidade de bypass via botão voltar do navegador
+          try {
+            await fetch('/api/auth/set-2fa-pending', {
+              method: 'POST',
+              credentials: 'include',
+            })
+          } catch (error) {
+            console.error('Erro ao definir cookie 2FA pendente:', error)
+          }
+          
           // Requer código 2FA
           setUserId(currentUser.uid)
           setRequires2FA(true)
@@ -138,7 +160,26 @@ function LoginForm() {
         const errorData = await response.json()
         // Fazer logout se o código estiver incorreto
         await auth.signOut()
+        // Remover cookie de 2FA pendente
+        try {
+          await fetch('/api/auth/set-2fa-pending', {
+            method: 'DELETE',
+            credentials: 'include',
+          })
+        } catch (error) {
+          console.error('Erro ao remover cookie 2FA pendente:', error)
+        }
         throw new Error(errorData.error || 'Código inválido')
+      }
+
+      // Código válido - remover cookie de 2FA pendente antes de continuar
+      try {
+        await fetch('/api/auth/set-2fa-pending', {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+      } catch (error) {
+        console.error('Erro ao remover cookie 2FA pendente:', error)
       }
 
       // Código válido, continuar com o login
@@ -153,6 +194,15 @@ function LoginForm() {
         await auth.signOut()
       } catch (signOutError) {
         console.error('Erro ao fazer logout:', signOutError)
+      }
+      // Remover cookie de 2FA pendente
+      try {
+        await fetch('/api/auth/set-2fa-pending', {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+      } catch (error) {
+        console.error('Erro ao remover cookie 2FA pendente:', error)
       }
       setError(err.message || 'Código inválido. Verifique e tente novamente.')
       setTwoFactorCode('')
@@ -402,9 +452,18 @@ function LoginForm() {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => {
+                  onClick={async () => {
                     // Fazer logout e voltar para o formulário de login
-                    auth.signOut()
+                    await auth.signOut()
+                    // Remover cookie de 2FA pendente
+                    try {
+                      await fetch('/api/auth/set-2fa-pending', {
+                        method: 'DELETE',
+                        credentials: 'include',
+                      })
+                    } catch (error) {
+                      console.error('Erro ao remover cookie 2FA pendente:', error)
+                    }
                     setRequires2FA(false)
                     setTwoFactorCode('')
                     setUserId(null)

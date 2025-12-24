@@ -3,10 +3,30 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, CheckCircle, Clock, ExternalLink, Loader2 } from 'lucide-react'
+import { 
+  ArrowLeft, 
+  CheckCircle, 
+  Clock, 
+  ExternalLink, 
+  Loader2, 
+  Archive, 
+  ArchiveRestore, 
+  Trash2,
+  AlertTriangle 
+} from 'lucide-react'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export default function ReportDetailsPage() {
   const params = useParams()
@@ -16,6 +36,9 @@ export default function ReportDetailsPage() {
   const [report, setReport] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [archiveLoading, setArchiveLoading] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   useEffect(() => {
     loadReport()
@@ -85,6 +108,69 @@ export default function ReportDetailsPage() {
     }
   }
 
+  const handleArchiveToggle = async () => {
+    if (!report) return
+
+    setArchiveLoading(true)
+
+    try {
+      const response = await fetch(`/api/admin/reports/${report.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ archived: !report.archived }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao atualizar arquivamento')
+      }
+
+      const data = await response.json()
+      setReport(data.report)
+
+      if (data.report.archived) {
+        alert('Report arquivado com sucesso!')
+      } else {
+        alert('Report desarquivado com sucesso!')
+      }
+    } catch (error: any) {
+      console.error('Erro ao atualizar arquivamento:', error)
+      alert(error.message || 'Erro ao atualizar arquivamento. Tente novamente.')
+    } finally {
+      setArchiveLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!report) return
+
+    setDeleteLoading(true)
+
+    try {
+      const response = await fetch(`/api/admin/reports/${report.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao excluir report')
+      }
+
+      alert('Report excluído permanentemente!')
+      router.push('/admin/reports')
+    } catch (error: any) {
+      console.error('Erro ao excluir report:', error)
+      alert(error.message || 'Erro ao excluir report. Tente novamente.')
+    } finally {
+      setDeleteLoading(false)
+      setShowDeleteDialog(false)
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pendente':
@@ -146,223 +232,307 @@ export default function ReportDetailsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Link href="/admin/reports">
-            <Button variant="ghost" size="sm" className="mb-4 cursor-pointer">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar para Reports
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight">Detalhes do Report</h1>
-          <p className="text-muted-foreground">
-            Informações completas sobre o erro reportado
-          </p>
+    <>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <Link href="/admin/reports">
+              <Button variant="ghost" size="sm" className="mb-4 cursor-pointer">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Voltar para Reports
+              </Button>
+            </Link>
+            <h1 className="text-3xl font-bold tracking-tight">Detalhes do Report</h1>
+            <p className="text-muted-foreground">
+              Informações completas sobre o erro reportado
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {report.archived && (
+              <Badge variant="outline" className="bg-muted">
+                <Archive className="mr-1 h-3 w-3" />
+                Arquivado
+              </Badge>
+            )}
+            {getStatusBadge(report.status)}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {getStatusBadge(report.status)}
-          <Button
-          className="cursor-pointer"
-            onClick={handleMarkAsResolved}
-            disabled={updatingStatus}
-            variant={report.status === 'pendente' ? 'default' : 'outline'}
-          >
-            {updatingStatus ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Atualizando...
-              </>
-            ) : report.status === 'pendente' ? (
-              <>
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Marcar como Resolvido
-              </>
-            ) : (
-              <>
-                <Clock className="mr-2 h-4 w-4" />
-                Marcar como Pendente
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Informações do Report */}
+        {/* Action Buttons */}
         <Card>
           <CardHeader>
-            <CardTitle>Informações do Report</CardTitle>
+            <CardTitle>Ações</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Status do Report
-              </p>
-              <div className="mt-1">{getStatusBadge(report.status)}</div>
-            </div>
-
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Data do Report
-              </p>
-              <p className="mt-1 text-sm">{formatDate(report.createdAt)}</p>
-            </div>
-
-            {report.resolvedAt && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Resolvido em
-                </p>
-                <p className="mt-1 text-sm">
-                  {formatDate(report.resolvedAt)} por{' '}
-                  {report.resolvedBy || 'Admin'}
-                </p>
-              </div>
-            )}
-
-            {report.tipos && report.tipos.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Tipos de Problema
-                </p>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {report.tipos.map((tipo: string, index: number) => (
-                    <Badge key={index} variant="outline">
-                      {tipo}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Informações do Usuário */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Informações do Usuário</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Nome</p>
-              <p className="mt-1 text-sm">{report.userName}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Email</p>
-              <p className="mt-1 text-sm">{report.userEmail}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Questão Reportada ou Tipo de Report */}
-      {report.questionId ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Questão Reportada</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg bg-muted p-4">
-              <p className="mb-2 text-sm text-muted-foreground">
-                ID: {report.questionId}
-              </p>
-              <p className="text-sm whitespace-pre-wrap break-words">
-                {report.questionText}
-              </p>
-            </div>
-            <Button variant="outline" size="sm" asChild className="cursor-pointer">
-              <a
-                href={`/admin/questions/${report.questionId}/edit`}
-                target="_blank"
-                rel="noopener noreferrer"
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                className="cursor-pointer"
+                onClick={handleMarkAsResolved}
+                disabled={updatingStatus}
+                variant={report.status === 'pendente' ? 'default' : 'outline'}
               >
-                Editar Questão
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </a>
-            </Button>
+                {updatingStatus ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Atualizando...
+                  </>
+                ) : report.status === 'pendente' ? (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Marcar como Resolvido
+                  </>
+                ) : (
+                  <>
+                    <Clock className="mr-2 h-4 w-4" />
+                    Marcar como Pendente
+                  </>
+                )}
+              </Button>
+
+              <Button
+                className="cursor-pointer"
+                onClick={handleArchiveToggle}
+                disabled={archiveLoading}
+                variant="outline"
+              >
+                {archiveLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {report.archived ? 'Desarquivando...' : 'Arquivando...'}
+                  </>
+                ) : report.archived ? (
+                  <>
+                    <ArchiveRestore className="mr-2 h-4 w-4" />
+                    Desarquivar
+                  </>
+                ) : (
+                  <>
+                    <Archive className="mr-2 h-4 w-4" />
+                    Arquivar
+                  </>
+                )}
+              </Button>
+
+              {report.archived && (
+                <Button
+                  className="cursor-pointer"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={deleteLoading}
+                  variant="destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir Permanentemente
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
-      ) : (
+
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Informações do Report */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Informações do Report</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Status do Report
+                </p>
+                <div className="mt-1">{getStatusBadge(report.status)}</div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Data do Report
+                </p>
+                <p className="mt-1 text-sm">{formatDate(report.createdAt)}</p>
+              </div>
+
+              {report.resolvedAt && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Resolvido em
+                  </p>
+                  <p className="mt-1 text-sm">
+                    {formatDate(report.resolvedAt)} por{' '}
+                    {report.resolvedBy || 'Admin'}
+                  </p>
+                </div>
+              )}
+
+              {report.tipos && report.tipos.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Tipos de Problema
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {report.tipos.map((tipo: string, index: number) => (
+                      <Badge key={index} variant="outline">
+                        {tipo}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Informações do Usuário */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Informações do Usuário</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Nome</p>
+                <p className="mt-1 text-sm">{report.userName}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Email</p>
+                <p className="mt-1 text-sm">{report.userEmail}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Questão Reportada ou Tipo de Report */}
+        {report.questionId ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Questão Reportada</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg bg-muted p-4">
+                <p className="mb-2 text-sm text-muted-foreground">
+                  ID: {report.questionId}
+                </p>
+                <p className="text-sm whitespace-pre-wrap break-words">
+                  {report.questionText}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" asChild className="cursor-pointer">
+                <a
+                  href={`/admin/questions/${report.questionId}/edit`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Editar Questão
+                  <ExternalLink className="ml-2 h-4 w-4" />
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Tipo de Report</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg bg-muted p-4">
+                <p className="text-sm font-medium">Suporte</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Report de bug geral (sem questão específica)
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Descrição do Problema */}
         <Card>
           <CardHeader>
-            <CardTitle>Tipo de Report</CardTitle>
+            <CardTitle>Descrição do Problema</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="rounded-lg bg-muted p-4">
-              <p className="text-sm font-medium">Suporte</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Report de bug geral (sem questão específica)
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Descrição do Problema */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Descrição do Problema</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-lg bg-muted p-4">
-            <div 
-              className="prose prose-sm max-w-none text-sm break-words"
-              dangerouslySetInnerHTML={{ __html: report.texto }}
-              style={{
-                wordBreak: 'break-word',
-                overflowWrap: 'anywhere',
-              }}
-            />
-          </div>
-          <style jsx global>{`
-            .prose img {
-              max-width: 100%;
-              height: auto;
-              border-radius: 0.5rem;
-              margin: 0.5rem 0;
-            }
-            .prose p {
-              margin: 0.5rem 0;
-            }
-            .prose p:first-child {
-              margin-top: 0;
-            }
-            .prose p:last-child {
-              margin-bottom: 0;
-            }
-          `}</style>
-        </CardContent>
-      </Card>
-
-      {/* Anexo */}
-      {report.imagemUrl && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Anexo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border bg-muted p-4">
-              <img
-                src={report.imagemUrl}
-                alt="Anexo do report"
-                className="max-h-96 w-full rounded object-contain"
+              <div 
+                className="prose prose-sm max-w-none text-sm break-words"
+                dangerouslySetInnerHTML={{ __html: report.texto }}
+                style={{
+                  wordBreak: 'break-word',
+                  overflowWrap: 'anywhere',
+                }}
               />
             </div>
-            <a
-              href={report.imagemUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-primary hover:underline"
-            >
-              Abrir imagem em nova aba
-              <ExternalLink className="h-4 w-4" />
-            </a>
+            <style jsx global>{`
+              .prose img {
+                max-width: 100%;
+                height: auto;
+                border-radius: 0.5rem;
+                margin: 0.5rem 0;
+              }
+              .prose p {
+                margin: 0.5rem 0;
+              }
+              .prose p:first-child {
+                margin-top: 0;
+              }
+              .prose p:last-child {
+                margin-bottom: 0;
+              }
+            `}</style>
           </CardContent>
         </Card>
-      )}
-    </div>
+
+        {/* Anexo */}
+        {report.imagemUrl && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Anexo</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border bg-muted p-4">
+                <img
+                  src={report.imagemUrl}
+                  alt="Anexo do report"
+                  className="max-h-96 w-full rounded object-contain"
+                />
+              </div>
+              <a
+                href={report.imagemUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-primary hover:underline"
+              >
+                Abrir imagem em nova aba
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Excluir Report Permanentemente
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O report será excluído permanentemente
+              do sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="cursor-pointer bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+            >
+              {deleteLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
-

@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Search, Eye, Shield, CheckCircle, XCircle, Plus, Loader2, Edit, UserX, UserCheck, Filter, X, Crown, MinusCircle } from 'lucide-react'
+import { Search, Eye, Shield, CheckCircle, XCircle, Plus, Loader2, Edit, UserX, UserCheck, Filter, X, Crown, MinusCircle, Infinity } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/lib/auth-context'
@@ -120,7 +120,7 @@ export default function UsersPage() {
   const [showRoleDialog, setShowRoleDialog] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [grantPlan, setGrantPlan] = useState<'monthly' | 'semester'>('monthly')
+  const [grantPlan, setGrantPlan] = useState<'monthly' | 'semester' | 'lifetime'>('monthly')
   const [newRole, setNewRole] = useState<string>('')
   const [grantingAccess, setGrantingAccess] = useState(false)
   const [removingPlan, setRemovingPlan] = useState(false)
@@ -677,6 +677,7 @@ export default function UsersPage() {
                       <SelectItem value="all">Todos os planos</SelectItem>
                       <SelectItem value="monthly">Mensal</SelectItem>
                       <SelectItem value="semester">Semestral</SelectItem>
+                      <SelectItem value="lifetime">Vitalício</SelectItem>
                       <SelectItem value="none">Sem plano</SelectItem>
                     </SelectContent>
                   </Select>
@@ -758,15 +759,29 @@ export default function UsersPage() {
                         <TableCell>{getRoleBadge(user.role)}</TableCell>
                         <TableCell>
                           {user.plan ? (
-                            <Badge variant="outline">
-                              {user.plan === 'monthly' ? 'Mensal' : 'Semestral'}
-                            </Badge>
+                            user.plan === 'lifetime' ? (
+                              <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                                <Crown className="mr-1 h-3 w-3" />
+                                Vitalício
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">
+                                {user.plan === 'monthly' ? 'Mensal' : 'Semestral'}
+                              </Badge>
+                            )
                           ) : (
                             <span className="text-sm text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {formatDate(user.planExpiresAt)}
+                          {user.plan === 'lifetime' ? (
+                            <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                              <Infinity className="h-3 w-3" />
+                              Nunca
+                            </span>
+                          ) : (
+                            formatDate(user.planExpiresAt)
+                          )}
                         </TableCell>
                         <TableCell>{getStatusBadge(user.status, user.disabled)}</TableCell>
                         <TableCell className="text-right">
@@ -893,7 +908,14 @@ export default function UsersPage() {
                     {selectedUser.plan
                       ? selectedUser.plan === 'monthly'
                         ? 'Mensal'
-                        : 'Semestral'
+                        : selectedUser.plan === 'semester'
+                          ? 'Semestral'
+                          : (
+                            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                              <Crown className="h-3 w-3" />
+                              Vitalício (Cortesia)
+                            </span>
+                          )
                       : 'Nenhum'}
                   </p>
                 </div>
@@ -901,7 +923,16 @@ export default function UsersPage() {
                   <p className="text-sm font-medium text-muted-foreground">
                     Data de expiração
                   </p>
-                  <p className="text-sm">{formatDate(selectedUser.planExpiresAt)}</p>
+                  <p className="text-sm">
+                    {selectedUser.plan === 'lifetime' ? (
+                      <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                        <Infinity className="h-3 w-3" />
+                        Nunca expira
+                      </span>
+                    ) : (
+                      formatDate(selectedUser.planExpiresAt)
+                    )}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Status</p>
@@ -973,9 +1004,26 @@ export default function UsersPage() {
                 <SelectContent>
                   <SelectItem value="monthly">Mensal (30 dias)</SelectItem>
                   <SelectItem value="semester">Semestral (180 dias)</SelectItem>
+                  <SelectItem value="lifetime">
+                    <span className="flex items-center gap-2">
+                      <Crown className="h-4 w-4 text-amber-500" />
+                      Vitalício (Cortesia)
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {grantPlan === 'lifetime' && (
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-sm">
+                <p className="font-medium text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                  <Crown className="h-4 w-4" />
+                  Plano Cortesia Vitalício
+                </p>
+                <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1">
+                  Este plano não expira. O usuário terá acesso premium para sempre.
+                </p>
+              </div>
+            )}
             <p className="text-sm text-muted-foreground">
               O acesso será liberado imediatamente e o usuário poderá utilizar todas as
               funcionalidades do sistema.

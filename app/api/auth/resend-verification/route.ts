@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminApp } from '@/lib/firebase-admin'
+import { sendVerificationEmail } from '@/lib/email'
 
 /**
  * POST /api/auth/resend-verification
- * Reenvia e-mail de verificação para o usuário
+ * Reenvia e-mail de verificação para o usuário usando Nodemailer
  */
 export async function POST(request: NextRequest) {
   try {
@@ -30,28 +31,37 @@ export async function POST(request: NextRequest) {
       }
 
       // Gerar link de verificação
+      const origin = request.headers.get('origin') || request.headers.get('host') || 'http://localhost:3000'
+      const protocol = origin.includes('localhost') ? 'http' : 'https'
+      const baseUrl = origin.includes('http') ? origin : `${protocol}://${origin}`
+      
       const actionCodeSettings = {
-        url: `${request.headers.get('origin') || 'http://localhost:3000'}/auth/login`,
+        url: `${baseUrl}/auth/login`,
         handleCodeInApp: false,
       }
 
-      // Gerar link de verificação (o Firebase Admin SDK gera o link mas não envia automaticamente)
-      // Em produção, você precisaria configurar um serviço de e-mail customizado ou usar Firebase Extensions
+      // Gerar link de verificação
       const link = await app.auth().generateEmailVerificationLink(email, actionCodeSettings)
       
-      // Nota: O Firebase Admin SDK não envia e-mails automaticamente.
-      // Você precisa:
-      // 1. Configurar um serviço de e-mail (SendGrid, AWS SES, etc.) para enviar o link
-      // 2. Ou usar Firebase Extensions para envio automático de e-mails
-      // 3. Ou usar o Firebase Client SDK no frontend (que já está implementado)
-      
-      // Por enquanto, retornamos sucesso (o frontend tentará usar o Client SDK primeiro)
-      return NextResponse.json({ 
-        success: true, 
-        message: 'E-mail de verificação será enviado. Verifique sua caixa de entrada.',
-        // Em desenvolvimento, você pode retornar o link para debug
-        ...(process.env.NODE_ENV === 'development' && { link })
-      })
+      // Enviar e-mail usando Nodemailer
+      try {
+        await sendVerificationEmail(userRecord.email!, link)
+        return NextResponse.json({ 
+          success: true, 
+          message: 'E-mail de verificação reenviado com sucesso. Verifique sua caixa de entrada.',
+        })
+      } catch (emailError: any) {
+        console.error('Erro ao enviar e-mail:', emailError)
+        // Se falhar o envio do e-mail, ainda retornamos sucesso mas com aviso
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Link de verificação gerado, mas houve erro ao enviar e-mail.',
+          emailError: emailError.message,
+          warning: 'Configure EMAIL_USER e EMAIL_PASSWORD nas variáveis de ambiente para envio automático',
+          // Em desenvolvimento, retornar o link para debug
+          ...(process.env.NODE_ENV === 'development' && { link })
+        })
+      }
     } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
         return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })

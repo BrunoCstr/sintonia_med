@@ -38,13 +38,18 @@ interface QuizQuestion {
 
 // Converter questão do banco para formato do quiz
 function convertQuestionToQuiz(question: QuestionDB, period: string): QuizQuestion {
+  // Construir array de alternativas, incluindo E apenas se estiver preenchida
   const alternatives = [
     question.alternativaA,
     question.alternativaB,
     question.alternativaC,
     question.alternativaD,
-    question.alternativaE,
   ]
+  
+  // Adicionar alternativa E apenas se estiver preenchida (é opcional)
+  if (question.alternativaE && typeof question.alternativaE === 'string' && question.alternativaE.trim().length > 0) {
+    alternatives.push(question.alternativaE)
+  }
 
   const correctAnswerIndex = question.alternativaCorreta.charCodeAt(0) - 65 // A=0, B=1, etc.
 

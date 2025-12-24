@@ -7,7 +7,6 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-  sendEmailVerification,
   type User,
 } from 'firebase/auth'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
@@ -149,13 +148,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Verificar se o e-mail está verificado
     if (!userCredential.user.emailVerified) {
-      // Tentar enviar e-mail de verificação antes de fazer logout
+      // Tentar enviar e-mail de verificação usando Nodemailer antes de fazer logout
       try {
-        await sendEmailVerification(userCredential.user, {
-          url: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/login`,
-          handleCodeInApp: false,
+        const response = await fetch('/api/auth/send-verification-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, uid: userCredential.user.uid }),
         })
-        console.log('✅ E-mail de verificação enviado automaticamente')
+        
+        if (response.ok) {
+          console.log('✅ E-mail de verificação enviado automaticamente via Nodemailer')
+        } else {
+          console.warn('⚠️ Não foi possível enviar e-mail automaticamente')
+        }
       } catch (emailError: any) {
         console.warn('⚠️ Não foi possível enviar e-mail automaticamente:', emailError.message)
       }
@@ -186,54 +193,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password)
     const user = userCredential.user
 
-    // Enviar e-mail de verificação usando Client SDK
+    // Enviar e-mail de verificação usando Nodemailer via API
     let emailSent = false
     let verificationLink: string | null = null
     
     try {
-      await sendEmailVerification(user, {
-        url: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/login`,
-        handleCodeInApp: false,
+      const response = await fetch('/api/auth/send-verification-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, uid: user.uid }),
       })
-      emailSent = true
-      console.log('✅ E-mail de verificação enviado via Client SDK')
-    } catch (error: any) {
-      console.warn('⚠️ Erro ao enviar e-mail de verificação via Client SDK:', error.message || error)
       
-      // Tentar usar a API como fallback
-      try {
-        const response = await fetch('/api/auth/send-verification-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, uid: user.uid }),
-        })
+      if (response.ok) {
+        const data = await response.json()
+        emailSent = true
+        verificationLink = data.link || null
         
-        if (response.ok) {
-          const data = await response.json()
-          verificationLink = data.link || null
-          
-          if (verificationLink) {
-            emailSent = true
-            console.log('✅ Link de verificação gerado via API')
-            
-            // Em desenvolvimento, mostrar o link no console de forma destacada
-            if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-              console.group('🔗 LINK DE VERIFICAÇÃO (DESENVOLVIMENTO)')
-              console.log('Copie este link e cole no navegador para verificar o e-mail:')
-              console.log(verificationLink)
-              console.groupEnd()
-            }
-          }
+        if (data.success) {
+          console.log('✅ E-mail de verificação enviado com sucesso via Nodemailer')
         } else {
-          const errorData = await response.json()
-          console.error('Erro na API de verificação:', errorData.error)
+          console.warn('⚠️ Link gerado mas e-mail pode não ter sido enviado:', data.warning || data.emailError)
+          // Em desenvolvimento, mostrar o link no console de forma destacada
+          if (verificationLink && typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+            console.group('🔗 LINK DE VERIFICAÇÃO (DESENVOLVIMENTO)')
+            console.log('Copie este link e cole no navegador para verificar o e-mail:')
+            console.log(verificationLink)
+            console.groupEnd()
+          }
         }
-      } catch (apiError: any) {
-        console.error('❌ Erro ao gerar link via API:', apiError.message || apiError)
-        // Não bloquear o cadastro se houver erro ao enviar e-mail
+      } else {
+        const errorData = await response.json()
+        console.error('Erro na API de verificação:', errorData.error)
+        // Tentar obter o link mesmo em caso de erro parcial
+        if (errorData.link) {
+          verificationLink = errorData.link
+        }
       }
+    } catch (apiError: any) {
+      console.error('❌ Erro ao enviar e-mail de verificação:', apiError.message || apiError)
+      // Não bloquear o cadastro se houver erro ao enviar e-mail
     }
 
     await setDoc(doc(db, 'users', user.uid), {
@@ -294,27 +294,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resendVerificationEmail = async (email: string) => {
     try {
-      // Se temos o usuário logado com esse email, usar o Client SDK diretamente
-      if (auth.currentUser && auth.currentUser.email === email && !auth.currentUser.emailVerified) {
-        try {
-          await sendEmailVerification(auth.currentUser, {
-            url: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/login`,
-            handleCodeInApp: false,
-          })
-          console.log('✅ E-mail de verificação reenviado via Client SDK')
-          return
-        } catch (clientError: any) {
-          console.error('❌ Erro ao reenviar via Client SDK:', clientError.message || clientError)
-          // Continuar para tentar fazer login temporário
-        }
-      }
-
-      // Se não temos usuário logado, precisamos fazer login temporário para enviar o e-mail
-      // Mas não temos a senha aqui, então vamos usar uma abordagem diferente:
-      // Criar uma rota que permite login temporário apenas para enviar e-mail
+      // Usar a API que envia e-mail via Nodemailer
+      // Se temos o usuário logado, usar o UID
+      const uid = auth.currentUser && auth.currentUser.email === email ? auth.currentUser.uid : undefined
       
-      // Tentar usar a API que vai fazer login temporário no backend
-      const response = await fetch('/api/auth/resend-verification-with-login', {
+      const response = await fetch('/api/auth/resend-verification', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -325,30 +309,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!response.ok) {
         const errorData = await response.json()
         
-        // Se a API não existir ou falhar, tentar a API simples que gera o link
-        if (response.status === 404) {
-          const simpleResponse = await fetch('/api/auth/send-verification-email', {
+        // Se a rota resend-verification não funcionar, tentar send-verification-email
+        if (response.status === 404 || response.status === 500) {
+          const fallbackResponse = await fetch('/api/auth/send-verification-email', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ email, uid }),
           })
           
-          if (simpleResponse.ok) {
-            const data = await simpleResponse.json()
-            // Em desenvolvimento, mostrar o link
+          if (fallbackResponse.ok) {
+            const data = await fallbackResponse.json()
+            if (data.success) {
+              console.log('✅ E-mail de verificação enviado via Nodemailer')
+              return
+            }
+            
+            // Em desenvolvimento, mostrar o link se houver erro no envio
             if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && data.link) {
               console.group('🔗 LINK DE VERIFICAÇÃO (DESENVOLVIMENTO)')
-              console.log('O Firebase não envia e-mails automaticamente via Admin SDK.')
-              console.log('Use este link para verificar manualmente ou configure um serviço de e-mail:')
+              console.log('E-mail pode não ter sido enviado. Use este link para verificar:')
               console.log(data.link)
               console.groupEnd()
               
               // Salvar no localStorage para facilitar
               localStorage.setItem('dev_verification_link', data.link)
             }
-            throw new Error('Link gerado, mas o Firebase não envia e-mails automaticamente. Verifique o console para o link (desenvolvimento) ou configure um serviço de e-mail.')
+            
+            if (data.warning) {
+              throw new Error(data.warning)
+            }
           }
         }
         
@@ -356,7 +347,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const data = await response.json()
-      console.log('✅ E-mail de verificação enviado')
+      if (data.success) {
+        console.log('✅ E-mail de verificação reenviado com sucesso via Nodemailer')
+      } else if (data.alreadyVerified) {
+        throw new Error('E-mail já está verificado')
+      }
       
     } catch (error: any) {
       // Se o erro for de usuário não encontrado ou similar, relançar

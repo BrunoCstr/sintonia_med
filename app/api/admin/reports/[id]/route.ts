@@ -124,6 +124,7 @@ export async function GET(
         tipos: data.tipos || [],
         imagemUrl: data.imagemUrl || null,
         status: data.status || 'pendente',
+        archived: data.archived === true,
         resolvedAt: resolvedAt ? resolvedAt.toISOString() : undefined,
         resolvedBy: data.resolvedBy || undefined,
         createdAt: createdAt.toISOString(),
@@ -142,6 +143,7 @@ export async function GET(
 /**
  * PUT /api/admin/reports/[id]
  * Atualiza o status de um report (apenas admin_master)
+ * Body pode conter: { status: 'pendente' | 'resolvido' } ou { archived: boolean }
  */
 export async function PUT(
   request: NextRequest,
@@ -161,14 +163,7 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const { status } = body
-
-    if (!status || (status !== 'pendente' && status !== 'resolvido')) {
-      return NextResponse.json(
-        { error: 'Status inválido. Deve ser "pendente" ou "resolvido"' },
-        { status: 400 }
-      )
-    }
+    const { status, archived } = body
 
     const app = getAdminApp()
     const db = app.firestore()
@@ -191,17 +186,38 @@ export async function PUT(
 
     // Atualizar report
     const updateData: any = {
-      status,
       updatedAt: new Date(),
     }
 
-    if (status === 'resolvido') {
-      updateData.resolvedAt = new Date()
-      updateData.resolvedBy = adminName
-    } else {
-      // Se voltar para pendente, remover dados de resolução
-      updateData.resolvedAt = null
-      updateData.resolvedBy = null
+    // Atualizar arquivamento se enviado
+    if (typeof archived === 'boolean') {
+      updateData.archived = archived
+      if (archived) {
+        updateData.archivedAt = new Date()
+        updateData.archivedBy = adminName
+      } else {
+        updateData.archivedAt = null
+        updateData.archivedBy = null
+      }
+    }
+
+    // Atualizar status se enviado
+    if (status) {
+      if (status !== 'pendente' && status !== 'resolvido') {
+        return NextResponse.json(
+          { error: 'Status inválido. Deve ser "pendente" ou "resolvido"' },
+          { status: 400 }
+        )
+      }
+      updateData.status = status
+      if (status === 'resolvido') {
+        updateData.resolvedAt = new Date()
+        updateData.resolvedBy = adminName
+      } else {
+        // Se voltar para pendente, remover dados de resolução
+        updateData.resolvedAt = null
+        updateData.resolvedBy = null
+      }
     }
 
     await reportRef.update(updateData)
@@ -265,6 +281,7 @@ export async function PUT(
         tipos: updatedData.tipos || [],
         imagemUrl: updatedData.imagemUrl || null,
         status: updatedData.status,
+        archived: updatedData.archived === true,
         resolvedAt: resolvedAt ? resolvedAt.toISOString() : undefined,
         resolvedBy: updatedData.resolvedBy || undefined,
         createdAt: createdAt.toISOString(),
@@ -275,6 +292,67 @@ export async function PUT(
     console.error('Erro ao atualizar report:', error)
     return NextResponse.json(
       { error: error.message || 'Erro ao atualizar report' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/admin/reports/[id]
+ * Exclui permanentemente um report arquivado (apenas admin_master)
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Verificar autenticação
+    const token = request.cookies.get('firebase-token')?.value
+    if (!token) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    }
+
+    const authUser = await verifyFirebaseToken(token)
+    if (!authUser || authUser.role !== 'admin_master') {
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+    }
+
+    const { id } = await params
+    const app = getAdminApp()
+    const db = app.firestore()
+
+    // Verificar se o report existe
+    const reportRef = db.collection('reports').doc(id)
+    const reportDoc = await reportRef.get()
+
+    if (!reportDoc.exists) {
+      return NextResponse.json(
+        { error: 'Report não encontrado' },
+        { status: 404 }
+      )
+    }
+
+    const reportData = reportDoc.data()!
+
+    // Só permitir excluir reports arquivados
+    if (reportData.archived !== true) {
+      return NextResponse.json(
+        { error: 'Apenas reports arquivados podem ser excluídos permanentemente' },
+        { status: 400 }
+      )
+    }
+
+    // Excluir permanentemente
+    await reportRef.delete()
+
+    return NextResponse.json({
+      success: true,
+      message: 'Report excluído permanentemente',
+    })
+  } catch (error: any) {
+    console.error('Erro ao excluir report:', error)
+    return NextResponse.json(
+      { error: error.message || 'Erro ao excluir report' },
       { status: 500 }
     )
   }

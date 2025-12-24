@@ -11,7 +11,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/auth-context'
 import { useRole } from '@/lib/hooks/use-role'
-import { User, Mail, Calendar, CreditCard, Edit2, Loader2, Check, Sparkles, TrendingUp, X, Camera } from 'lucide-react'
+import { formatPrice } from '@/lib/utils'
+import { User, Mail, Calendar, CreditCard, Edit2, Loader2, Check, Sparkles, TrendingUp, X, Camera, ShieldCheck, Crown, Infinity } from 'lucide-react'
 import { TwoFactorSettings } from '@/components/admin/two-factor-settings'
 import { useRouter } from 'next/navigation'
 import { auth } from '@/lib/firebase'
@@ -616,61 +617,98 @@ export default function ProfilePage() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <p className="font-semibold">
-                  {userProfile?.plan === 'monthly' && 'Plano Mensal'}
-                  {userProfile?.plan === 'semester' && 'Plano Semestral'}
-                  {!userProfile?.plan && 'Nenhum Plano Ativo'}
-                </p>
-                {userProfile?.plan && userProfile?.planExpiresAt && (() => {
-                  try {
-                    const expiresDate = typeof userProfile.planExpiresAt === 'string'
-                      ? new Date(userProfile.planExpiresAt)
-                      : userProfile.planExpiresAt instanceof Date
-                        ? userProfile.planExpiresAt
-                        : new Date(userProfile.planExpiresAt)
+            {/* Plano Vitalício - Design especial */}
+            {userProfile?.plan === 'lifetime' ? (
+              <div className="relative overflow-hidden rounded-xl border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-amber-500/10 to-orange-500/5 p-6">
+                {/* Decoração de fundo */}
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-amber-500/10 blur-2xl" />
+                <div className="absolute bottom-0 left-0 -mb-4 -ml-4 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl" />
+                
+                <div className="relative flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg shadow-amber-500/25">
+                    <Crown className="h-7 w-7 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent dark:from-amber-400 dark:to-orange-400">
+                        Plano Vitalício
+                      </h3>
+                      <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25 hover:bg-amber-500/20">
+                        Cortesia
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
+                      <Infinity className="h-4 w-4 text-amber-500" />
+                      Acesso premium sem expiração
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="relative mt-4 pt-4 border-t border-amber-500/20">
+                  <p className="text-xs text-amber-600/70 dark:text-amber-400/70">
+                    Você possui acesso completo a todas as funcionalidades da plataforma para sempre.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              /* Planos normais (mensal/semestral ou sem plano) */
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <p className="font-semibold">
+                    {userProfile?.plan === 'monthly' && 'Plano Mensal'}
+                    {userProfile?.plan === 'semester' && 'Plano Semestral'}
+                    {!userProfile?.plan && 'Nenhum Plano Ativo'}
+                  </p>
+                  {userProfile?.plan && userProfile?.planExpiresAt && (() => {
+                    try {
+                      const expiresDate = typeof userProfile.planExpiresAt === 'string'
+                        ? new Date(userProfile.planExpiresAt)
+                        : userProfile.planExpiresAt instanceof Date
+                          ? userProfile.planExpiresAt
+                          : new Date(userProfile.planExpiresAt)
 
-                    if (isNaN(expiresDate.getTime())) {
+                      if (isNaN(expiresDate.getTime())) {
+                        return null
+                      }
+
+                      // Calcular dias restantes se não foi calculado ainda
+                      let daysLeft = daysRemaining
+                      if (daysLeft === null) {
+                        const now = new Date()
+                        const diffTime = expiresDate.getTime() - now.getTime()
+                        daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                      }
+
+                      const formattedDate = expiresDate.toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                      })
+
+                      return (
+                        <p className="text-sm text-muted-foreground">
+                          Expira em: {formattedDate}
+                          {daysLeft !== null && daysLeft >= 0 && (
+                            <span className="ml-2 text-primary font-medium">
+                              ({daysLeft} {daysLeft === 1 ? 'dia' : 'dias'})
+                            </span>
+                          )}
+                        </p>
+                      )
+                    } catch (error) {
+                      console.error('Erro ao formatar data de expiração:', error)
                       return null
                     }
-
-                    // Calcular dias restantes se não foi calculado ainda
-                    let daysLeft = daysRemaining
-                    if (daysLeft === null) {
-                      const now = new Date()
-                      const diffTime = expiresDate.getTime() - now.getTime()
-                      daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-                    }
-
-                    const formattedDate = expiresDate.toLocaleDateString('pt-BR', {
-                      day: '2-digit',
-                      month: 'long',
-                      year: 'numeric',
-                    })
-
-                    return (
-                      <p className="text-sm text-muted-foreground">
-                        Expira em: {formattedDate}
-                        {daysLeft !== null && daysLeft >= 0 && (
-                          <span className="ml-2 text-primary font-medium">
-                            ({daysLeft} {daysLeft === 1 ? 'dia' : 'dias'})
-                          </span>
-                        )}
-                      </p>
-                    )
-                  } catch (error) {
-                    console.error('Erro ao formatar data de expiração:', error)
-                    return null
-                  }
-                })()}
+                  })()}
+                </div>
+                <Badge variant={userProfile?.plan ? 'default' : 'secondary'}>
+                  {userProfile?.plan ? 'Ativo' : 'Inativo'}
+                </Badge>
               </div>
-              <Badge variant={userProfile?.plan ? 'default' : 'secondary'}>
-                {userProfile?.plan ? 'Ativo' : 'Inativo'}
-              </Badge>
-            </div>
+            )}
 
-            {!showPlans ? (
+            {/* Não mostra opções de plano para usuários com plano vitalício */}
+            {userProfile?.plan === 'lifetime' ? null : !showPlans ? (
               <Button
                 variant={userProfile?.plan ? 'outline' : 'default'}
                 onClick={() => setShowPlans(true)} 
@@ -721,7 +759,7 @@ export default function ProfilePage() {
                           {plan.originalPrice && (
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-muted-foreground line-through">
-                                R$ {plan.originalPrice.toFixed(2)}
+                                R$ {formatPrice(plan.originalPrice)}
                               </span>
                               <Badge variant="destructive" className="text-xs">
                                 20% OFF
@@ -730,7 +768,7 @@ export default function ProfilePage() {
                           )}
                           <div className="flex items-baseline gap-1">
                             <span className="text-3xl font-bold">
-                              R$ {calculatePrice(plan.price, plan.id).toFixed(2)}
+                              R$ {formatPrice(calculatePrice(plan.price, plan.id))}
                             </span>
                             {appliedCoupon && isCouponApplicableToPlan(plan.id) && (
                               <Badge variant="secondary" className="ml-2 text-xs">
@@ -740,7 +778,7 @@ export default function ProfilePage() {
                           </div>
                           {plan.id === 'semester' && (
                             <p className="text-sm text-muted-foreground">
-                              ou R$ {(calculatePrice(plan.price, plan.id) / 6).toFixed(2)}/mês
+                              ou R$ {formatPrice(calculatePrice(plan.price, plan.id) / 6)}/mês
                             </p>
                           )}
                           {appliedCoupon && !isCouponApplicableToPlan(plan.id) && (
@@ -896,6 +934,11 @@ export default function ProfilePage() {
               Complete o pagamento para ativar sua assinatura
             </DialogDescription>
           </DialogHeader>
+
+          <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <span>Pagamento seguro via MercadoPago</span>
+          </div>
 
           {checkoutData && (
             <PaymentBrick

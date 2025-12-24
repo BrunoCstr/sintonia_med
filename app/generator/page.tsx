@@ -35,7 +35,7 @@ export default function GeneratorPage() {
   const [selectedDisciplinas, setSelectedDisciplinas] = useState<string[]>(['SOI', 'HAM', 'IESC', 'CI']) // Pré-marcado em todos (quando período é "all")
   const [difficulty, setDifficulty] = useState('all') // Pré-marcado em todos
   const [officialOnly, setOfficialOnly] = useState(false)
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('all') // Pré-marcado em todos
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('') // Será definido quando userProfile carregar
   const [questionCount, setQuestionCount] = useState('5')
   const [timed, setTimed] = useState(false)
   const [timeLimit, setTimeLimit] = useState('30')
@@ -58,6 +58,21 @@ export default function GeneratorPage() {
     }
   }, [user, loading, router])
 
+  // Definir período inicial baseado no perfil do usuário
+  useEffect(() => {
+    if (selectedPeriod === '' && !loading) {
+      // Lista de períodos válidos para o select
+      const validPeriods = ['1º Período', '2º Período', '3º Período', '4º Período', '5º Período', '6º Período', '7º Período', '8º Período']
+      
+      if (userProfile?.period && validPeriods.includes(userProfile.period)) {
+        // Se o usuário tiver período definido e ele estiver na lista válida, usar ele
+        setSelectedPeriod(userProfile.period)
+      } else {
+        // Se não houver período definido ou ele não estiver na lista válida, usar "1º Período" como padrão
+        setSelectedPeriod('1º Período')
+      }
+    }
+  }, [userProfile, loading, selectedPeriod])
 
   useEffect(() => {
     const checkFreeLimits = async () => {
@@ -809,9 +824,14 @@ export default function GeneratorPage() {
                   Nenhum sistema disponível no momento.
                 </p>
               ) : filteredSistemas.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nenhum sistema disponível para o período selecionado.
-                </p>
+                <div className="rounded-lg border border-warning/20 bg-warning/5 p-4">
+                  <p className="text-sm font-medium text-warning mb-1">
+                    Nenhum sistema disponível para o {selectedPeriod}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Verifique se existem sistemas cadastrados para este período ou selecione "Todos" para ver todos os sistemas.
+                  </p>
+                </div>
               ) : (
                 <>
                   <div 
@@ -862,6 +882,14 @@ export default function GeneratorPage() {
                                 <span className={`font-medium ${isSelected ? 'text-primary' : ''}`}>
                                   {sistema.nome}
                                 </span>
+                                {sistema.periodo && sistema.periodo !== 'Todos os períodos' && (
+                                  <Badge 
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 ml-2 shrink-0"
+                                  >
+                                    {sistema.periodo}
+                                  </Badge>
+                                )}
                                 {sistemaMaterias.length > 0 && (
                                   <Badge 
                                     variant={allMateriasSelected ? "default" : someMateriasSelected ? "secondary" : "outline"}

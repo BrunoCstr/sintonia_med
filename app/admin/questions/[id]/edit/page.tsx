@@ -15,12 +15,13 @@ import {
 } from '@/components/ui/select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, Save, Upload, X } from 'lucide-react'
+import { ArrowLeft, Save, Upload, X, Edit } from 'lucide-react'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
 import type { MedicalArea, Materia } from '@/lib/types'
+import { ImageEditorDialog } from '@/components/ui/image-editor-dialog'
 
 export default function EditQuestionPage() {
   const router = useRouter()
@@ -31,6 +32,8 @@ export default function EditQuestionPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [imageForEditor, setImageForEditor] = useState<string | null>(null)
   const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([])
   const [materias, setMaterias] = useState<Materia[]>([])
   const [loadingMaterias, setLoadingMaterias] = useState(false)
@@ -178,15 +181,28 @@ export default function EditQuestionPage() {
       return
     }
 
-    // Armazenar arquivo para upload posterior (ao salvar)
-    setSelectedImageFile(file)
+    // Criar preview local e abrir editor
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const imageSrc = reader.result as string
+      setImageForEditor(imageSrc)
+      setEditorOpen(true)
+    }
+    reader.readAsDataURL(file)
+  }
 
-    // Criar preview local
+  const handleImageEditorSave = (editedFile: File) => {
+    setSelectedImageFile(editedFile)
+    
+    // Criar preview da imagem editada
     const reader = new FileReader()
     reader.onloadend = () => {
       setImagePreview(reader.result as string)
     }
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(editedFile)
+    
+    setEditorOpen(false)
+    setImageForEditor(null)
   }
 
   const handleRemoveImage = () => {
@@ -386,16 +402,31 @@ export default function EditQuestionPage() {
                         className="object-contain"
                       />
                     </div>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleRemoveImage}
-                      className="mt-2 cursor-pointer"
-                    >
-                      <X className="mr-2 h-4 w-4" />
-                      Remover Imagem
-                    </Button>
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setImageForEditor(imagePreview || formData.imagemUrl)
+                          setEditorOpen(true)
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Editar Imagem
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleRemoveImage}
+                        className="cursor-pointer"
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Remover Imagem
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-4">
@@ -420,9 +451,17 @@ export default function EditQuestionPage() {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Formatos aceitos: JPG, PNG, GIF. Tamanho máximo: 5MB
+                  Formatos aceitos: JPG, PNG, GIF. Tamanho máximo: 5MB. Você poderá editar a imagem após o upload.
                 </p>
               </div>
+              
+              {/* Image Editor Dialog */}
+              <ImageEditorDialog
+                open={editorOpen}
+                onOpenChange={setEditorOpen}
+                imageSrc={imageForEditor}
+                onSave={handleImageEditorSave}
+              />
             </CardContent>
           </Card>
 

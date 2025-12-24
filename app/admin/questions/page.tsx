@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Pencil, Archive, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Archive, Eye, Trash2, FileQuestion } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import type { Question, MedicalArea } from "@/lib/types";
@@ -260,6 +260,42 @@ export default function QuestionsListPage() {
             Nova Questão
           </Link>
         </Button>
+      </div>
+
+      {/* Questions by Period Cards */}
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight mb-4">
+          Questões por Período
+        </h2>
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+          {['1º Período', '2º Período', '3º Período', '4º Período', '5º Período', '6º Período', '7º Período', '8º Período'].map((period) => {
+            const count = questions.filter((q) => {
+              const questionPeriod = q.period || q.tipo || '';
+              return questionPeriod === period;
+            }).length;
+            const total = questions.length;
+            const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+
+            return (
+              <Card key={period}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    {period}
+                  </CardTitle>
+                  <FileQuestion className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {new Intl.NumberFormat('pt-BR').format(count)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {percentage}% do total
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
 
       {/* Filters */}

@@ -6,16 +6,20 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { CheckCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useAuth } from '@/lib/auth-context'
 
 function PaymentSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { refreshUserProfile } = useAuth()
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState<'success' | 'pending' | 'error'>('success')
+  const [isFreeAccess, setIsFreeAccess] = useState(false)
 
   useEffect(() => {
     const paymentId = searchParams.get('payment_id')
     const statusParam = searchParams.get('status')
+    const freeAccessParam = searchParams.get('free_access')
 
     if (statusParam === 'approved') {
       setStatus('success')
@@ -25,11 +29,30 @@ function PaymentSuccessContent() {
       setStatus('error')
     }
 
-    // Aguardar um pouco para garantir que o webhook foi processado
-    setTimeout(() => {
-      setLoading(false)
-    }, 2000)
-  }, [searchParams])
+    // Verificar se foi acesso gratuito via cupom
+    if (freeAccessParam === 'true') {
+      setIsFreeAccess(true)
+    }
+
+    // Atualizar o perfil do usuário para refletir o novo plano
+    const updateProfile = async () => {
+      try {
+        // Aguardar um pouco para garantir que o webhook foi processado (se não for free access)
+        if (freeAccessParam !== 'true') {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+        
+        // Atualizar o perfil do usuário no contexto
+        await refreshUserProfile()
+      } catch (error) {
+        console.error('Erro ao atualizar perfil:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    updateProfile()
+  }, [searchParams, refreshUserProfile])
 
   if (loading) {
     return (
@@ -52,9 +75,13 @@ function PaymentSuccessContent() {
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
                   <CheckCircle className="h-10 w-10 text-success" />
                 </div>
-                <CardTitle className="text-2xl">Pagamento Aprovado!</CardTitle>
+                <CardTitle className="text-2xl">
+                  {isFreeAccess ? 'Cupom Aplicado com Sucesso!' : 'Pagamento Aprovado!'}
+                </CardTitle>
                 <CardDescription className="text-base">
-                  Sua assinatura foi ativada com sucesso
+                  {isFreeAccess 
+                    ? 'Seu cupom de 100% de desconto foi aplicado e sua assinatura foi ativada' 
+                    : 'Sua assinatura foi ativada com sucesso'}
                 </CardDescription>
               </>
             )}

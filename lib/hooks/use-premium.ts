@@ -41,6 +41,11 @@ export function usePremium() {
   const isPremium = () => {
     if (!userProfile?.plan) return false
     
+    // Plano vitalício é sempre ativo
+    if (userProfile.plan === 'lifetime') {
+      return true
+    }
+    
     // Verificar se o plano não expirou
     if (userProfile.planExpiresAt) {
       const expiresAt = new Date(userProfile.planExpiresAt)
@@ -51,9 +56,12 @@ export function usePremium() {
     // Se não tem data de expiração, considerar como ativo
     return true
   }
+  
+  const isLifetime = userProfile?.plan === 'lifetime'
 
   return {
     isPremium: isPremium(),
+    isLifetime,
     plan: userProfile?.plan || null,
     planExpiresAt: userProfile?.planExpiresAt || null,
   }

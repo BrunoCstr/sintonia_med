@@ -5,6 +5,8 @@ import { verifyFirebaseToken } from '@/lib/middleware-auth'
 /**
  * GET /api/admin/coupons
  * Lista todos os cupons (apenas admin_master)
+ * Query params:
+ * - archived: 'true' para listar apenas arquivados, 'false' ou omitido para listar apenas não arquivados
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,29 +21,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const showArchived = searchParams.get('archived') === 'true'
+
     const app = getAdminApp()
     const db = app.firestore()
 
     // Buscar todos os cupons
     const couponsSnapshot = await db.collection('coupons').orderBy('createdAt', 'desc').get()
 
-    const coupons = couponsSnapshot.docs.map((doc) => {
-      const data = doc.data()
-      return {
-        code: doc.id,
-        discount: data.discount,
-        description: data.description || null,
-        active: data.active,
-        maxUses: data.maxUses || null,
-        maxUsesPerUser: data.maxUsesPerUser || null,
-        validFrom: data.validFrom?.toDate ? data.validFrom.toDate().toISOString() : new Date(data.validFrom).toISOString(),
-        validUntil: data.validUntil?.toDate ? data.validUntil.toDate().toISOString() : new Date(data.validUntil).toISOString(),
-        applicablePlans: data.applicablePlans || null,
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
-        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date(data.updatedAt).toISOString(),
-        createdBy: data.createdBy,
-      }
-    })
+    const coupons = couponsSnapshot.docs
+      .filter((doc) => {
+        const data = doc.data()
+        const isArchived = data.archived === true
+        return showArchived === isArchived
+      })
+      .map((doc) => {
+        const data = doc.data()
+        return {
+          code: doc.id,
+          discount: data.discount,
+          description: data.description || null,
+          active: data.active,
+          archived: data.archived === true,
+          maxUses: data.maxUses || null,
+          maxUsesPerUser: data.maxUsesPerUser || null,
+          validFrom: data.validFrom?.toDate ? data.validFrom.toDate().toISOString() : new Date(data.validFrom).toISOString(),
+          validUntil: data.validUntil?.toDate ? data.validUntil.toDate().toISOString() : new Date(data.validUntil).toISOString(),
+          applicablePlans: data.applicablePlans || null,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : new Date(data.updatedAt).toISOString(),
+          createdBy: data.createdBy,
+        }
+      })
 
     return NextResponse.json({ success: true, coupons })
   } catch (error: any) {

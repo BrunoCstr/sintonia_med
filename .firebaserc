@@ -1,11 +1,8 @@
 {
   "projects": {
-    "default": "seu-projeto-id"
-  }
+    "default": "seu-projeto-id",
+    "sintoniamed": "sintoniamed-72585"
+  },
+  "targets": {},
+  "etags": {}
 }
-
-
-
-
-
-

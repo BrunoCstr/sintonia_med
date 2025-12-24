@@ -13,32 +13,23 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Check, Sparkles, Crown, ArrowLeft, TrendingUp } from 'lucide-react'
+import { Check, Sparkles, Crown, ArrowLeft, TrendingUp, ShieldCheck, Loader2 } from 'lucide-react'
 import { usePremium } from '@/lib/hooks/use-premium'
 import { auth } from '@/lib/firebase'
+import { formatPrice } from '@/lib/utils'
 import { PaymentBrick, PaymentErrorInfo } from '@/components/payment-brick'
 
-const plans = [
-  {
-    id: 'monthly',
-    name: 'Plano Mensal',
-    price: 29.90,
-    originalPrice: null,
-    badge: 'Flexível',
-    badgeVariant: 'secondary' as const,
-    duration: '1 mês',
-  },
-  {
-    id: 'semester',
-    name: 'Plano Semestral',
-    price: 143.00,
-    originalPrice: 179.00,
-    badge: 'Mais Vendido',
-    badgeVariant: 'default' as const,
-    duration: '6 meses',
-    recommended: true,
-  },
-]
+interface Plan {
+  id: string
+  name: string
+  price: number
+  originalPrice: number | null
+  badge: string
+  badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline'
+  duration: string
+  durationMonths: number
+  recommended?: boolean
+}
 
 const freeFeatures = [
   'Acesso ao banco de questões completo (5 mil questões)',
@@ -66,6 +57,8 @@ interface PlansWelcomeDialogProps {
 export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: PlansWelcomeDialogProps) {
   const router = useRouter()
   const { isPremium } = usePremium()
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(true)
   const [showCheckout, setShowCheckout] = useState(false)
   const [checkoutData, setCheckoutData] = useState<{ preferenceId: string; amount: number } | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
@@ -76,6 +69,29 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
     discount: number; 
     applicablePlans: string[] | null 
   } | null>(null)
+
+  // Buscar planos do Firestore
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const response = await fetch('/api/plans')
+        const data = await response.json()
+        if (data.success && data.plans && data.plans.length > 0) {
+          setPlans(data.plans)
+        } else {
+          setPlans([])
+        }
+      } catch (error) {
+        console.error('Erro ao buscar planos:', error)
+        setPlans([])
+      } finally {
+        setLoadingPlans(false)
+      }
+    }
+    if (open) {
+      fetchPlans()
+    }
+  }, [open])
 
   // Se o usuário já for premium, não mostrar o dialog
   useEffect(() => {
@@ -304,6 +320,11 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
               </div>
             </DialogHeader>
             
+            <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <span>Pagamento seguro via MercadoPago</span>
+            </div>
+            
             <PaymentBrick
               publicKey={process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || ''}
               preferenceId={checkoutData.preferenceId}
@@ -327,6 +348,30 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
                 )
               }}
             />
+          </>
+        ) : loadingPlans ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : plans.length === 0 ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-center">
+                Assinaturas Temporariamente Indisponíveis
+              </DialogTitle>
+              <DialogDescription className="text-center">
+                Não há planos disponíveis no momento. Tente novamente mais tarde.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="text-center py-6">
+              <Button
+                variant="outline"
+                onClick={handleContinueFree}
+                className="cursor-pointer"
+              >
+                Continuar Gratuito
+              </Button>
+            </div>
           </>
         ) : (
           <>
@@ -399,7 +444,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
                   {plan.originalPrice && (
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground line-through">
-                        R$ {plan.originalPrice.toFixed(2)}
+                        R$ {formatPrice(plan.originalPrice)}
                       </span>
                       <Badge variant="destructive" className="text-xs">
                         20% OFF
@@ -409,7 +454,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
                   {appliedCoupon && isCouponApplicableToPlan(plan.id) && (
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground line-through">
-                        R$ {plan.price.toFixed(2)}
+                        R$ {formatPrice(plan.price)}
                       </span>
                       <Badge variant="secondary" className="text-xs">
                         Cupom aplicado
@@ -418,7 +463,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
                   )}
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-bold">
-                      R$ {calculatePrice(plan.price, plan.id).toFixed(2)}
+                      R$ {formatPrice(calculatePrice(plan.price, plan.id))}
                     </span>
                   </div>
                   {plan.id === 'monthly' && (
@@ -426,7 +471,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
                   )}
                   {plan.id === 'semester' && (
                     <p className="text-sm text-muted-foreground">
-                      ou R$ {(calculatePrice(plan.price, plan.id) / 6).toFixed(2)}/mês
+                      ou R$ {formatPrice(calculatePrice(plan.price, plan.id) / 6)}/mês
                     </p>
                   )}
                   {appliedCoupon && !isCouponApplicableToPlan(plan.id) && (
@@ -472,6 +517,12 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
             </Card>
           ))}
         </div>
+
+            {/* Payment Security Info */}
+            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <span>Pagamento seguro via MercadoPago</span>
+            </div>
 
             {/* Coupon Section */}
             <Card className="mx-auto max-w-2xl mt-6">

@@ -111,12 +111,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Calcular preço
-    const planPrices: Record<string, number> = {
-      monthly: 29.90,
-      semester: 143.00,
+    // Buscar preço do plano do Firestore
+    const planDoc = await db.collection('plans').doc(planId).get()
+    
+    if (!planDoc.exists) {
+      return NextResponse.json(
+        { error: 'Plano não encontrado. Os planos devem ser cadastrados no Firestore primeiro.' },
+        { status: 404 }
+      )
     }
-    const basePrice = planPrices[planId]
+    
+    const planData = planDoc.data()!
+    const basePrice = planData.price
+    
+    if (!basePrice || typeof basePrice !== 'number') {
+      return NextResponse.json(
+        { error: 'Preço do plano inválido' },
+        { status: 400 }
+      )
+    }
     // Arredondar para 2 casas decimais para evitar problemas de precisão de ponto flutuante
     const finalPrice = Math.round((basePrice * (1 - discount)) * 100) / 100
 
@@ -127,6 +140,68 @@ export async function POST(request: NextRequest) {
       expiresAt.setMonth(expiresAt.getMonth() + 1)
     } else {
       expiresAt.setMonth(expiresAt.getMonth() + 6)
+    }
+
+    // Se o preço final for 0 (cupom de 100%), conceder acesso diretamente sem Mercado Pago
+    if (finalPrice <= 0) {
+      // Ativar assinatura diretamente
+      const userRef = db.collection('users').doc(authUser.uid)
+      await userRef.update({
+        plan: planId,
+        planExpiresAt: expiresAt,
+        updatedAt: now,
+      })
+
+      // Criar registro de assinatura
+      await db.collection('subscriptions').add({
+        userId: authUser.uid,
+        plan: planId,
+        status: 'active',
+        startDate: now,
+        expiresAt,
+        paymentId: `FREE_COUPON_${couponCode?.toUpperCase()}_${Date.now()}`,
+        couponCode: couponCode?.toUpperCase() || null,
+        discount: discount,
+        createdAt: now,
+      })
+
+      // Registrar uso do cupom
+      if (couponCode && discount > 0) {
+        await db.collection('coupon_uses').add({
+          couponCode: couponCode.toUpperCase(),
+          userId: authUser.uid,
+          planId,
+          discountApplied: basePrice,
+          originalPrice: basePrice,
+          finalPrice: 0,
+          paymentId: null,
+          preferenceId: null,
+          usedAt: now,
+        })
+      }
+
+      // Salvar registro do pagamento gratuito
+      await db.collection('payments').add({
+        userId: authUser.uid,
+        planId,
+        preferenceId: null,
+        paymentId: `FREE_COUPON_${couponCode?.toUpperCase()}_${Date.now()}`,
+        status: 'approved',
+        amount: 0,
+        originalAmount: basePrice,
+        couponCode: couponCode?.toUpperCase() || null,
+        discount: discount * 100,
+        createdAt: now,
+        expiresAt: expiresAt,
+        isFreeAccess: true,
+      })
+
+      return NextResponse.json({
+        success: true,
+        freeAccess: true, // Indicador de que foi acesso gratuito
+        amount: 0,
+        message: 'Acesso concedido gratuitamente com cupom de 100% de desconto',
+      })
     }
 
     // Criar preferência de pagamento

@@ -10,6 +10,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Ba
 interface AdminStats {
   totalQuestions: number
   questionsThisWeek: number
+  questionsByPeriod?: Record<string, number>
   activeUsers?: number
   usersThisMonth?: number
   pendingReports?: number
@@ -216,6 +217,47 @@ export default function AdminDashboardPage() {
               </Card>
             </>
           )}
+        </div>
+
+        {/* Questions by Period Section */}
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight mb-4">
+            Questões por Período
+          </h2>
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+            {['1º Período', '2º Período', '3º Período', '4º Período', '5º Período', '6º Período', '7º Período', '8º Período'].map((period) => (
+              <Card key={period}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    {period}
+                  </CardTitle>
+                  <FileQuestion className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  ) : error ? (
+                    <div className="text-sm text-destructive">Erro</div>
+                  ) : (
+                    <>
+                      <div className="text-2xl font-bold">
+                        {stats?.questionsByPeriod?.[period] !== undefined 
+                          ? formatNumber(stats.questionsByPeriod[period]) 
+                          : '0'}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {stats && stats.totalQuestions > 0 && stats.questionsByPeriod?.[period] !== undefined
+                          ? `${Math.round((stats.questionsByPeriod[period] / stats.totalQuestions) * 100)}% do total`
+                          : '0% do total'}
+                      </p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
 
         {/* Plan Stats Section - Only for admin_master */}

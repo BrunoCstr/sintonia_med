@@ -130,8 +130,8 @@ export async function POST(request: NextRequest) {
         if (couponCode && discount > 0) {
           // Buscar registro de uso existente pela preferência
           const paymentDoc = await paymentRef.get()
-          const paymentData = paymentDoc.data()
-          const preferenceId = paymentData?.preferenceId
+          const paymentDataDoc = paymentDoc.data()
+          const preferenceId = paymentDataDoc?.preferenceId
 
           if (preferenceId) {
             const couponUsesSnapshot = await db
@@ -147,25 +147,25 @@ export async function POST(request: NextRequest) {
                 paymentId,
               })
             } else {
-              // Criar novo registro se não existir
-              const planPrices: Record<string, number> = {
-                monthly: 29.90,
-                semester: 143.00,
+              // Buscar preço do plano no Firestore
+              const planDoc = await db.collection('plans').doc(planId).get()
+              if (planDoc.exists) {
+                const planData = planDoc.data()!
+                const basePrice = planData.price || 0
+                const finalPrice = basePrice * (1 - discount / 100)
+                
+                await db.collection('coupon_uses').add({
+                  couponCode: couponCode.toUpperCase(),
+                  userId,
+                  planId,
+                  discountApplied: basePrice - finalPrice,
+                  originalPrice: basePrice,
+                  finalPrice,
+                  paymentId,
+                  preferenceId,
+                  usedAt: new Date(),
+                })
               }
-              const basePrice = planPrices[planId]
-              const finalPrice = basePrice * (1 - discount / 100)
-              
-              await db.collection('coupon_uses').add({
-                couponCode: couponCode.toUpperCase(),
-                userId,
-                planId,
-                discountApplied: basePrice - finalPrice,
-                originalPrice: basePrice,
-                finalPrice,
-                paymentId,
-                preferenceId,
-                usedAt: new Date(),
-              })
             }
           }
         }

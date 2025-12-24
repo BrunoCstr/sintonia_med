@@ -351,9 +351,12 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
                           )}
                         </h5>
                         {isPremium ? (
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            {question.explanation || question.comentarioGabarito || 'Sem explicação disponível'}
-                          </p>
+                          <div
+                            className="prose prose-sm max-w-none break-words text-sm leading-relaxed text-muted-foreground"
+                            dangerouslySetInnerHTML={{
+                              __html: question.explanation || question.comentarioGabarito || 'Sem explicação disponível',
+                            }}
+                          />
                         ) : (
                           <div className="space-y-4">
                             <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 bg-background/50 p-6 text-center">
@@ -375,14 +378,17 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
                                 <p className="text-xs font-medium text-muted-foreground mb-1">
                                   Resposta Correta: {String.fromCharCode(65 + question.correctAnswer)}
                                 </p>
-                                <p className={cn(
-                                  "text-xs text-muted-foreground/70 blur-sm select-none pointer-events-none line-clamp-3 break-words whitespace-normal"
-                                )}>
-                                  {(() => {
-                                    const text = question.explanation || question.comentarioGabarito || ''
-                                    return text.length > 150 ? text.substring(0, 150) + '...' : text
-                                  })()}
-                                </p>
+                                <div
+                                  className={cn(
+                                    "prose prose-sm max-w-none text-xs text-muted-foreground/70 blur-sm select-none pointer-events-none line-clamp-3 break-words whitespace-normal"
+                                  )}
+                                  dangerouslySetInnerHTML={{
+                                    __html: (() => {
+                                      const text = question.explanation || question.comentarioGabarito || ''
+                                      return text.length > 150 ? text.substring(0, 150) + '...' : text
+                                    })(),
+                                  }}
+                                />
                                 <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-lg">
                                   <Lock className="h-6 w-6 text-muted-foreground/50" />
                                 </div>

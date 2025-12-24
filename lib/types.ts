@@ -9,7 +9,7 @@ export interface UserProfile {
   institution: string
   photoURL?: string
   theme?: 'light' | 'dark'
-  plan: 'monthly' | 'semester' | null
+  plan: 'monthly' | 'semester' | 'lifetime' | null
   planExpiresAt: Date | null
   createdAt: Date
   role: UserRole // Role stored in Firestore document

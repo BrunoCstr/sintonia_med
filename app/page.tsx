@@ -1,19 +1,58 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Target, CheckCircle, Award, Brain, BookOpen, GraduationCap, Stethoscope, BarChart3, History, FileText, Users } from 'lucide-react'
+import { ArrowRight, Target, CheckCircle, Award, Brain, BookOpen, GraduationCap, Stethoscope, BarChart3, History, FileText, Users, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useTheme } from '@/lib/theme-provider'
+import { formatPrice } from '@/lib/utils'
+
+interface Plan {
+  id: string
+  name: string
+  price: number
+  originalPrice: number | null
+  badge: string
+  badgeVariant: string
+  duration: string
+  durationMonths: number
+  recommended?: boolean
+}
 
 export default function WelcomePage() {
   const { user, loading } = useAuth()
   const { theme } = useTheme()
   const router = useRouter()
+  const [monthlyPrice, setMonthlyPrice] = useState<number | null>(null)
+  const [plansAvailable, setPlansAvailable] = useState(true)
+
+  // Buscar preço do plano mensal do Firestore
+  useEffect(() => {
+    const fetchMonthlyPrice = async () => {
+      try {
+        const response = await fetch('/api/plans')
+        const data = await response.json()
+        if (data.success && data.plans && data.plans.length > 0) {
+          const monthlyPlan = data.plans.find((plan: Plan) => plan.id === 'monthly')
+          if (monthlyPlan) {
+            setMonthlyPrice(monthlyPlan.price)
+          } else {
+            setPlansAvailable(false)
+          }
+        } else {
+          setPlansAvailable(false)
+        }
+      } catch (error) {
+        console.error('Erro ao buscar preços:', error)
+        setPlansAvailable(false)
+      }
+    }
+    fetchMonthlyPrice()
+  }, [])
 
   useEffect(() => {
     if (!loading && user) {
@@ -66,10 +105,10 @@ export default function WelcomePage() {
                 <h1 className="text-balance text-4xl font-bold leading-tight tracking-tight text-foreground lg:text-5xl">
                   Domine os temas essenciais estudando por questões no formato{' '}
                   <span className="relative inline-block">
-                    <span className="relative z-10 text-primary">PBL</span>
+                    <span className="relative z-10 text-primary">PBL.</span>
                     <span className="absolute bottom-2 left-0 h-3 w-full bg-primary/20" />
                   </span>
-                  {' '} prática que gera resultado.
+                  {' '} Prática que gera resultado.
                 </h1>
                 
                 <div className="space-y-3">
@@ -77,7 +116,7 @@ export default function WelcomePage() {
                     O banco de questões independente, pensado para estudantes de medicina das instituições do grupo Afya.
                   </p>
                   <p className="text-pretty text-lg text-muted-foreground lg:text-xl">
-                    Questões comentadas, simulados personalizados e análise de desempenho e evolução.
+                    Questões comentadas, simulados personalizados, análise de desempenho e gráficos de evolução.
                   </p>
                 </div>
               </motion.div>
@@ -295,14 +334,20 @@ export default function WelcomePage() {
             <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
               <div className="space-y-6">
                 <h2 className="text-balance text-3xl font-bold lg:text-4xl">
-                  Junte-se a milhares de estudantes que já estão aprovando
+                  Comece agora mesmo a treinar com o método de estudo ativo.
                 </h2>
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
                     <CheckCircle className="mt-1 h-6 w-6 shrink-0 text-success" />
                     <div>
                       <div className="font-semibold text-foreground">Planos acessíveis</div>
-                      <div className="text-sm text-muted-foreground">A partir de R$ 29,90/mês com acesso completo</div>
+                      <div className="text-sm text-muted-foreground">
+                        {monthlyPrice !== null 
+                          ? `A partir de R$ ${formatPrice(monthlyPrice)}/mês com acesso completo`
+                          : plansAvailable 
+                          ? 'Carregando preços...' 
+                          : 'Consulte nossos planos'}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -324,8 +369,16 @@ export default function WelcomePage() {
               
               <div className="flex flex-col justify-center space-y-6 rounded-2xl border bg-card p-8 shadow-xl">
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground">Oferta especial</div>
-                  <div className="text-4xl font-bold text-foreground">R$ 29,90<span className="text-xl font-normal text-muted-foreground">/mês</span></div>
+                  <div className="text-sm font-medium text-muted-foreground">
+                    {monthlyPrice !== null ? 'Oferta especial' : 'Planos disponíveis'}
+                  </div>
+                  <div className="text-4xl font-bold text-foreground">
+                    {monthlyPrice !== null 
+                      ? <>R$ {formatPrice(monthlyPrice)}<span className="text-xl font-normal text-muted-foreground">/mês</span></>
+                      : plansAvailable 
+                      ? <span className="text-2xl">Carregando...</span>
+                      : <span className="text-2xl">Consulte planos</span>}
+                  </div>
                 </div>
                 <ul className="space-y-3">
                   <li className="flex items-center gap-2 text-sm">
@@ -351,6 +404,10 @@ export default function WelcomePage() {
                     <ArrowRight className="h-5 w-5" />
                   </Link>
                 </Button>
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <ShieldCheck className="h-3 w-3 text-primary" />
+                  <span>Pagamento seguro via MercadoPago</span>
+                </div>
               </div>
             </div>
           </div>
@@ -398,7 +455,7 @@ export default function WelcomePage() {
                 className="h-16 w-auto lg:h-20"
               />
               <p className="text-sm opacity-80">
-                A plataforma completa para sua aprovação em medicina.
+                A plataforma que vai te garantir uma aprovação tranquila no semestre.
               </p>
             </div>
             

@@ -295,6 +295,7 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Ao resetar o histórico, todas as questões que você já respondeu poderão aparecer novamente nos seus simulados.
+                Além disso, todos os gráficos e estatísticas de desempenho serão resetados.
               </p>
               <Button
                 variant="outline"
@@ -360,9 +361,13 @@ export default function SettingsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Resetar Histórico de Questões?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação irá resetar todas as questões que você já respondeu. Após o reset,
-              todas as questões poderão aparecer novamente nos seus simulados.
-              <br />
+              Esta ação irá resetar todas as questões que você já respondeu e todos os seus resultados de simulados.
+              Após o reset:
+              <ul className="mt-2 list-inside list-disc space-y-1">
+                <li>Todas as questões poderão aparecer novamente nos seus simulados</li>
+                <li>Todos os gráficos e estatísticas serão resetados</li>
+                <li>O histórico de desempenho será apagado</li>
+              </ul>
               <br />
               <strong>Esta ação não pode ser desfeita.</strong>
             </AlertDialogDescription>

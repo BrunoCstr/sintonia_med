@@ -73,6 +73,17 @@ export async function GET(request: NextRequest) {
     
     let totalQuestions = 0
     let questionsThisWeek = 0
+    const questionsByPeriod: Record<string, number> = {
+      '1º Período': 0,
+      '2º Período': 0,
+      '3º Período': 0,
+      '4º Período': 0,
+      '5º Período': 0,
+      '6º Período': 0,
+      '7º Período': 0,
+      '8º Período': 0,
+      'Sem período': 0,
+    }
 
     questionsSnapshot.forEach((doc) => {
       const data = doc.data()
@@ -81,6 +92,19 @@ export async function GET(request: NextRequest) {
       const createdAt = convertToDate(data.createdAt)
       if (createdAt >= weekStart) {
         questionsThisWeek++
+      }
+
+      // Contar por período
+      const period = data.period || data.tipo || data.periodo || ''
+      if (period && period !== 'Todos os períodos') {
+        if (questionsByPeriod.hasOwnProperty(period)) {
+          questionsByPeriod[period]++
+        } else {
+          // Se o período não está na lista padrão, adicionar
+          questionsByPeriod[period] = 1
+        }
+      } else {
+        questionsByPeriod['Sem período']++
       }
     })
 
@@ -203,6 +227,7 @@ export async function GET(request: NextRequest) {
       stats: {
         totalQuestions,
         questionsThisWeek,
+        questionsByPeriod,
         ...(authUser.role === 'admin_master' && {
           activeUsers,
           usersThisMonth,

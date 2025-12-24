@@ -65,7 +65,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Token presente - permitir acesso
+  // Verificar se há 2FA pendente - VULNERABILIDADE DE SEGURANÇA CORRIGIDA
+  // Se o usuário tem 2FA ativado mas ainda não inseriu o código, 
+  // não deve ter acesso ao sistema
+  const pending2FA = request.cookies.get('2fa-pending')
+  if (pending2FA && pending2FA.value === 'true') {
+    // Redirecionar para login para completar o 2FA
+    const loginUrl = new URL('/auth/login', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    loginUrl.searchParams.set('pending2fa', 'true')
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // Token presente e 2FA completo - permitir acesso
   // A validação de role e permissões será feita nas páginas via RoleGuard
   return NextResponse.next()
 }

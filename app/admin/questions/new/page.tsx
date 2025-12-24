@@ -15,12 +15,13 @@ import {
 } from '@/components/ui/select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, Save, Upload, X } from 'lucide-react'
+import { ArrowLeft, Save, Upload, X, Edit } from 'lucide-react'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import type { MedicalArea, Materia } from '@/lib/types'
+import { ImageEditorDialog } from '@/components/ui/image-editor-dialog'
 
 export default function NewQuestionPage() {
   const router = useRouter()
@@ -28,6 +29,8 @@ export default function NewQuestionPage() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [imageForEditor, setImageForEditor] = useState<string | null>(null)
   const [medicalAreas, setMedicalAreas] = useState<MedicalArea[]>([])
   const [materias, setMaterias] = useState<Materia[]>([])
   const [loadingMaterias, setLoadingMaterias] = useState(false)
@@ -68,6 +71,14 @@ export default function NewQuestionPage() {
 
     loadMedicalAreas()
   }, [])
+
+  // Filtrar sistemas baseado no período selecionado
+  const filteredMedicalAreas = useMemo(() => {
+    if (!formData.period || formData.period === 'Todos os períodos') {
+      return medicalAreas
+    }
+    return medicalAreas.filter((area) => area.periodo === formData.period)
+  }, [medicalAreas, formData.period])
 
   // Carregar matérias quando o sistema for selecionado
   const [previousArea, setPreviousArea] = useState<string>('')
@@ -130,15 +141,28 @@ export default function NewQuestionPage() {
       return
     }
 
-    // Armazenar arquivo para upload posterior (ao salvar)
-    setSelectedImageFile(file)
+    // Criar preview local e abrir editor
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const imageSrc = reader.result as string
+      setImageForEditor(imageSrc)
+      setEditorOpen(true)
+    }
+    reader.readAsDataURL(file)
+  }
 
-    // Criar preview local
+  const handleImageEditorSave = (editedFile: File) => {
+    setSelectedImageFile(editedFile)
+    
+    // Criar preview da imagem editada
     const reader = new FileReader()
     reader.onloadend = () => {
       setImagePreview(reader.result as string)
     }
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(editedFile)
+    
+    setEditorOpen(false)
+    setImageForEditor(null)
   }
 
   const handleRemoveImage = () => {
@@ -350,16 +374,31 @@ export default function NewQuestionPage() {
                         className="object-contain"
                       />
                     </div>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleRemoveImage}
-                      className="mt-2 cursor-pointer"
-                    >
-                      <X className="mr-2 h-4 w-4" />
-                      Remover Imagem
-                    </Button>
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setImageForEditor(imagePreview || formData.imagemUrl)
+                          setEditorOpen(true)
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Editar Imagem
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleRemoveImage}
+                        className="cursor-pointer"
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Remover Imagem
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-4">
@@ -384,9 +423,17 @@ export default function NewQuestionPage() {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Formatos aceitos: JPG, PNG, GIF. Tamanho máximo: 5MB
+                  Formatos aceitos: JPG, PNG, GIF. Tamanho máximo: 5MB. Você poderá editar a imagem após o upload.
                 </p>
               </div>
+              
+              {/* Image Editor Dialog */}
+              <ImageEditorDialog
+                open={editorOpen}
+                onOpenChange={setEditorOpen}
+                imageSrc={imageForEditor}
+                onSave={handleImageEditorSave}
+              />
             </CardContent>
           </Card>
 
@@ -495,9 +542,15 @@ export default function NewQuestionPage() {
                 <Label htmlFor="period">Período <span className="text-destructive">*</span></Label>
                 <Select
                   value={formData.period}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, period: value })
-                  }
+                  onValueChange={(value) => {
+                    // Se o sistema selecionado não corresponder ao novo período, limpar o sistema e a matéria
+                    const selectedSistema = medicalAreas.find((area) => area.nome === formData.area)
+                    if (selectedSistema && value !== 'Todos os períodos' && selectedSistema.periodo !== value) {
+                      setFormData({ ...formData, period: value, area: '', subarea: '' })
+                    } else {
+                      setFormData({ ...formData, period: value })
+                    }
+                  }}
                   required
                 >
                   <SelectTrigger id="period">
@@ -544,21 +597,29 @@ export default function NewQuestionPage() {
                 <Label htmlFor="area">Sistema <span className="text-destructive">*</span></Label>
                 <Select
                   value={formData.area}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, area: value })
-                  }
+                  onValueChange={(value) => {
+                    const selectedSistema = medicalAreas.find((area) => area.nome === value)
+                    // Se não houver período selecionado, preencher automaticamente com o período do sistema
+                    if (selectedSistema && (!formData.period || formData.period === '')) {
+                      setFormData({ ...formData, area: value, period: selectedSistema.periodo })
+                    } else {
+                      setFormData({ ...formData, area: value })
+                    }
+                  }}
                   required
                 >
                   <SelectTrigger id="area">
                     <SelectValue placeholder="Selecione o sistema" />
                   </SelectTrigger>
                   <SelectContent>
-                    {medicalAreas.length === 0 ? (
+                    {filteredMedicalAreas.length === 0 ? (
                       <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        Nenhum sistema disponível
+                        {formData.period && formData.period !== 'Todos os períodos'
+                          ? `Nenhum sistema disponível para ${formData.period}`
+                          : 'Nenhum sistema disponível'}
                       </div>
                     ) : (
-                      medicalAreas.map((area) => (
+                      filteredMedicalAreas.map((area) => (
                         <SelectItem key={area.id} value={area.nome}>
                           {area.nome}
                         </SelectItem>

@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/user/question-history
- * Reseta o histórico de questões respondidas do usuário
+ * Reseta o histórico de questões respondidas do usuário e todos os resultados de simulados
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -133,12 +133,11 @@ export async function DELETE(request: NextRequest) {
     const app = getAdminApp()
     const db = app.firestore()
 
-    // Deletar em lotes (Firestore permite até 500 operações por batch)
-    let totalDeleted = 0
-    let hasMore = true
+    // Deletar histórico de questões (coleção history)
+    let historyDeleted = 0
+    let hasMoreHistory = true
 
-    while (hasMore) {
-      // Buscar até 500 documentos por vez
+    while (hasMoreHistory) {
       const historySnapshot = await db
         .collection('history')
         .where('userId', '==', authUser.uid)
@@ -146,28 +145,59 @@ export async function DELETE(request: NextRequest) {
         .get()
 
       if (historySnapshot.empty) {
-        hasMore = false
+        hasMoreHistory = false
         break
       }
 
-      // Deletar em batch
       const batch = db.batch()
       historySnapshot.forEach((doc) => {
         batch.delete(doc.ref)
       })
 
       await batch.commit()
-      totalDeleted += historySnapshot.size
+      historyDeleted += historySnapshot.size
 
-      // Se retornou menos de 500, não há mais documentos
       if (historySnapshot.size < 500) {
-        hasMore = false
+        hasMoreHistory = false
+      }
+    }
+
+    // Deletar resultados de simulados (coleção results) - usado para gráficos e estatísticas
+    let resultsDeleted = 0
+    let hasMoreResults = true
+
+    while (hasMoreResults) {
+      const resultsSnapshot = await db
+        .collection('results')
+        .where('userId', '==', authUser.uid)
+        .limit(500)
+        .get()
+
+      if (resultsSnapshot.empty) {
+        hasMoreResults = false
+        break
+      }
+
+      const batch = db.batch()
+      resultsSnapshot.forEach((doc) => {
+        batch.delete(doc.ref)
+      })
+
+      await batch.commit()
+      resultsDeleted += resultsSnapshot.size
+
+      if (resultsSnapshot.size < 500) {
+        hasMoreResults = false
       }
     }
 
     return NextResponse.json({ 
       success: true,
-      deleted: totalDeleted 
+      deleted: {
+        history: historyDeleted,
+        results: resultsDeleted,
+        total: historyDeleted + resultsDeleted
+      }
     })
   } catch (error: any) {
     console.error('Erro ao resetar histórico:', error)

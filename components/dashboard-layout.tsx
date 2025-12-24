@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
-import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope, Ticket, Bug } from 'lucide-react'
+import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope, Ticket, Bug, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -61,6 +61,18 @@ const adminNavigation = [
     name: 'Reports',
     href: '/admin/reports',
     icon: Flag,
+    roles: ['admin_master'],
+  },
+  {
+    name: 'Cupons',
+    href: '/admin/coupons',
+    icon: Ticket,
+    roles: ['admin_master'],
+  },
+  {
+    name: 'Planos',
+    href: '/admin/plans',
+    icon: CreditCard,
     roles: ['admin_master'],
   },
 ]

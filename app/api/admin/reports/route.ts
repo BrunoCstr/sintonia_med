@@ -5,6 +5,8 @@ import { verifyFirebaseToken } from '@/lib/middleware-auth'
 /**
  * GET /api/admin/reports
  * Lista todos os reports (apenas admin_master)
+ * Query params:
+ * - archived: 'true' para listar apenas arquivados, 'false' ou omitido para listar apenas não arquivados
  */
 export async function GET(request: NextRequest) {
   try {
@@ -18,6 +20,9 @@ export async function GET(request: NextRequest) {
     if (!authUser || authUser.role !== 'admin_master') {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
+
+    const { searchParams } = new URL(request.url)
+    const showArchived = searchParams.get('archived') === 'true'
 
     const app = getAdminApp()
     const db = app.firestore()
@@ -33,6 +38,13 @@ export async function GET(request: NextRequest) {
 
     for (const doc of reportsSnapshot.docs) {
       const data = doc.data()
+      
+      // Filtrar por status de arquivamento
+      const isArchived = data.archived === true
+      if (showArchived !== isArchived) {
+        continue
+      }
+
       // Só adicionar questionId ao set se não for null
       if (data.questionId) {
         questionIds.add(data.questionId)
@@ -109,6 +121,7 @@ export async function GET(request: NextRequest) {
         tipos: data.tipos || [],
         imagemUrl: data.imagemUrl || null,
         status: data.status || 'pendente',
+        archived: data.archived === true,
         resolvedAt: resolvedAt ? resolvedAt.toISOString() : undefined,
         resolvedBy: data.resolvedBy || undefined,
         createdAt: createdAt.toISOString(),

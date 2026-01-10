@@ -10,6 +10,7 @@ import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useTheme } from '@/lib/theme-provider'
 import { formatPrice } from '@/lib/utils'
+import { AvailabilityNotice } from '@/components/availability-notice'
 
 interface Plan {
   id: string
@@ -304,9 +305,8 @@ export default function WelcomePage() {
               { icon: Target, title: 'Simulados Personalizados', description: 'Crie provas sob medida com filtros de período, matéria, dificuldade e quantidade. Modo cronometrado para simular o dia da prova.' },
               { icon: FileText, title: 'Gabarito Comentado', description: 'Todas as questões com explicações detalhadas. Entenda o raciocínio por trás de cada alternativa correta e incorreta.' },
               { icon: BarChart3, title: 'Dashboard Inteligente', description: 'Acompanhe seu progresso com gráficos detalhados. Identifique pontos fracos e otimize seus estudos com dados reais.' },
-              { icon: History, title: 'Histórico Completo', description: 'Revise todos os seus simulados anteriores. Compare desempenho e veja sua evolução ao longo do tempo.' },
-              { icon: BookOpen, title: 'Questões Revisadas', description: 'Banco de dados construído com rigor acadêmico e revisado por monitores e professores para assegurar confiabilidade e consistência.' },
-              { icon: Users, title: 'Comunidade Ativa', description: 'Comente, tire dúvidas e interaja com outros estudantes. Aprendizado colaborativo que multiplica resultados.' },
+              { icon: History, title: 'Histórico Completo', description: 'Revise todos os seus simulados anteriores em detalhes. Compare seu desempenho entre diferentes períodos, matérias e dificuldades. Veja sua evolução ao longo do tempo através de gráficos interativos e estatísticas precisas. Identifique padrões de acertos e erros para otimizar sua estratégia de estudos.' },
+              { icon: BookOpen, title: 'Questões Revisadas', description: 'Banco de dados extenso construído com rigor acadêmico e revisado minuciosamente por monitores experientes e professores qualificados. Cada questão passa por um processo de validação rigoroso para assegurar confiabilidade, consistência pedagógica e alinhamento com os padrões acadêmicos das instituições Afya.' },
             ].map((feature, index) => (
               <motion.div
                 key={index}
@@ -324,6 +324,16 @@ export default function WelcomePage() {
                 <p className="text-muted-foreground">{feature.description}</p>
               </motion.div>
             ))}
+            
+            {/* Availability Notice - Card no mesmo tamanho dos outros */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.5 }}
+            >
+              <AvailabilityNotice />
+            </motion.div>
           </div>
         </div>
       </section>

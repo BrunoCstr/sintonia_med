@@ -1,0 +1,189 @@
+/**
+ * EXEMPLO DE IMPLEMENTAÇÃO COM RESEND
+ * 
+ * Este é um exemplo de como migrar para Resend para ter e-mails 3-5x mais rápidos
+ * 
+ * Setup:
+ * 1. npm install resend
+ * 2. Criar conta em https://resend.com
+ * 3. Adicionar RESEND_API_KEY nas variáveis de ambiente
+ * 4. Substituir lib/email.ts por este arquivo
+ */
+
+import { Resend } from 'resend'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+/**
+ * Template HTML para e-mail de validação (mesmo template atual)
+ */
+function getVerificationEmailTemplate(verificationLink: string): string {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validação de E-mail - SintoniaMed</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);">
+    <table role="presentation" style="width: 100%; border-collapse: collapse; padding: 40px 20px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" style="max-width: 560px; width: 100%; background-color: #FFFFF3; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); overflow: hidden;">
+                    
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #CF0300 0%, #90091C 100%); padding: 40px 30px; text-align: center;">
+                            <img src="https://iili.io/fG6xijj.md.png" alt="SintoniaMed Logo" width="260" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border: 0;">
+                        </td>
+                    </tr>
+                    
+                    <!-- Body -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            
+                            <h1 style="margin: 0 0 20px 0; color: #90091C; font-size: 30px; font-weight: 700; text-align: center; letter-spacing: -0.5px;">
+                                Valide seu E-mail
+                            </h1>
+                            
+                            <p style="margin: 0 0 20px 0; color: #333; font-size: 16px; line-height: 1.7; text-align: center;">
+                                Olá! 👋
+                            </p>
+                            
+                            <p style="margin: 0 0 20px 0; color: #555; font-size: 16px; line-height: 1.7; text-align: center;">
+                                Seja bem-vindo(a) ao <strong style="color: #90091C;">SintoniaMed</strong>! Estamos muito felizes em tê-lo(a) conosco.
+                            </p>
+                            
+                            <p style="margin: 0 0 30px 0; color: #555; font-size: 16px; line-height: 1.7; text-align: center;">
+                                Para começar a usar sua conta, precisamos confirmar seu endereço de e-mail. Clique no botão abaixo para validar:
+                            </p>
+                            
+                            <!-- Button -->
+                            <table role="presentation" style="margin: 0 auto 30px auto; width: 100%;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="${verificationLink}" style="display: inline-block; padding: 16px 44px; background: linear-gradient(135deg, #CF0300 0%, #90091C 100%); color: #FFFFF3; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 12px; box-shadow: 0 8px 20px rgba(207, 3, 0, 0.3); letter-spacing: 0.5px;">
+                                            ✅ Validar Meu E-mail
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <div style="text-align: center; margin-top: 35px; padding-top: 25px; border-top: 2px solid #f0f0f0;">
+                                <p style="margin: 0 0 5px 0; color: #333; font-size: 15px;">
+                                    Atenciosamente,
+                                </p>
+                                <p style="margin: 0; color: #90091C; font-size: 17px; font-weight: 700;">
+                                    Equipe SintoniaMed
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background: linear-gradient(180deg, #f8f8f8 0%, #f0f0f0 100%); padding: 30px; text-align: center;">
+                            <p style="margin: 0 0 15px 0; color: #666; font-size: 14px; line-height: 1.6;">
+                                Se você não criou esta conta, pode ignorar este e-mail com segurança.
+                            </p>
+                            
+                            <p style="margin: 20px 0 0 0; color: #999; font-size: 12px;">
+                                © 2024 SintoniaMed - Sistema de Questionários e Simulados de Medicina<br>
+                                Todos os direitos reservados.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`
+}
+
+/**
+ * Envia e-mail de validação usando Resend
+ * 
+ * Vantagens sobre Gmail SMTP:
+ * - 3-5x mais rápido (1-3 segundos vs 5-15 segundos)
+ * - 99.9% de deliverability
+ * - Não cai em spam
+ * - Grátis até 3.000 e-mails/mês
+ * - Analytics e tracking incluídos
+ * 
+ * @param to - E-mail do destinatário
+ * @param verificationLink - Link de verificação gerado pelo Firebase
+ */
+export async function sendVerificationEmail(
+  to: string,
+  verificationLink: string
+): Promise<void> {
+  try {
+    const emailHtml = getVerificationEmailTemplate(verificationLink)
+
+    const { data, error } = await resend.emails.send({
+      from: 'SintoniaMed <noreply@seudominio.com>', // Use seu domínio verificado
+      to,
+      subject: 'Valide seu E-mail - SintoniaMed',
+      html: emailHtml,
+      // Opcionalmente, adicionar tags para analytics
+      tags: [
+        { name: 'category', value: 'verification' },
+        { name: 'environment', value: process.env.NODE_ENV || 'development' },
+      ],
+    })
+
+    if (error) {
+      throw error
+    }
+
+    console.log('✅ E-mail de validação enviado com sucesso via Resend:', data?.id)
+  } catch (error: any) {
+    console.error('❌ Erro ao enviar e-mail de validação:', error)
+    throw error
+  }
+}
+
+/**
+ * INSTRUÇÕES DE MIGRAÇÃO:
+ * 
+ * 1. Instalar Resend:
+ *    npm install resend
+ * 
+ * 2. Criar conta em https://resend.com
+ * 
+ * 3. Adicionar domínio e verificar DNS:
+ *    - Vá em Settings > Domains
+ *    - Adicione seu domínio
+ *    - Configure SPF, DKIM e DMARC records
+ * 
+ * 4. Obter API Key:
+ *    - Vá em Settings > API Keys
+ *    - Crie uma nova API key
+ * 
+ * 5. Configurar variável de ambiente:
+ *    RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxx
+ * 
+ * 6. Renomear arquivos:
+ *    mv lib/email.ts lib/email-nodemailer.ts.backup
+ *    mv lib/email-resend.ts.example lib/email.ts
+ * 
+ * 7. Remover dependências antigas (opcional):
+ *    npm uninstall nodemailer @types/nodemailer
+ * 
+ * 8. Testar:
+ *    - Criar nova conta
+ *    - Verificar se e-mail chega em < 5 segundos
+ *    - Verificar logs no dashboard do Resend
+ * 
+ * CUSTOS:
+ * - Grátis: Até 3.000 e-mails/mês
+ * - $20/mês: Até 50.000 e-mails/mês
+ * - $80/mês: Até 200.000 e-mails/mês
+ * 
+ * Para começar com o plano grátis, você pode usar o domínio
+ * onboarding.resend.dev temporariamente antes de configurar seu próprio domínio.
+ */
+
+

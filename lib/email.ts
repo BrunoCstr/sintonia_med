@@ -20,7 +20,7 @@ function getVerificationEmailTemplate(verificationLink: string): string {
                     <!-- Header -->
                     <tr>
                         <td style="background: linear-gradient(135deg, #CF0300 0%, #90091C 100%); padding: 40px 30px; text-align: center;">
-                            <img src="https://iili.io/fG6xijj.md.png" alt="SintoniaMed Logo" width="260" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border: 0;">
+                            <img src="https://sintoniamed.com.br/public/logo-template-email.png" alt="SintoniaMed Logo" width="260" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border: 0;">
                         </td>
                     </tr>
                     
@@ -156,7 +156,7 @@ function getVerificationEmailTemplate(verificationLink: string): string {
                             </div>
                             
                             <p style="margin: 20px 0 0 0; color: #999; font-size: 12px;">
-                                © 2024 SintoniaMed - Sistema de Questionários e Simulados de Medicina<br>
+                                © 2026 SintoniaMed - Sistema de Questionários e Simulados de Medicina<br>
                                 Todos os direitos reservados.
                             </p>
                         </td>
@@ -171,9 +171,18 @@ function getVerificationEmailTemplate(verificationLink: string): string {
 }
 
 /**
- * Cria e retorna um transporter do Nodemailer configurado
+ * Transporter cacheado para evitar criação repetida
  */
-function createTransporter() {
+let cachedTransporter: any = null
+
+/**
+ * Cria e retorna um transporter do Nodemailer configurado (com cache)
+ */
+function getTransporter() {
+  if (cachedTransporter) {
+    return cachedTransporter
+  }
+
   const emailUser = process.env.EMAIL_USER
   const emailPassword = process.env.EMAIL_PASSWORD
 
@@ -187,13 +196,19 @@ function createTransporter() {
   const cleanEmailUser = emailUser.trim()
   const cleanEmailPassword = emailPassword.trim().replace(/\s/g, '')
 
-  return nodemailer.createTransport({
+  cachedTransporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: cleanEmailUser,
       pass: cleanEmailPassword,
     },
+    // Configurações de pool para melhor performance
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
   })
+
+  return cachedTransporter
 }
 
 /**
@@ -206,10 +221,10 @@ export async function sendVerificationEmail(
   verificationLink: string
 ): Promise<void> {
   try {
-    const transporter = createTransporter()
+    const transporter = getTransporter()
 
-    // Verificar conexão SMTP
-    await transporter.verify()
+    // REMOVIDO: transporter.verify() - adiciona 2-5s de latência desnecessária
+    // A verificação só é útil em desenvolvimento/testes, não em produção
 
     const emailUser = process.env.EMAIL_USER!
     const emailHtml = getVerificationEmailTemplate(verificationLink)
@@ -219,6 +234,8 @@ export async function sendVerificationEmail(
       to: to,
       subject: 'Valide seu E-mail - SintoniaMed',
       html: emailHtml,
+      // Prioridade alta para e-mails de verificação
+      priority: 'high',
     }
 
     const info = await transporter.sendMail(mailOptions)

@@ -5,7 +5,7 @@ import type { Materia } from '@/lib/types'
 
 /**
  * GET /api/admin/materias
- * Lista todas as matérias de um sistema (apenas admins)
+ * Lista todas as matérias de um sistema (apenas admin_master)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     const authUser = await verifyFirebaseToken(token)
-    if (!authUser || (authUser.role !== 'admin_master' && authUser.role !== 'admin_questoes')) {
+    if (!authUser || authUser.role !== 'admin_master') {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/admin/materias
- * Cria uma nova matéria (apenas admins)
+ * Cria uma nova matéria (apenas admin_master)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     const authUser = await verifyFirebaseToken(token)
-    if (!authUser || (authUser.role !== 'admin_master' && authUser.role !== 'admin_questoes')) {
+    if (!authUser || authUser.role !== 'admin_master') {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
 

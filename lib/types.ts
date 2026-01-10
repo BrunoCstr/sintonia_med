@@ -96,3 +96,15 @@ export interface Materia {
 
 // Mantido para compatibilidade com código antigo (deprecated)
 export type MedicalArea = Sistema
+
+// Notice types (Avisos para usuários)
+export interface Notice {
+  id: string
+  titulo: string
+  mensagem: string
+  ativo: boolean
+  createdAt: Date
+  updatedAt: Date
+  createdBy: string
+  createdByName?: string
+}

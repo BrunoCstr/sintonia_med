@@ -26,8 +26,10 @@ import type { Question, MedicalArea } from "@/lib/types";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DataTablePagination } from "@/components/data-table-pagination";
+import { useAuth } from "@/lib/auth-context";
 
 export default function QuestionsListPage() {
+  const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [areaFilter, setAreaFilter] = useState("all");
   const [dificuldadeFilter, setDificuldadeFilter] = useState("all");
@@ -152,6 +154,12 @@ export default function QuestionsListPage() {
   };
 
   const handleDelete = async (id: string) => {
+    // Verificar se o usuário é admin_master
+    if (userRole !== 'admin_master') {
+      alert("Apenas o administrador geral pode excluir questões permanentemente.");
+      return;
+    }
+
     if (
       !confirm(
         "Tem certeza que deseja excluir esta questão permanentemente?\n\nEsta ação também excluirá a questão do histórico de todos os usuários e não pode ser desfeita."
@@ -524,8 +532,9 @@ export default function QuestionsListPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(question.id)}
-                          title="Excluir permanentemente"
-                          className="cursor-pointer text-destructive hover:text-destructive"
+                          title={userRole !== 'admin_master' ? "Apenas admin master pode excluir" : "Excluir permanentemente"}
+                          className={userRole !== 'admin_master' ? "cursor-not-allowed opacity-50" : "cursor-pointer text-destructive hover:text-destructive"}
+                          disabled={userRole !== 'admin_master'}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

@@ -374,7 +374,7 @@ export async function PUT(
 
 /**
  * DELETE /api/admin/questions/[id]
- * Deleta uma questão (apenas admins)
+ * Deleta uma questão (apenas admin_master)
  */
 export async function DELETE(
   request: NextRequest,
@@ -390,8 +390,8 @@ export async function DELETE(
     }
 
     const authUser = await verifyFirebaseToken(token)
-    if (!authUser || (authUser.role !== 'admin_master' && authUser.role !== 'admin_questoes')) {
-      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+    if (!authUser || authUser.role !== 'admin_master') {
+      return NextResponse.json({ error: 'Apenas o administrador geral pode excluir questões' }, { status: 403 })
     }
 
     const app = getAdminApp()

@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Search, Eye, Shield, CheckCircle, XCircle, Plus, Loader2, Edit, UserX, UserCheck, Filter, X, Crown, MinusCircle, Infinity } from 'lucide-react'
+import { Search, Eye, Shield, CheckCircle, XCircle, Plus, Loader2, Edit, UserX, UserCheck, Filter, X, Crown, MinusCircle, Infinity, Settings } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/lib/auth-context'
@@ -138,6 +138,20 @@ export default function UsersPage() {
   // Form states for editing user
   const [editUserName, setEditUserName] = useState('')
   const [editUserPeriod, setEditUserPeriod] = useState('')
+  
+  // States for availability management
+  const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false)
+  const [availabilityData, setAvailabilityData] = useState({
+    periods: {
+      '1': false, '2': false, '3': false, '4': false,
+      '5': false, '6': false, '7': false, '8': false,
+    },
+    subjects: {
+      '1-5': { SOI: false, HAM: false, IESC: false, MCM: false },
+      '6-8': { CI: false, HAM: false, IESC: false, MCM: false },
+    },
+  })
+  const [savingAvailability, setSavingAvailability] = useState(false)
   const [editUserInstitution, setEditUserInstitution] = useState('')
   const [editUserRole, setEditUserRole] = useState<'aluno' | 'admin_master' | 'admin_questoes'>('aluno')
   const [editingUser, setEditingUser] = useState(false)
@@ -206,6 +220,77 @@ export default function UsersPage() {
     setEditUserRole(user.role as 'aluno' | 'admin_master' | 'admin_questoes')
     setEditError('')
     setShowEditDialog(true)
+  }
+
+  const handleOpenAvailability = async () => {
+    try {
+      const response = await fetch('/api/availability')
+      const data = await response.json()
+      if (data.success) {
+        setAvailabilityData(data.availability)
+      }
+      setShowAvailabilityDialog(true)
+    } catch (error) {
+      console.error('Erro ao buscar disponibilidade:', error)
+      setShowAvailabilityDialog(true)
+    }
+  }
+
+  const handleSaveAvailability = async () => {
+    if (!user?.uid) return
+
+    try {
+      setSavingAvailability(true)
+      const token = await user.getIdToken()
+      
+      const response = await fetch('/api/availability', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          availability: availabilityData,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao salvar disponibilidade')
+      }
+
+      alert('Disponibilidade atualizada com sucesso!')
+      setShowAvailabilityDialog(false)
+    } catch (error: any) {
+      console.error('Erro ao salvar disponibilidade:', error)
+      alert(error.message || 'Erro ao salvar disponibilidade')
+    } finally {
+      setSavingAvailability(false)
+    }
+  }
+
+  const togglePeriod = (period: string) => {
+    setAvailabilityData(prev => ({
+      ...prev,
+      periods: {
+        ...prev.periods,
+        [period]: !prev.periods[period],
+      },
+    }))
+  }
+
+  const toggleSubject = (range: '1-5' | '6-8', subject: string) => {
+    setAvailabilityData(prev => ({
+      ...prev,
+      subjects: {
+        ...prev.subjects,
+        [range]: {
+          ...prev.subjects[range],
+          [subject]: !prev.subjects[range][subject as keyof typeof prev.subjects[typeof range]],
+        },
+      },
+    }))
   }
 
   const confirmEditUser = async () => {
@@ -606,10 +691,21 @@ export default function UsersPage() {
               Gerencie os usuários e suas assinaturas
             </p>
           </div>
-          <Button onClick={handleCreateUser} className="cursor-pointer">
-            <Plus className="mr-2 h-4 w-4" />
-            Cadastrar Usuário
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleOpenAvailability} 
+              variant="outline" 
+              size="sm"
+              className="cursor-pointer"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Disponibilidade
+            </Button>
+            <Button onClick={handleCreateUser} className="cursor-pointer">
+              <Plus className="mr-2 h-4 w-4" />
+              Cadastrar Usuário
+            </Button>
+          </div>
         </div>
 
         {/* Search and Filters */}
@@ -1293,6 +1389,136 @@ export default function UsersPage() {
             </Button>
             <Button onClick={confirmEditUser} disabled={editingUser} className="cursor-pointer">
               {editingUser ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                'Salvar Alterações'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para gerenciar disponibilidade */}
+      <Dialog open={showAvailabilityDialog} onOpenChange={setShowAvailabilityDialog}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Gerenciar Disponibilidade</DialogTitle>
+            <DialogDescription>
+              Configure quais períodos e matérias estão disponíveis na plataforma
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* Períodos */}
+            <div>
+              <h3 className="mb-3 font-semibold">Períodos</h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {['1', '2', '3', '4', '5', '6', '7', '8'].map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => togglePeriod(period)}
+                    className={`flex items-center justify-between rounded-lg border p-3 transition-all cursor-pointer ${
+                      availabilityData.periods[period]
+                        ? 'border-green-500/50 bg-green-500/10'
+                        : 'border-red-500/50 bg-red-500/10'
+                    }`}
+                  >
+                    <span className="font-medium">{period}º</span>
+                    <div
+                      className={`h-3 w-3 rounded-full ${
+                        availabilityData.periods[period]
+                          ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'
+                          : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Matérias 1-5 */}
+            <div>
+              <h3 className="mb-3 font-semibold">Matérias - 1º ao 5º Período</h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {['SOI', 'HAM', 'IESC', 'MCM'].map((subject) => (
+                  <button
+                    key={subject}
+                    onClick={() => toggleSubject('1-5', subject)}
+                    className={`flex items-center justify-between rounded-lg border p-3 transition-all cursor-pointer ${
+                      availabilityData.subjects['1-5'][subject as keyof typeof availabilityData.subjects['1-5']]
+                        ? 'border-green-500/50 bg-green-500/10'
+                        : 'border-red-500/50 bg-red-500/10'
+                    }`}
+                  >
+                    <span className="font-medium">{subject}</span>
+                    <div
+                      className={`h-3 w-3 rounded-full ${
+                        availabilityData.subjects['1-5'][subject as keyof typeof availabilityData.subjects['1-5']]
+                          ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'
+                          : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Matérias 6-8 */}
+            <div>
+              <h3 className="mb-3 font-semibold">Matérias - 6º ao 8º Período</h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {['CI', 'HAM', 'IESC', 'MCM'].map((subject) => (
+                  <button
+                    key={subject}
+                    onClick={() => toggleSubject('6-8', subject)}
+                    className={`flex items-center justify-between rounded-lg border p-3 transition-all cursor-pointer ${
+                      availabilityData.subjects['6-8'][subject as keyof typeof availabilityData.subjects['6-8']]
+                        ? 'border-green-500/50 bg-green-500/10'
+                        : 'border-red-500/50 bg-red-500/10'
+                    }`}
+                  >
+                    <span className="font-medium">{subject}</span>
+                    <div
+                      className={`h-3 w-3 rounded-full ${
+                        availabilityData.subjects['6-8'][subject as keyof typeof availabilityData.subjects['6-8']]
+                          ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'
+                          : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Legenda */}
+            <div className="flex items-center justify-center gap-6 border-t pt-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                <span className="text-muted-foreground">Disponível</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+                <span className="text-muted-foreground">Em breve</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAvailabilityDialog(false)} 
+              disabled={savingAvailability}
+              className="cursor-pointer"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveAvailability} 
+              disabled={savingAvailability}
+              className="cursor-pointer"
+            >
+              {savingAvailability ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Salvando...

@@ -27,8 +27,17 @@ import { useState, useEffect, useMemo, Fragment } from 'react'
 import type { MedicalArea, Materia } from '@/lib/types'
 import { DataTablePagination } from '@/components/data-table-pagination'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { RoleGuard } from '@/components/role-guard'
 
 export default function MedicalAreasPage() {
+  return (
+    <RoleGuard allowedRoles={['admin_master']} redirectTo="/admin">
+      <MedicalAreasContent />
+    </RoleGuard>
+  )
+}
+
+function MedicalAreasContent() {
   const [areas, setAreas] = useState<MedicalArea[]>([])
   const [materias, setMaterias] = useState<Record<string, Materia[]>>({})
   const [expandedSistemas, setExpandedSistemas] = useState<Set<string>>(new Set())
@@ -769,4 +778,3 @@ export default function MedicalAreasPage() {
     </div>
   )
 }
-

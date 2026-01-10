@@ -552,21 +552,21 @@ export default function AdminDashboardPage() {
               </div>
             </a>
 
-            <a
-              href="/admin/medical-areas"
-              className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-accent"
-            >
-              <Stethoscope className="h-8 w-8 text-primary" />
-              <div>
-                <div className="font-medium">Sistemas</div>
-                <div className="text-sm text-muted-foreground">
-                  Gerenciar sistemas e matérias (subdivisões)
-                </div>
-              </div>
-            </a>
-
             {isAdminMaster && (
               <>
+                <a
+                  href="/admin/medical-areas"
+                  className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-accent"
+                >
+                  <Stethoscope className="h-8 w-8 text-primary" />
+                  <div>
+                    <div className="font-medium">Sistemas</div>
+                    <div className="text-sm text-muted-foreground">
+                      Gerenciar sistemas e matérias (subdivisões)
+                    </div>
+                  </div>
+                </a>
+
                 <a
                   href="/admin/users"
                   className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-accent"

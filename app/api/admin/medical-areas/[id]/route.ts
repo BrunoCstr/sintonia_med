@@ -5,7 +5,7 @@ import type { Sistema, MedicalArea } from '@/lib/types'
 
 /**
  * PUT /api/admin/medical-areas/[id]
- * Atualiza um sistema (apenas admins)
+ * Atualiza um sistema (apenas admin_master)
  * Mantido o endpoint para compatibilidade, mas agora usa a coleção 'sistemas'
  */
 export async function PUT(
@@ -20,7 +20,7 @@ export async function PUT(
     }
 
     const authUser = await verifyFirebaseToken(token)
-    if (!authUser || (authUser.role !== 'admin_master' && authUser.role !== 'admin_questoes')) {
+    if (!authUser || authUser.role !== 'admin_master') {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
 
@@ -120,7 +120,7 @@ export async function PUT(
 
 /**
  * DELETE /api/admin/medical-areas/[id]
- * Deleta um sistema (apenas admins)
+ * Deleta um sistema (apenas admin_master)
  * Mantido o endpoint para compatibilidade, mas agora usa a coleção 'sistemas'
  */
 export async function DELETE(
@@ -135,7 +135,7 @@ export async function DELETE(
     }
 
     const authUser = await verifyFirebaseToken(token)
-    if (!authUser || (authUser.role !== 'admin_master' && authUser.role !== 'admin_questoes')) {
+    if (!authUser || authUser.role !== 'admin_master') {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
 

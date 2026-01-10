@@ -16,13 +16,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
-import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope, Ticket, Bug, CreditCard } from 'lucide-react'
+import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope, Ticket, Bug, CreditCard, Bell } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import { RoleGuard } from '@/components/role-guard'
 import { ReportDialog } from '@/components/report-dialog'
+import { NoticePopup } from '@/components/notice-popup'
 
 const navigation = [
   { name: 'Página Inicial', href: '/dashboard', icon: Home },
@@ -49,7 +50,7 @@ const adminNavigation = [
     name: 'Sistemas',
     href: '/admin/sistemas',
     icon: Stethoscope,
-    roles: ['admin_master', 'admin_questoes'],
+    roles: ['admin_master'],
   },
   {
     name: 'Usuários',
@@ -75,6 +76,12 @@ const adminNavigation = [
     icon: CreditCard,
     roles: ['admin_master'],
   },
+  {
+    name: 'Avisos',
+    href: '/admin/notices',
+    icon: Bell,
+    roles: ['admin_master'],
+  },
 ]
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -88,9 +95,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   
   const isAdminRoute = pathname?.startsWith('/admin')
   
-  const filteredAdminNavigation = adminNavigation.filter((item) =>
-    item.roles.includes(userRole || 'aluno')
-  )
+  const filteredAdminNavigation = adminNavigation.filter((item) => {
+    if (!userRole) return false
+    return item.roles.includes(userRole)
+  })
 
   const handleLogout = async () => {
     await logout()
@@ -331,6 +339,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         onOpenChange={setShowReportDialog}
         questionId={null}
       />
+
+      {/* Notice Popup */}
+      <NoticePopup />
     </div>
   )
 }

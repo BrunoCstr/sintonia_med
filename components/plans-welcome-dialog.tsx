@@ -287,7 +287,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
       }}
     >
       <DialogContent 
-        className={showCheckout ? "max-w-2xl max-h-[90vh] overflow-y-auto" : "max-w-5xl max-h-[90vh] overflow-y-auto"}
+        className={showCheckout ? "max-w-2xl max-h-[90vh] overflow-y-auto" : "max-w-6xl max-h-[90vh] overflow-y-auto"}
         onInteractOutside={(e) => {
           if (showCheckout) {
             // Prevenir fechar ao clicar fora quando estiver no checkout

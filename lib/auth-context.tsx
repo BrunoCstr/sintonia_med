@@ -94,6 +94,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user)
       if (user) {
+        // Verificar se o e-mail está verificado antes de sincronizar token
+        // Isso previne que tokens sejam salvos para usuários com e-mail não verificado
+        if (!user.emailVerified) {
+          // E-mail não verificado - não sincronizar token e fazer logout
+          console.warn('⚠️ E-mail não verificado detectado no onAuthStateChanged - fazendo logout')
+          try {
+            await fetch('/api/auth/sync-token', {
+              method: 'DELETE',
+            })
+          } catch (error) {
+            console.error('Erro ao remover token:', error)
+          }
+          await signOut(auth)
+          setUserProfile(null)
+          setUserRole(null)
+          setLoading(false)
+          return
+        }
+
         // Verificar se o plano expirou e atualizar no banco se necessário
         try {
           await fetch('/api/user/check-expired-plan', {

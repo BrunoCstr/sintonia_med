@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
@@ -36,6 +36,19 @@ function LoginForm() {
   const redirect = searchParams.get('redirect') || '/dashboard'
   const accountCreated = searchParams.get('message') === 'account-created'
   const accountCreatedNoEmail = searchParams.get('message') === 'account-created-no-email'
+  const emailNotVerified = searchParams.get('emailNotVerified') === 'true'
+
+  // Verificar se o usuário foi redirecionado por e-mail não verificado
+  useEffect(() => {
+    if (emailNotVerified) {
+      setError('Por favor, verifique seu e-mail antes de acessar o sistema. Um e-mail de verificação foi enviado para você.')
+      setShowResendEmail(true)
+      // Limpar o parâmetro da URL para evitar mostrar a mensagem novamente
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('emailNotVerified')
+      window.history.replaceState({}, '', newUrl.toString())
+    }
+  }, [emailNotVerified])
 
   const check2FAStatus = async (uid: string): Promise<boolean> => {
     try {

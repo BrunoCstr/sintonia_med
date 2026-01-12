@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { verifyFirebaseToken } from '@/lib/middleware-auth'
+import { getAdminApp } from '@/lib/firebase-admin'
 
 // Rotas públicas (não requerem autenticação)
 const publicRoutes = ['/', '/auth', '/plans']
@@ -65,6 +67,46 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // Verificar se o token é válido e se o e-mail está verificado
+  try {
+    const authUser = await verifyFirebaseToken(cookieToken.value)
+    
+    if (!authUser) {
+      // Token inválido - redirecionar para login
+      const loginUrl = new URL('/auth/login', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      // Limpar cookie inválido
+      const response = NextResponse.redirect(loginUrl)
+      response.cookies.delete('firebase-token')
+      return response
+    }
+
+    // Verificar se o e-mail está verificado - CORREÇÃO DE SEGURANÇA
+    // Isso previne que usuários com e-mail não verificado acessem o sistema
+    // mesmo após atualizar a página
+    const app = getAdminApp()
+    const userRecord = await app.auth().getUser(authUser.uid)
+    
+    if (!userRecord.emailVerified) {
+      // E-mail não verificado - redirecionar para login
+      const loginUrl = new URL('/auth/login', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      loginUrl.searchParams.set('emailNotVerified', 'true')
+      // Limpar cookie para forçar novo login
+      const response = NextResponse.redirect(loginUrl)
+      response.cookies.delete('firebase-token')
+      return response
+    }
+  } catch (error) {
+    // Erro ao verificar token ou usuário - redirecionar para login
+    console.error('Erro ao verificar autenticação no middleware:', error)
+    const loginUrl = new URL('/auth/login', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    const response = NextResponse.redirect(loginUrl)
+    response.cookies.delete('firebase-token')
+    return response
+  }
+
   // Verificar se há 2FA pendente - VULNERABILIDADE DE SEGURANÇA CORRIGIDA
   // Se o usuário tem 2FA ativado mas ainda não inseriu o código, 
   // não deve ter acesso ao sistema
@@ -77,7 +119,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Token presente e 2FA completo - permitir acesso
+  // Token presente, e-mail verificado e 2FA completo - permitir acesso
   // A validação de role e permissões será feita nas páginas via RoleGuard
   return NextResponse.next()
 }

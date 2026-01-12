@@ -20,7 +20,7 @@ function getVerificationEmailTemplate(verificationLink: string): string {
                     <!-- Header -->
                     <tr>
                         <td style="background: linear-gradient(135deg, #CF0300 0%, #90091C 100%); padding: 40px 30px; text-align: center;">
-                            <img src="https://sintoniamed.com.br/public/logo-template-email.png" alt="SintoniaMed Logo" width="260" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border: 0;">
+                            <img src="https://sintoniamed.com.br/logo-template-email.png" alt="SintoniaMed Logo" width="260" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border: 0;">
                         </td>
                     </tr>
                     

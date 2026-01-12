@@ -181,7 +181,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <Button size="lg" onClick={() => router.push('/generator')} className="w-full sm:w-auto cursor-pointer">
-              Gerar Lista de Questões
+              Gerar Simulado
             </Button>
           </CardContent>
         </Card>
@@ -422,7 +422,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <Button size="lg" onClick={() => router.push('/generator')} className="cursor-pointer">
-              Gerar Lista de Questões
+              Gerar Simulado
             </Button>
           </CardContent>
         </Card>

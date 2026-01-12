@@ -574,7 +574,7 @@ export default function GeneratorPage() {
     <DashboardLayout>
       <div className="mx-auto max-w-4xl space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Gerar Lista de Questões</h1>
+          <h1 className="text-3xl font-bold">Gerar Simulado</h1>
           <p className="text-muted-foreground">
             Personalize seu simulado escolhendo os filtros abaixo
           </p>
@@ -674,7 +674,7 @@ export default function GeneratorPage() {
                       <Link href="/plans">
                         <Button variant="outline" className="w-full cursor-pointer" size="sm">
                           <Crown className="mr-2 h-4 w-4" />
-                          Assine Premium para gerar questões ilimitadas
+                          Assine Premium para gerar simulados ilimitados
                         </Button>
                       </Link>
                     </div>
@@ -1170,7 +1170,7 @@ export default function GeneratorPage() {
               <br />
               <Link href="/plans" className="mt-2 inline-flex items-center gap-1 text-sm font-medium underline">
                 <Crown className="h-3 w-3" />
-                Assine um plano premium para gerar questões ilimitadas
+                Assine um plano premium para gerar simulados ilimitados
               </Link>
             </AlertDescription>
           </Alert>

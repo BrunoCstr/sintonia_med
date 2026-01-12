@@ -25,7 +25,6 @@ export const metadata: Metadata = {
   authors: [{ name: 'BRNDev', url: 'https://brunocastrodev.com.br' }],
   manifest: '/manifest.json',
   keywords: ['medicina', 'questões', 'simulado', 'estudo', 'concurso médico', 'revalida', 'residência médica'],
-  authors: [{ name: 'SintoniaMed' }],
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },

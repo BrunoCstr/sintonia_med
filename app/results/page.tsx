@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress'
 import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ReportDialog } from '@/components/report-dialog'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, XCircle, Circle, ChevronDown, Flag, BarChart3, Home, RefreshCw, Lock, Crown, Sparkles, ArrowRight } from 'lucide-react'
+import { CheckCircle2, XCircle, Circle, ChevronDown, Flag, BarChart3, Home, RefreshCw, Lock, Crown, Sparkles, ArrowRight, Star } from 'lucide-react'
 import { type Question } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
@@ -22,8 +22,11 @@ export default function ResultsPage() {
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set())
   const [showReportDialog, setShowReportDialog] = useState(false)
   const [reportQuestionId, setReportQuestionId] = useState<string | null>(null)
+  const [favoritedQuestions, setFavoritedQuestions] = useState<Set<string>>(new Set())
+  const [favoriteIds, setFavoriteIds] = useState<Record<string, string>>({})
+  const [loadingFavorites, setLoadingFavorites] = useState<Record<string, boolean>>({})
   const router = useRouter()
-  const { userProfile } = useAuth()
+  const { userProfile, user } = useAuth()
   const { isPremium } = usePremium()
 
   useEffect(() => {
@@ -36,6 +39,40 @@ export default function ResultsPage() {
     const data = JSON.parse(resultsStr)
     setResults(data)
   }, [router])
+
+  // Carregar status de favoritos ao montar o componente
+  useEffect(() => {
+    if (!user || !results) return
+
+    const checkFavorites = async () => {
+      const favoritesMap: Record<string, string> = {}
+      const favoritedSet = new Set<string>()
+
+      for (const question of results.questions) {
+        try {
+          const response = await fetch(`/api/user/favorites/check/${question.id}`, {
+            credentials: 'include',
+          })
+          if (response.ok) {
+            const data = await response.json()
+            if (data.isFavorited) {
+              favoritedSet.add(question.id)
+              if (data.favoriteId) {
+                favoritesMap[question.id] = data.favoriteId
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao verificar favorito:', error)
+        }
+      }
+
+      setFavoritedQuestions(favoritedSet)
+      setFavoriteIds(favoritesMap)
+    }
+
+    checkFavorites()
+  }, [user, results])
 
   if (!results) {
     return (
@@ -68,6 +105,74 @@ export default function ResultsPage() {
   const handleReport = (questionId: string) => {
     setReportQuestionId(questionId)
     setShowReportDialog(true)
+  }
+
+  const handleToggleFavorite = async (question: Question) => {
+    if (!user || !results) return
+
+    const isFavorited = favoritedQuestions.has(question.id)
+    setLoadingFavorites((prev) => ({ ...prev, [question.id]: true }))
+
+    try {
+      if (isFavorited) {
+        // Desfavoritar
+        const favoriteId = favoriteIds[question.id]
+        if (favoriteId) {
+          const response = await fetch(`/api/user/favorites/${favoriteId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ archived: true }),
+          })
+
+          if (response.ok) {
+            setFavoritedQuestions((prev) => {
+              const newSet = new Set(prev)
+              newSet.delete(question.id)
+              return newSet
+            })
+          }
+        }
+      } else {
+        // Favoritar
+        // Preparar dados completos da questão
+        const questionData = {
+          id: question.id,
+          text: question.text,
+          alternatives: question.alternatives,
+          correctAnswer: question.correctAnswer,
+          explanation: question.explanation,
+          subject: question.subject,
+          difficulty: question.difficulty,
+          period: question.period,
+          isOfficial: question.isOfficial,
+          imagemUrl: (question as any).imagemUrl,
+          comentarioGabarito: (question as any).comentarioGabarito || question.explanation,
+        }
+
+        const response = await fetch('/api/user/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            questionId: question.id,
+            question: questionData,
+          }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setFavoritedQuestions((prev) => new Set(prev).add(question.id))
+          if (data.id) {
+            setFavoriteIds((prev) => ({ ...prev, [question.id]: data.id }))
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao favoritar/desfavoritar:', error)
+    } finally {
+      setLoadingFavorites((prev) => ({ ...prev, [question.id]: false }))
+    }
   }
 
   return (
@@ -205,12 +310,37 @@ export default function ResultsPage() {
                             </div>
                           </div>
                         </div>
-                        <ChevronDown
-                          className={cn(
-                            'h-5 w-5 shrink-0 transition-transform text-muted-foreground',
-                            isExpanded && 'rotate-180'
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Botão de favoritar - sempre visível */}
+                          {!isUnanswered && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleToggleFavorite(question)
+                              }}
+                              disabled={loadingFavorites[question.id]}
+                              className="cursor-pointer"
+                              title={favoritedQuestions.has(question.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                            >
+                              <Star
+                                className={cn(
+                                  'h-5 w-5 transition-colors',
+                                  favoritedQuestions.has(question.id)
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-muted-foreground hover:text-yellow-400'
+                                )}
+                              />
+                            </Button>
                           )}
-                        />
+                          <ChevronDown
+                            className={cn(
+                              'h-5 w-5 shrink-0 transition-transform text-muted-foreground',
+                              isExpanded && 'rotate-180'
+                            )}
+                          />
+                        </div>
                       </div>
                     </CardHeader>
                   </CollapsibleTrigger>
@@ -281,15 +411,34 @@ export default function ResultsPage() {
                       {/* Explanation - Só mostra se a questão foi respondida */}
                       {!isUnanswered && (
                         <div className="rounded-lg bg-muted/50 p-4">
-                          <h4 className="mb-2 flex items-center gap-2 font-semibold">
-                            Gabarito Comentado
-                            {!isPremium && (
-                              <Badge variant="secondary" className="ml-auto">
-                                <Lock className="mr-1 h-3 w-3" />
-                                Premium
-                              </Badge>
-                            )}
-                          </h4>
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <h4 className="flex items-center gap-2 font-semibold">
+                              Gabarito Comentado
+                              {!isPremium && (
+                                <Badge variant="secondary">
+                                  <Lock className="mr-1 h-3 w-3" />
+                                  Premium
+                                </Badge>
+                              )}
+                            </h4>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleToggleFavorite(question)}
+                              disabled={loadingFavorites[question.id]}
+                              className="cursor-pointer"
+                              title={favoritedQuestions.has(question.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                            >
+                              <Star
+                                className={cn(
+                                  'h-5 w-5 transition-colors',
+                                  favoritedQuestions.has(question.id)
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-muted-foreground hover:text-yellow-400'
+                                )}
+                              />
+                            </Button>
+                          </div>
                           {isPremium ? (
                             <div
                               className="prose prose-sm max-w-none break-words text-sm leading-relaxed text-muted-foreground"
@@ -349,16 +498,18 @@ export default function ResultsPage() {
                         </div>
                       )}
 
-                      {/* Report Button */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleReport(question.id)}
-                        className="w-full sm:w-auto cursor-pointer"
-                      >
-                        <Flag className="mr-2 h-4 w-4" />
-                        Relatar Erro
-                      </Button>
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleReport(question.id)}
+                          className="cursor-pointer"
+                        >
+                          <Flag className="mr-2 h-4 w-4" />
+                          Relatar Erro
+                        </Button>
+                      </div>
                         </CardContent>
                       </motion.div>
                     )}

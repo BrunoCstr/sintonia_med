@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
-import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope, Ticket, Bug, CreditCard, Bell } from 'lucide-react'
+import { Home, FileText, User, Settings, LogOut, Moon, Sun, Menu, History, Shield, LayoutDashboard, FileQuestion, Users, Flag, Stethoscope, Ticket, Bug, CreditCard, Bell, Star } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -29,6 +29,7 @@ const navigation = [
   { name: 'Página Inicial', href: '/dashboard', icon: Home },
   { name: 'Gerar Questões', href: '/generator', icon: FileText },
   { name: 'Histórico', href: '/history', icon: History },
+  { name: 'Questões Favoritadas', href: '/favorites', icon: Star },
   { name: 'Perfil', href: '/profile', icon: User },
   { name: 'Configurações', href: '/settings', icon: Settings },
 ]

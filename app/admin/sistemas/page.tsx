@@ -31,7 +31,7 @@ import { RoleGuard } from '@/components/role-guard'
 
 export default function MedicalAreasPage() {
   return (
-    <RoleGuard allowedRoles={['admin_master']} redirectTo="/admin">
+    <RoleGuard allowedRoles={['admin_master', 'admin_questoes']} redirectTo="/admin">
       <MedicalAreasContent />
     </RoleGuard>
   )

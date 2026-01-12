@@ -26,9 +26,9 @@ const navigation = [
   },
   {
     name: 'Sistemas',
-    href: '/admin/medical-areas',
+    href: '/admin/sistemas',
     icon: Stethoscope,
-    roles: ['admin_master'],
+    roles: ['admin_master', 'admin_questoes'],
   },
   {
     name: 'Usuários',

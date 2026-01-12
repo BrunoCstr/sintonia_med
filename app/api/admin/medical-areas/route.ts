@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     const authUser = await verifyFirebaseToken(token)
-    if (!authUser || authUser.role !== 'admin_master') {
+    if (!authUser || (authUser.role !== 'admin_master' && authUser.role !== 'admin_questoes')) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
 
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     const authUser = await verifyFirebaseToken(token)
-    if (!authUser || authUser.role !== 'admin_master') {
+    if (!authUser || (authUser.role !== 'admin_master' && authUser.role !== 'admin_questoes')) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
 

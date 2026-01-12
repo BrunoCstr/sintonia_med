@@ -33,7 +33,7 @@ const PLAN_COLORS_DARK = {
 }
 
 export default function AdminDashboardPage() {
-  const { userRole, isAdminMaster } = useRole()
+  const { userRole, isAdminMaster, isAnyAdmin } = useRole()
   const { theme } = useTheme()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -552,10 +552,10 @@ export default function AdminDashboardPage() {
               </div>
             </a>
 
-            {isAdminMaster && (
+            {isAnyAdmin && (
               <>
                 <a
-                  href="/admin/medical-areas"
+                  href="/admin/sistemas"
                   className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-accent"
                 >
                   <Stethoscope className="h-8 w-8 text-primary" />
@@ -566,6 +566,11 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                 </a>
+              </>
+            )}
+
+            {isAdminMaster && (
+              <>
 
                 <a
                   href="/admin/users"

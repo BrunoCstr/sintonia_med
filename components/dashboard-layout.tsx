@@ -50,7 +50,7 @@ const adminNavigation = [
     name: 'Sistemas',
     href: '/admin/sistemas',
     icon: Stethoscope,
-    roles: ['admin_master'],
+    roles: ['admin_master', 'admin_questoes'],
   },
   {
     name: 'Usuários',

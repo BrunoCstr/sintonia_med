@@ -17,6 +17,7 @@ interface QuizResult {
   percentage: number
   subjects: string[]
   timeSpent: number | null
+  isFreeQuestion?: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -87,15 +88,15 @@ export default function HistoryPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Histórico de Simulados</h1>
-          <p className="text-muted-foreground">Acompanhe todos os simulados que você realizou</p>
+          <h1 className="text-3xl font-bold">Histórico de Respostas</h1>
+          <p className="text-muted-foreground">Acompanhe todas as questões e simulados que você realizou</p>
         </div>
 
         {/* Stats Summary */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Total de Simulados</CardTitle>
+              <CardTitle className="text-sm font-medium">Total de Respostas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalQuizzes}</div>
@@ -125,10 +126,15 @@ export default function HistoryPage() {
         {results.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">Você ainda não realizou nenhum simulado.</p>
-              <Button className="mt-4 cursor-pointer" asChild>
-                <Link href="/generator">Gerar Primeiro Simulado</Link>
-              </Button>
+              <p className="text-muted-foreground">Você ainda não respondeu nenhuma questão.</p>
+              <div className="mt-4 flex gap-2 justify-center">
+                <Button className="cursor-pointer" asChild>
+                  <Link href="/generator">Gerar Simulado</Link>
+                </Button>
+                <Button variant="outline" className="cursor-pointer" asChild>
+                  <Link href="/free-questions">Questões Livres</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -139,7 +145,7 @@ export default function HistoryPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <CardTitle className="text-lg">
-                        Simulado de {quiz.questionsCount} questões
+                        {quiz.isFreeQuestion ? 'Questão livre' : `Simulado de ${quiz.questionsCount} questões`}
                       </CardTitle>
                       <CardDescription className="flex items-center gap-2 mt-1">
                         <Calendar className="h-3 w-3" />

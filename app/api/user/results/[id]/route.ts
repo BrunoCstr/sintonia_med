@@ -140,6 +140,7 @@ export async function GET(
       unansweredCount: data.unansweredCount || 0,
       percentage: data.percentage || 0,
       subjects: data.subjects || [],
+      isFreeQuestion: data.isFreeQuestion || false,
       createdAt: createdAt.toISOString(),
       updatedAt: updatedAt.toISOString(),
     }

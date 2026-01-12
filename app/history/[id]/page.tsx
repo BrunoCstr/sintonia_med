@@ -26,6 +26,7 @@ interface QuizDetail {
   unansweredCount: number
   percentage: number
   subjects: string[]
+  isFreeQuestion?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -111,7 +112,9 @@ export default function HistoryDetailsPage({ params }: { params: Promise<{ id: s
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Detalhes do Simulado</h1>
+            <h1 className="text-3xl font-bold">
+              {quiz.isFreeQuestion ? 'Detalhes da Questão Livre' : 'Detalhes do Simulado'}
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {new Date(quiz.createdAt).toLocaleDateString('pt-BR', {
                 day: '2-digit',

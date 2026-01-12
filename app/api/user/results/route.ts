@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { questions, answers, filters, timeSpent } = body
+    const { questions, answers, filters, timeSpent, isFreeQuestion } = body
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return NextResponse.json({ error: 'Dados inválidos: questions é obrigatório e deve ser um array não vazio' }, { status: 400 })
@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
       unansweredCount,
       percentage,
       subjects,
+      isFreeQuestion: isFreeQuestion || false,
       createdAt: now,
       updatedAt: now,
     })
@@ -313,6 +314,7 @@ export async function GET(request: NextRequest) {
         percentage: data.percentage || 0,
         subjects: data.subjects || [],
         timeSpent: data.timeSpent || null,
+        isFreeQuestion: data.isFreeQuestion || false,
         createdAt: createdAt.toISOString(),
         updatedAt: updatedAt.toISOString(),
       }

@@ -153,12 +153,13 @@ export default function FreeQuestionsPracticePage() {
     setSelectedAnswer(answerIndex)
   }
 
-  const handleRespond = () => {
-    if (selectedAnswer === null) return
+  const handleRespond = async () => {
+    if (selectedAnswer === null || !currentQuestion) return
     setShowAnswer(true)
 
-    // Salvar no histórico se o usuário estiver logado
+    // Salvar no histórico e resultado se o usuário estiver logado
     if (user && currentQuestion) {
+      // Salvar no histórico
       fetch('/api/user/question-history', {
         method: 'POST',
         headers: {
@@ -169,6 +170,44 @@ export default function FreeQuestionsPracticePage() {
       }).catch((error) => {
         console.error('Erro ao salvar histórico:', error)
       })
+
+      // Salvar resultado para métricas do dashboard (similar ao quiz)
+      try {
+        const answers = { [currentQuestion.id]: selectedAnswer }
+        
+        // Garantir que a questão tenha o campo 'area' para compatibilidade com a API
+        const questionForResult = {
+          ...currentQuestion,
+          area: currentQuestion.subject, // A API usa q.subject || q.area
+        }
+        
+        const resultData = {
+          questions: [questionForResult],
+          answers,
+          filters: filters || {},
+          timeSpent: null, // Questões livres não têm timer
+          isFreeQuestion: true, // Identificador para questões livres
+        }
+
+        const resultsResponse = await fetch('/api/user/results', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(resultData),
+        })
+
+        if (!resultsResponse.ok) {
+          const errorData = await resultsResponse.json()
+          console.error('Erro ao salvar resultado:', errorData)
+        } else {
+          console.log('Resultado salvo com sucesso para métricas do dashboard')
+        }
+      } catch (error) {
+        console.error('Erro ao salvar resultado:', error)
+        // Não bloquear o fluxo se houver erro ao salvar resultado
+      }
     }
   }
 

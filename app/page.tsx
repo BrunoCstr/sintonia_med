@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Target, CheckCircle, Award, Brain, BookOpen, GraduationCap, Stethoscope, BarChart3, History, FileText, Users, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Target, CheckCircle, Award, Brain, BookOpen, GraduationCap, Stethoscope, BarChart3, History, FileText, Users, ShieldCheck, ChevronDown, HelpCircle } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
@@ -30,6 +30,7 @@ export default function WelcomePage() {
   const router = useRouter()
   const [monthlyPrice, setMonthlyPrice] = useState<number | null>(null)
   const [plansAvailable, setPlansAvailable] = useState(true)
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null)
 
   // Buscar preço do plano mensal do Firestore
   useEffect(() => {
@@ -338,7 +339,142 @@ export default function WelcomePage() {
         </div>
       </section>
 
-      <section className="px-4 py-20">
+      <section className="relative overflow-hidden px-4 py-20">
+        {/* Decorative background elements */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute left-1/4 top-20 h-[400px] w-[400px] rounded-full bg-primary/5 blur-3xl" />
+          <div className="absolute right-1/4 bottom-20 h-[300px] w-[300px] rounded-full bg-secondary/5 blur-3xl" />
+        </div>
+
+        <div className="mx-auto max-w-7xl">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="mb-16 text-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              whileInView={{ scale: 1, opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 via-primary/10 to-transparent"
+            >
+              <motion.div
+                animate={{ 
+                  rotate: [0, 5, -5, 0],
+                }}
+                transition={{ 
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              >
+                <HelpCircle className="h-10 w-10 text-primary" />
+              </motion.div>
+            </motion.div>
+            <h2 className="mb-4 text-balance text-4xl font-bold lg:text-5xl">
+              Perguntas frequentes
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              Tudo o que você precisa saber sobre o SintoniaMed
+            </p>
+          </motion.div>
+          
+          <div className="mx-auto max-w-4xl space-y-4">
+            {[
+              {
+                question: 'Quantas questões existem por período no site?',
+                answer: 'No momento temos em torno de mil questões por período no site. Mas o SintoniaMed tem um sistema que prevê a adição de novas questões periódicamente, dessa forma nosso banco estará sempre crescendo.'
+              },
+              {
+                question: 'Eu encontro as questões de provas da Afya?',
+                answer: 'Sim, você irá encontrar questões baseadas nas questões das nacionais anteriores da Afya, de todos os períodos que estão disponíveis no site. As questões tem algumas alterações de grafia e de diagramação, mas tem a mesma idéia e raciocínio das questões originais, teste e verá.'
+              },
+              {
+                question: 'Como são feitas as questões do site?',
+                answer: 'As questões do SintoniaMed são feitas uma a uma por monitores e professores com mais de 2 anos de experiência com as provas da matriz Afya. Embora não tenhamos nenhum vínculo com a instituição, somos veteranos do curso e já fizemos as provas centenas de vezes, tanto em aula quanto em off. Dessa forma, as questões autorais do site são produzidas visando o modelo de questões que você encontrará na sua prova, tudo para seu estudo ser o mais efetivo possível.'
+              },
+              {
+                question: 'É usado IA para fazer as questões do site?',
+                answer: 'Sim, usamos IA para diagramar e deixar as questões e gabaritos num formato padrão. Mas todas as questões e gabaritos são de autoria de um monitor ou professor. A IA é usada para diagramar e padronizar as questões em escala. Em outras palavras, cada questão é revisada individualmente por um humano, o que torna a experiência do SintoniaMed única no segmento.'
+              },
+              {
+                question: 'Como é feito o pagamento? É seguro?',
+                answer: 'O pagamento é feito via Mercado Pago. O SintoniaMed não armazena nenhum dado sensível dos usuários, todo o processo de pagamento é feito via API do Mercado Pago, maximizando a segurança dos dados e levando mais credibilidade na hora da compra.'
+              }
+            ].map((faq, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ 
+                  duration: 0.5, 
+                  delay: index * 0.08,
+                  ease: [0.25, 0.4, 0.25, 1]
+                }}
+              >
+                <motion.button
+                  onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
+                  className="group w-full overflow-hidden rounded-xl border bg-card/50 backdrop-blur-sm text-left transition-all hover:border-primary/50 hover:bg-card hover:shadow-lg hover:shadow-primary/5"
+                  whileHover={{ scale: 1.01 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="flex items-center justify-between gap-4 p-6">
+                    <div className="flex items-center gap-4 flex-1">
+                      <motion.div
+                        initial={{ scale: 1 }}
+                        animate={{ scale: openFaqIndex === index ? 1.1 : 1 }}
+                        transition={{ duration: 0.2 }}
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+                      >
+                        {index + 1}
+                      </motion.div>
+                      <h3 className="flex-1 font-semibold text-foreground text-lg">
+                        {faq.question}
+                      </h3>
+                    </div>
+                    <motion.div
+                      animate={{ rotate: openFaqIndex === index ? 180 : 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className="shrink-0"
+                    >
+                      <ChevronDown className="h-5 w-5 text-primary" />
+                    </motion.div>
+                  </div>
+                  <motion.div
+                    initial={false}
+                    animate={{
+                      height: openFaqIndex === index ? "auto" : 0,
+                      opacity: openFaqIndex === index ? 1 : 0
+                    }}
+                    transition={{ 
+                      height: { duration: 0.3, ease: "easeInOut" },
+                      opacity: { duration: 0.2, ease: "easeInOut" }
+                    }}
+                    className="overflow-hidden"
+                  >
+                    <motion.div
+                      initial={{ y: -10 }}
+                      animate={{ y: openFaqIndex === index ? 0 : -10 }}
+                      transition={{ duration: 0.3 }}
+                      className="border-t bg-background/50 px-6 pb-6 pt-4"
+                    >
+                      <p className="text-muted-foreground leading-relaxed">
+                        {faq.answer}
+                      </p>
+                    </motion.div>
+                  </motion.div>
+                </motion.button>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y bg-card px-4 py-20">
         <div className="mx-auto max-w-7xl">
           <div className="rounded-3xl border bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-12 lg:p-16">
             <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
@@ -424,7 +560,7 @@ export default function WelcomePage() {
         </div>
       </section>
 
-      <section className="border-t bg-card px-4 py-20">
+      <section className="px-4 py-20">
         <div className="mx-auto max-w-4xl text-center">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-6 py-3 text-sm font-medium text-primary">
             <Award className="h-5 w-5" />

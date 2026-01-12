@@ -9,7 +9,7 @@ import {
   sendPasswordResetEmail,
   type User,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import type { UserProfile, UserRole } from './types'
 
@@ -255,16 +255,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Não bloquear o cadastro se houver erro ao enviar e-mail
     }
 
-    await setDoc(doc(db, 'users', user.uid), {
-      name,
-      email,
-      period,
-      institution,
-      plan: null,
-      planExpiresAt: null,
-      role: 'aluno', // Default role
-      createdAt: new Date(),
-    })
+    // Criar perfil do usuário no Firestore via API route (usa Admin SDK)
+    // Isso evita problemas de permissão do Firestore
+    try {
+      // Obter token para passar no header (caso o cookie ainda não esteja disponível)
+      const token = await user.getIdToken()
+      
+      // Sincronizar token primeiro para que a API possa autenticar
+      await syncTokenWithServer(user)
+      
+      const profileResponse = await fetch('/api/auth/create-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name,
+          email,
+          period,
+          institution,
+        }),
+      })
+
+      if (!profileResponse.ok) {
+        const errorData = await profileResponse.json()
+        console.error('Erro ao criar perfil:', errorData.error)
+        throw new Error(errorData.error || 'Erro ao criar perfil do usuário')
+      }
+    } catch (profileError: any) {
+      console.error('❌ Erro ao criar perfil do usuário:', profileError.message || profileError)
+      // Se falhar ao criar perfil, ainda tentar continuar, mas logar o erro
+      throw new Error(profileError.message || 'Erro ao criar perfil. Tente novamente.')
+    }
     
     // Incrementar rate limit após sucesso
     try {

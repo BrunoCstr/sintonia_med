@@ -300,13 +300,14 @@ export default function GeneratorPage() {
         const allSistemaNames = areas.map((area: MedicalArea) => area.nome)
         setSelectedSistemas(allSistemaNames)
         
-        // Carregar matérias (submatérias) para cada sistema via API pública
+        // Carregar matérias (submatérias) para cada sistema via API pública em paralelo
         const materiasMap: Record<string, any[]> = {}
         const todasMaterias: string[] = []
         
-        console.log('📚 Carregando matérias para', areas.length, 'sistemas...')
+        console.log('📚 Carregando matérias para', areas.length, 'sistemas em paralelo...')
         
-        for (const sistema of areas) {
+        // Criar todas as promessas de requisição em paralelo
+        const materiasPromises = areas.map(async (sistema) => {
           try {
             const materiasResponse = await fetch(`/api/materias?sistemaId=${sistema.id}`, {
               credentials: 'include',
@@ -315,26 +316,50 @@ export default function GeneratorPage() {
             if (materiasResponse.ok) {
               const materiasData = await materiasResponse.json()
               const sistemaMaterias = materiasData.materias || []
-              materiasMap[sistema.id] = sistemaMaterias
               
               console.log(`  ✓ Sistema "${sistema.nome}" (${sistema.id}): ${sistemaMaterias.length} matérias`)
               
-              // Coletar todas as matérias para marcar por padrão
-              sistemaMaterias.forEach((m: any) => {
-                if (!todasMaterias.includes(m.nome)) {
-                  todasMaterias.push(m.nome)
-                }
-              })
+              return {
+                sistemaId: sistema.id,
+                sistemaNome: sistema.nome,
+                materias: sistemaMaterias,
+                error: null,
+              }
             } else {
               const errorText = await materiasResponse.text()
               console.warn(`  ✗ Sistema "${sistema.nome}" (${sistema.id}): Erro ${materiasResponse.status} - ${errorText}`)
-              materiasMap[sistema.id] = []
+              return {
+                sistemaId: sistema.id,
+                sistemaNome: sistema.nome,
+                materias: [],
+                error: `Erro ${materiasResponse.status}`,
+              }
             }
           } catch (error: any) {
             console.error(`  ✗ Erro ao carregar matérias do sistema "${sistema.nome}" (${sistema.id}):`, error.message)
-            materiasMap[sistema.id] = []
+            return {
+              sistemaId: sistema.id,
+              sistemaNome: sistema.nome,
+              materias: [],
+              error: error.message,
+            }
           }
-        }
+        })
+        
+        // Aguardar todas as requisições em paralelo
+        const materiasResults = await Promise.all(materiasPromises)
+        
+        // Processar resultados
+        materiasResults.forEach((result) => {
+          materiasMap[result.sistemaId] = result.materias
+          
+          // Coletar todas as matérias para marcar por padrão
+          result.materias.forEach((m: any) => {
+            if (!todasMaterias.includes(m.nome)) {
+              todasMaterias.push(m.nome)
+            }
+          })
+        })
         
         setMaterias(materiasMap)
         // Marcar todas as matérias por padrão

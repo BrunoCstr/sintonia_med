@@ -9,7 +9,7 @@ import { getUserWithClaims, verifyAdmin } from '@/lib/firebase-admin'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { uid: string } }
+  { params }: { params: Promise<{ uid: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url)
@@ -31,7 +31,7 @@ export async function GET(
       )
     }
 
-    const { uid } = params
+    const { uid } = await params
     const user = await getUserWithClaims(uid)
 
     return NextResponse.json({ success: true, user })

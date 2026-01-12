@@ -18,6 +18,7 @@ import { usePremium } from '@/lib/hooks/use-premium'
 import { auth } from '@/lib/firebase'
 import { formatPrice } from '@/lib/utils'
 import { PaymentBrick, PaymentErrorInfo } from '@/components/payment-brick'
+import { toast } from 'sonner'
 
 interface Plan {
   id: string
@@ -141,11 +142,20 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
       const data = await response.json()
 
       if (data.valid) {
+        const discount = data.discount / 100 // Converter de percentual para decimal
         setAppliedCoupon({ 
           code: data.code, 
-          discount: data.discount / 100, // Converter de percentual para decimal
+          discount,
           applicablePlans: data.applicablePlans || null, // Planos aplicáveis do cupom
         })
+        
+        // Se for cupom de 100%, mostrar mensagem especial
+        if (discount === 1 || data.discount === 100) {
+          toast.success('Cupom cortesia de 100% ativado com sucesso!', {
+            description: 'Por favor, recarregue a página e cheque seu perfil para conferir a ativação do plano.',
+            duration: 8000,
+          })
+        }
       } else {
         alert(data.error || 'Cupom inválido')
         setAppliedCoupon(null)
@@ -254,6 +264,24 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
       }
 
       const data = await response.json()
+      
+      // Se foi acesso gratuito (cupom 100%), mostrar mensagem e não abrir checkout
+      if (data.freeAccess || data.amount <= 0 || !data.preferenceId) {
+        setSelectedPlan(null)
+        
+        // Mostrar mensagem de sucesso
+        toast.success('Cupom cortesia de 100% ativado com sucesso!', {
+          description: 'Por favor, recarregue a página e cheque seu perfil para conferir a ativação do plano.',
+          duration: 8000,
+        })
+        
+        // Fechar o dialog e recarregar a página após um delay
+        setTimeout(() => {
+          onOpenChange(false)
+          window.location.reload()
+        }, 2000)
+        return
+      }
       
       // Abrir checkout dentro do dialog
       setCheckoutData({

@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { toast } from 'sonner'
 
 interface Plan {
   id: string
@@ -140,11 +141,20 @@ export default function PlansPage() {
       const data = await response.json()
 
       if (data.valid) {
+        const discount = data.discount / 100 // Converter de percentual para decimal
         setAppliedCoupon({ 
           code: data.code, 
-          discount: data.discount / 100, // Converter de percentual para decimal
+          discount,
           applicablePlans: data.applicablePlans || null, // Planos aplicáveis do cupom
         })
+        
+        // Se for cupom de 100%, mostrar mensagem especial
+        if (discount === 1 || data.discount === 100) {
+          toast.success('Cupom cortesia de 100% ativado com sucesso!', {
+            description: 'Por favor, recarregue a página e cheque seu perfil para conferir a ativação do plano.',
+            duration: 8000,
+          })
+        }
       } else {
         alert(data.error || 'Cupom inválido')
         setAppliedCoupon(null)
@@ -226,9 +236,20 @@ export default function PlansPage() {
       if (data.freeAccess || data.amount <= 0 || !data.preferenceId) {
         // Resetar estado do botão antes de redirecionar
         setSelectedPlan(null)
+        
+        // Mostrar mensagem de sucesso
+        toast.success('Cupom cortesia de 100% ativado com sucesso!', {
+          description: 'Por favor, recarregue a página e cheque seu perfil para conferir a ativação do plano.',
+          duration: 8000,
+        })
+        
         // Atualizar o perfil do usuário para refletir o novo plano
         await refreshUserProfile()
-        router.push('/payment/success?status=approved&free_access=true')
+        
+        // Aguardar um pouco para o usuário ver a mensagem antes de redirecionar
+        setTimeout(() => {
+          router.push('/payment/success?status=approved&free_access=true')
+        }, 2000)
         return
       }
       

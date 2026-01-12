@@ -3,6 +3,7 @@ import { Geist, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/lib/auth-context'
 import { ThemeProvider } from '@/lib/theme-provider'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 const geist = Geist({ subsets: ['latin'] })
@@ -62,6 +63,7 @@ export default function RootLayout({
             {children}
           </ThemeProvider>
         </AuthProvider>
+        <Toaster />
         <Analytics />
       </body>
     </html>

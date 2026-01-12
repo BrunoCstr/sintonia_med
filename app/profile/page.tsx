@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { toast } from 'sonner'
 
 const periods = [
   '1º Período',
@@ -293,11 +294,20 @@ export default function ProfilePage() {
       const data = await response.json()
 
       if (data.valid) {
+        const discount = data.discount / 100 // Converter de percentual para decimal
         setAppliedCoupon({
           code: data.code,
-          discount: data.discount / 100, // Converter de percentual para decimal
+          discount,
           applicablePlans: data.applicablePlans || null, // Planos aplicáveis do cupom
         })
+        
+        // Se for cupom de 100%, mostrar mensagem especial
+        if (discount === 1 || data.discount === 100) {
+          toast.success('Cupom cortesia de 100% ativado com sucesso!', {
+            description: 'Por favor, recarregue a página e cheque seu perfil para conferir a ativação do plano.',
+            duration: 8000,
+          })
+        }
       } else {
         alert(data.error || 'Cupom inválido')
         setAppliedCoupon(null)
@@ -374,6 +384,28 @@ export default function ProfilePage() {
       }
 
       const data = await response.json()
+
+      // Se foi acesso gratuito (cupom 100%), mostrar mensagem e não abrir checkout
+      if (data.freeAccess || data.amount <= 0 || !data.preferenceId) {
+        setSelectedPlan(null)
+        
+        // Mostrar mensagem de sucesso
+        toast.success('Cupom cortesia de 100% ativado com sucesso!', {
+          description: 'Por favor, recarregue a página e cheque seu perfil para conferir a ativação do plano.',
+          duration: 8000,
+        })
+        
+        // Atualizar o perfil do usuário
+        if (refreshUserProfile) {
+          await refreshUserProfile()
+        }
+        
+        // Recarregar a página após um delay para o usuário ver a mensagem
+        setTimeout(() => {
+          window.location.reload()
+        }, 2000)
+        return
+      }
 
       // Abrir checkout transparente
       setCheckoutData({

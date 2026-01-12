@@ -109,7 +109,7 @@ export function NoticePopup() {
     }
   }
 
-  const handleClose = () => {
+  const markAsSeen = () => {
     if (notice) {
       // Se marcou para não mostrar mais, salvar permanentemente
       if (dontShowAgain) {
@@ -123,6 +123,10 @@ export function NoticePopup() {
       sessionNotices[notice.id] = true
       setSessionNotices(sessionNotices)
     }
+  }
+
+  const handleClose = () => {
+    markAsSeen()
     setOpen(false)
   }
 
@@ -132,7 +136,18 @@ export function NoticePopup() {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog 
+        open={open} 
+        onOpenChange={(newOpen) => {
+          if (!newOpen) {
+            // Quando o dialog é fechado (seja pelo X ou de outra forma), marcar como visto
+            markAsSeen()
+            setOpen(false)
+          } else {
+            setOpen(newOpen)
+          }
+        }}
+      >
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

@@ -259,8 +259,8 @@ export default function ResultsPage() {
                 <Collapsible open={isExpanded} onOpenChange={() => toggleQuestion(question.id)}>
                   <CollapsibleTrigger asChild>
                     <CardHeader className="w-full max-w-full overflow-hidden">
-                      <div className="flex items-start justify-between gap-4 w-full max-w-full">
-                        <div className="flex items-start gap-3 flex-1 min-w-0 w-full max-w-full overflow-hidden">
+                      <div className="flex items-center justify-between gap-4 w-full max-w-full">
+                        <div className="flex items-center gap-3 flex-1 min-w-0 w-full max-w-full overflow-hidden">
                           <div
                             className={cn(
                               'flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-semibold',
@@ -271,24 +271,11 @@ export default function ResultsPage() {
                           >
                             {index + 1}
                           </div>
-                          <div className="flex-1 min-w-0 w-full max-w-full overflow-hidden">
-                            <div
-                              className="prose prose-sm max-w-none break-words text-base leading-relaxed w-full max-w-full overflow-wrap-anywhere"
-                              style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                              dangerouslySetInnerHTML={{ __html: question.text }}
-                            />
-                            {/* Image if exists */}
-                            {(question as any).imagemUrl && (
-                              <div className="relative mt-3 h-48 w-full overflow-hidden rounded-lg border">
-                                <Image
-                                  src={(question as any).imagemUrl}
-                                  alt="Questão"
-                                  fill
-                                  className="object-contain"
-                                />
-                              </div>
-                            )}
-                            <div className="mt-2 flex flex-wrap gap-2">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <span className="text-base font-medium">
+                              Questão {(index + 1).toString().padStart(2, '0')}
+                            </span>
+                            <div className="flex flex-wrap gap-2">
                               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                                 {question.subject}
                               </span>
@@ -355,6 +342,25 @@ export default function ResultsPage() {
                         style={{ overflow: 'hidden' }}
                       >
                         <CardContent className="space-y-4 pt-0">
+                      {/* Question Text */}
+                      <div className="space-y-3">
+                        <div
+                          className="prose prose-sm max-w-none break-words text-base leading-relaxed w-full max-w-full overflow-wrap-anywhere"
+                          style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                          dangerouslySetInnerHTML={{ __html: question.text }}
+                        />
+                        {/* Image if exists */}
+                        {(question as any).imagemUrl && (
+                          <div className="relative mt-3 h-48 w-full overflow-hidden rounded-lg border">
+                            <Image
+                              src={(question as any).imagemUrl}
+                              alt="Questão"
+                              fill
+                              className="object-contain"
+                            />
+                          </div>
+                        )}
+                      </div>
                       {/* Alternatives */}
                       <div className="space-y-2">
                         {question.alternatives.map((alt, altIndex) => {

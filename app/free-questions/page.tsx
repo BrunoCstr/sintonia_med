@@ -98,7 +98,11 @@ export default function FreeQuestionsPage() {
   const handleSistemaToggle = (sistemaId: string) => {
     setSelectedSistemas((prev) => {
       if (sistemaId === 'TODOS') {
-        // Se clicar em TODOS, marcar apenas TODOS
+        // Se clicar em TODOS e já estiver selecionado, desmarcar
+        if (prev.includes('TODOS')) {
+          return []
+        }
+        // Se clicar em TODOS e não estiver selecionado, marcar apenas TODOS
         return ['TODOS']
       } else {
         // Se clicar em um sistema específico, remover TODOS e adicionar/remover o sistema

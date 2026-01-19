@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useLayoutEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -77,6 +77,10 @@ function convertQuestionToQuiz(question: QuestionDB, period: string): QuizQuesti
 export default function QuizPage() {
   const { user } = useAuth()
   const { isPremium } = usePremium()
+  const isSafari =
+    typeof navigator !== 'undefined' &&
+    /safari/i.test(navigator.userAgent) &&
+    !/chrome|crios|android/i.test(navigator.userAgent)
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [loading, setLoading] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -88,6 +92,26 @@ export default function QuizPage() {
   const [allowNegativeTime, setAllowNegativeTime] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const router = useRouter()
+  const pendingScrollRestoreRef = useRef<number | null>(null)
+
+  const markScrollRestore = useCallback(() => {
+    if (!isSafari || typeof window === 'undefined') return
+    const currentScroll = window.scrollY
+    if (currentScroll > 0) {
+      pendingScrollRestoreRef.current = currentScroll
+    }
+  }, [isSafari])
+
+  useLayoutEffect(() => {
+    if (!isSafari || pendingScrollRestoreRef.current === null) return
+    const target = pendingScrollRestoreRef.current
+    pendingScrollRestoreRef.current = null
+    if (typeof window === 'undefined') return
+    const currentScroll = window.scrollY
+    if (target > 0 && currentScroll < Math.min(64, target)) {
+      window.scrollTo({ top: target })
+    }
+  }, [isSafari, currentIndex, answers, timeLeft])
 
   useEffect(() => {
     const loadQuestions = async () => {
@@ -157,9 +181,16 @@ export default function QuizPage() {
     loadQuestions()
   }, [router])
 
-  const handleAnswer = (questionId: string, answerIndex: number) => {
+  const handleAnswer = useCallback((questionId: string, answerIndex: number) => {
+    markScrollRestore()
+    // Safari às vezes “puxa” o scroll para o topo por causa de foco em elemento clicável.
+    // Remover o foco antes de atualizar o estado evita o scroll jumping.
+    if (isSafari) {
+      const active = document.activeElement
+      if (active && active instanceof HTMLElement) active.blur()
+    }
     setAnswers((prev) => ({ ...prev, [questionId]: answerIndex }))
-  }
+  }, [isSafari, markScrollRestore])
 
   const handleFinish = useCallback(async () => {
     // Prevenir múltiplas chamadas simultâneas
@@ -305,6 +336,7 @@ export default function QuizPage() {
     if (showTimeUpDialog) return
 
     const timer = setInterval(() => {
+      markScrollRestore()
       setTimeLeft((prev) => {
         if (prev === null) return null
         
@@ -329,7 +361,7 @@ export default function QuizPage() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [timeLeft, allowNegativeTime, showTimeUpDialog])
+  }, [timeLeft, allowNegativeTime, showTimeUpDialog, markScrollRestore])
 
   const formatTime = (seconds: number) => {
     const isNegative = seconds < 0
@@ -390,23 +422,27 @@ export default function QuizPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 py-8">
-      <div className="container mx-auto max-w-4xl px-4 w-full overflow-hidden">
+      {/* Cronômetro Flutuante - Fixed para acompanhar o scroll */}
+      {timeLeft !== null && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+          <div className={cn(
+            "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium shadow-lg border backdrop-blur-sm",
+            timeLeft < 0 ? "bg-destructive/90 text-destructive-foreground border-destructive" : 
+            timeLeft < 60 ? "bg-destructive/80 text-destructive-foreground border-destructive/50" : "bg-background/95 border-border"
+          )}>
+            <Clock className="h-4 w-4" />
+            {formatTime(timeLeft)}
+          </div>
+        </div>
+      )}
+
+      <div className="container mx-auto max-w-4xl px-4 w-full">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold">
               Questão {currentIndex + 1} de {questions.length}
             </h1>
-            {timeLeft !== null && (
-              <div className={cn(
-                "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
-                timeLeft < 0 ? "bg-destructive/20 text-destructive" : 
-                timeLeft < 60 ? "bg-destructive/10 text-destructive" : "bg-muted"
-              )}>
-                <Clock className="h-4 w-4" />
-                {formatTime(timeLeft)}
-              </div>
-            )}
           </div>
           <Button variant="outline" onClick={() => setShowFinishDialog(true)} className="cursor-pointer">
             <Flag className="mr-2 h-4 w-4" />
@@ -464,11 +500,24 @@ export default function QuizPage() {
               const letter = String.fromCharCode(65 + index) // A, B, C, D, E
 
               return (
-                <button
+                <div
                   key={index}
+                  role="button"
+                  tabIndex={isSafari ? undefined : 0}
+                  onMouseDown={isSafari ? (e) => e.preventDefault() : undefined}
                   onClick={() => handleAnswer(currentQuestion.id, index)}
+                  onKeyDown={
+                    isSafari
+                      ? undefined
+                      : (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handleAnswer(currentQuestion.id, index)
+                          }
+                        }
+                  }
                   className={cn(
-                    'w-full max-w-full cursor-pointer rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50 overflow-hidden',
+                    'w-full max-w-full cursor-pointer rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50 overflow-hidden select-none',
                     isSelected
                       ? 'border-primary bg-primary/5'
                       : 'border-border bg-card hover:bg-accent'
@@ -492,7 +541,7 @@ export default function QuizPage() {
                       {alt}
                     </span>
                   </div>
-                </button>
+                </div>
               )
             })}
           </CardContent>

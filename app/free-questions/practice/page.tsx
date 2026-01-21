@@ -579,7 +579,7 @@ export default function FreeQuestionsPracticePage() {
                       ? borderColor
                       : isSelected
                       ? 'border-primary bg-primary/5 hover:border-primary/70 cursor-pointer'
-                      : 'border-border bg-card hover:bg-accent hover:border-primary/50 cursor-pointer'
+                      : 'border-border bg-card hover:bg-accent hover:border-primary/50 hover:text-white cursor-pointer'
                   )}
                 >
                   <div className="flex items-start gap-3 w-full max-w-full">

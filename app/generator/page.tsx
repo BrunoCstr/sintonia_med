@@ -292,8 +292,6 @@ export default function GeneratorPage() {
         const data = await response.json()
         const areas = data.areas || []
         
-        console.log('✅ Sistemas carregados:', areas.length)
-        console.log('Sistemas:', areas.map((a: MedicalArea) => ({ id: a.id, nome: a.nome })))
         setSistemas(areas)
         
         // Marcar todos os sistemas por padrão
@@ -303,8 +301,6 @@ export default function GeneratorPage() {
         // Carregar matérias (submatérias) para cada sistema via API pública em paralelo
         const materiasMap: Record<string, any[]> = {}
         const todasMaterias: string[] = []
-        
-        console.log('📚 Carregando matérias para', areas.length, 'sistemas em paralelo...')
         
         // Criar todas as promessas de requisição em paralelo
         const materiasPromises = areas.map(async (sistema) => {
@@ -316,8 +312,6 @@ export default function GeneratorPage() {
             if (materiasResponse.ok) {
               const materiasData = await materiasResponse.json()
               const sistemaMaterias = materiasData.materias || []
-              
-              console.log(`  ✓ Sistema "${sistema.nome}" (${sistema.id}): ${sistemaMaterias.length} matérias`)
               
               return {
                 sistemaId: sistema.id,
@@ -364,14 +358,6 @@ export default function GeneratorPage() {
         setMaterias(materiasMap)
         // Marcar todas as matérias por padrão
         setSelectedMaterias(todasMaterias)
-        
-        console.log('✅ Matérias carregadas:', Object.keys(materiasMap).length, 'sistemas com matérias')
-        console.log('✅ Total de matérias únicas:', todasMaterias.length)
-        console.log('✅ Matérias por sistema:', Object.entries(materiasMap).map(([id, mats]) => ({
-          sistemaId: id,
-          sistemaNome: areas.find((a: MedicalArea) => a.id === id)?.nome,
-          materias: mats.length
-        })))
       } catch (error) {
         console.error('Erro ao carregar sistemas:', error)
       } finally {

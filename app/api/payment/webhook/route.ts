@@ -169,11 +169,8 @@ export async function POST(request: NextRequest) {
             }
           }
         }
-
-        console.log(`Assinatura ativada para usuário ${userId}, plano ${planId}`)
       } else if (paymentStatus === 'rejected' || paymentStatus === 'cancelled') {
         // Atualizar status do pagamento como rejeitado/cancelado
-        console.log(`Pagamento ${paymentStatus} para usuário ${userId}`)
       }
 
       return NextResponse.json({ received: true })

@@ -84,8 +84,6 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       })
 
-      console.log(`[Expired Plan] Plano expirado removido para usuário ${authUser.uid}`)
-
       return NextResponse.json({
         expired: true,
         plan: null,

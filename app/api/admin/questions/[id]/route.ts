@@ -176,13 +176,11 @@ export async function PUT(
                 const [exists] = await fileRef.exists()
                 if (exists) {
                   await fileRef.delete()
-                  console.log(`✅ Imagem deletada do Storage (formato antigo): ${fileName}`)
                   deleted = true
                 }
               }
             } catch (urlError) {
               // Se não conseguir parsear a URL, continuar para tentar o formato novo
-              console.log('Tentando deletar usando formato novo baseado no ID')
             }
 
             // Se não deletou com o formato antigo, tentar o formato novo baseado no ID
@@ -197,7 +195,6 @@ export async function PUT(
                   const [exists] = await fileRef.exists()
                   if (exists) {
                     await fileRef.delete()
-                    console.log(`✅ Imagem deletada do Storage (formato novo): ${filePath}`)
                     deleted = true
                     break
                   }
@@ -206,12 +203,6 @@ export async function PUT(
                 }
               }
             }
-            
-            if (!deleted) {
-              console.log(`⚠️ Arquivo não encontrado no Storage para questão ${id}`)
-            }
-          } else {
-            console.log('⚠️ Bucket name não configurado, pulando deleção de imagem')
           }
         } catch (deleteError: any) {
           // Log do erro mas não falha a atualização da questão
@@ -441,12 +432,11 @@ export async function DELETE(
                 const [exists] = await fileRef.exists()
                 if (exists) {
                   await fileRef.delete()
-                  console.log(`✅ Imagem deletada do Storage (formato antigo): ${fileName}`)
                   deleted = true
                 }
               }
             } catch (urlError) {
-              console.log('Tentando deletar usando formato novo baseado no ID')
+              // Se não conseguir parsear a URL, continuar para tentar o formato novo
             }
           }
 
@@ -462,7 +452,6 @@ export async function DELETE(
                 const [exists] = await fileRef.exists()
                 if (exists) {
                   await fileRef.delete()
-                  console.log(`✅ Imagem deletada do Storage (formato novo): ${filePath}`)
                   deleted = true
                   break
                 }
@@ -471,12 +460,6 @@ export async function DELETE(
               }
             }
           }
-          
-          if (!deleted) {
-            console.log(`⚠️ Arquivo não encontrado no Storage para questão ${id}`)
-          }
-        } else {
-          console.log('⚠️ Bucket name não configurado, pulando deleção de imagem')
         }
       } catch (deleteError: any) {
         // Log do erro mas não falha a exclusão da questão

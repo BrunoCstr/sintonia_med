@@ -8,9 +8,11 @@ import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import type { Question as QuestionDB } from '@/lib/types'
 import { useAuth } from '@/lib/auth-context'
+import { usePremium } from '@/lib/hooks/use-premium'
 import { DashboardLayout } from '@/components/dashboard-layout'
-import { Star, ChevronRight, Scissors, Loader2, AlertCircle } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Star, ChevronRight, Scissors, Loader2, AlertCircle, Crown, Lock, RotateCcw } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import Link from 'next/link'
 
 // Interface para questões no formato do quiz
 interface QuizQuestion {
@@ -63,6 +65,7 @@ function convertQuestionToQuiz(question: QuestionDB, period: string): QuizQuesti
 
 export default function FreeQuestionsPracticePage() {
   const { user } = useAuth()
+  const { isPremium } = usePremium()
   const router = useRouter()
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(null)
   const [loading, setLoading] = useState(true)
@@ -75,6 +78,99 @@ export default function FreeQuestionsPracticePage() {
   const [scissorsUsed, setScissorsUsed] = useState(false)
   const [filters, setFilters] = useState<{ period: string; sistemas: string[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [noMoreQuestions, setNoMoreQuestions] = useState(false)
+  const [limitReached, setLimitReached] = useState(false)
+  const [remainingQuestions, setRemainingQuestions] = useState<number | null>(null)
+  const [validatingLimit, setValidatingLimit] = useState(false)
+
+  const loadQuestion = useCallback(async (filtersToUse: { period: string; sistemas: string[] }, isInitialLoad = false) => {
+    try {
+      setLoading(true)
+      setError(null)
+      setNoMoreQuestions(false)
+      setSelectedAnswer(null)
+      setShowAnswer(false)
+      setDisabledAlternatives(new Set())
+      setScissorsUsed(false)
+      setIsFavorited(false)
+      setFavoriteId(null)
+      setLimitReached(false)
+
+      // Construir query string para a API
+      const params = new URLSearchParams()
+      if (filtersToUse.sistemas && filtersToUse.sistemas.length > 0) {
+        params.append('areas', filtersToUse.sistemas.join(','))
+      }
+      if (filtersToUse.period) {
+        params.append('period', filtersToUse.period)
+      }
+      params.append('limit', '1')
+      // Por padrão, a API já exclui as questões respondidas.
+      // Mantemos explícito aqui para evitar repetição quando o usuário esgota o filtro.
+      params.append('excludeAnswered', 'true')
+
+      // Fazer requisições em paralelo: questão + verificação de limites (se necessário)
+      const questionPromise = fetch(`/api/questions?${params.toString()}`)
+      const limitsPromise = (!isPremium && !isInitialLoad) 
+        ? fetch('/api/user/check-free-limits', { credentials: 'include' })
+        : Promise.resolve(null)
+
+      const [questionResponse, limitsResponse] = await Promise.all([questionPromise, limitsPromise])
+
+      // Verificar limites (se aplicável)
+      if (limitsResponse && limitsResponse.ok) {
+        const limitsData = await limitsResponse.json()
+        setRemainingQuestions(limitsData.remainingQuestions)
+        
+        if (!limitsData.canGenerate || limitsData.remainingQuestions === 0) {
+          setLimitReached(true)
+          setLoading(false)
+          return
+        }
+      }
+
+      // Processar questão
+      if (!questionResponse.ok) {
+        throw new Error('Erro ao buscar questão')
+      }
+
+      const data = await questionResponse.json()
+      const questions = data.questions || []
+
+      if (questions.length === 0) {
+        // Importante: limpar a questão atual para não “repetir” a última na UI.
+        setCurrentQuestion(null)
+        setNoMoreQuestions(true)
+        setLoading(false)
+        return
+      }
+
+      const quizQuestion = convertQuestionToQuiz(questions[0], filtersToUse.period || '')
+      
+      // Mostrar questão imediatamente (não bloquear para verificar favorito)
+      setCurrentQuestion(quizQuestion)
+      setLoading(false)
+
+      // Verificar favorito em background (não bloqueia a UI)
+      if (user) {
+        fetch(`/api/user/favorites/check/${quizQuestion.id}`, {
+          credentials: 'include',
+        })
+          .then((res) => res.ok ? res.json() : null)
+          .then((favoriteData) => {
+            if (favoriteData) {
+              setIsFavorited(favoriteData.isFavorited)
+              setFavoriteId(favoriteData.favoriteId)
+            }
+          })
+          .catch(() => {}) // Ignorar erros de favorito
+      }
+    } catch (error) {
+      console.error('Erro ao carregar questão:', error)
+      setError('Erro ao carregar questão. Tente novamente.')
+      setLoading(false)
+    }
+  }, [user, isPremium])
 
   useEffect(() => {
     // Carregar filtros do localStorage
@@ -86,67 +182,9 @@ export default function FreeQuestionsPracticePage() {
 
     const savedFilters = JSON.parse(filtersStr)
     setFilters(savedFilters)
-    loadQuestion(savedFilters)
+    loadQuestion(savedFilters, true) // true = isInitialLoad (já foi validado na página anterior)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
-
-  const loadQuestion = useCallback(async (filtersToUse: { period: string; sistemas: string[] }) => {
-    try {
-      setLoading(true)
-      setError(null)
-      setSelectedAnswer(null)
-      setShowAnswer(false)
-      setDisabledAlternatives(new Set())
-      setScissorsUsed(false)
-      setIsFavorited(false)
-      setFavoriteId(null)
-
-      // Construir query string para a API
-      const params = new URLSearchParams()
-      if (filtersToUse.sistemas && filtersToUse.sistemas.length > 0) {
-        params.append('areas', filtersToUse.sistemas.join(','))
-      }
-      if (filtersToUse.period) {
-        params.append('period', filtersToUse.period)
-      }
-      params.append('limit', '1')
-      params.append('excludeAnswered', 'false') // Não excluir questões já respondidas para questões livres
-
-      const response = await fetch(`/api/questions?${params.toString()}`)
-      if (!response.ok) {
-        throw new Error('Erro ao buscar questão')
-      }
-
-      const data = await response.json()
-      const questions = data.questions || []
-
-      if (questions.length === 0) {
-        setError('Nenhuma questão encontrada com os filtros selecionados.')
-        setLoading(false)
-        return
-      }
-
-      const quizQuestion = convertQuestionToQuiz(questions[0], filtersToUse.period || '')
-      setCurrentQuestion(quizQuestion)
-
-      // Verificar se está favoritada
-      if (user) {
-        const favoriteResponse = await fetch(`/api/user/favorites/check/${quizQuestion.id}`, {
-          credentials: 'include',
-        })
-        if (favoriteResponse.ok) {
-          const favoriteData = await favoriteResponse.json()
-          setIsFavorited(favoriteData.isFavorited)
-          setFavoriteId(favoriteData.favoriteId)
-        }
-      }
-
-      setLoading(false)
-    } catch (error) {
-      console.error('Erro ao carregar questão:', error)
-      setError('Erro ao carregar questão. Tente novamente.')
-      setLoading(false)
-    }
-  }, [user])
 
   const handleAnswer = (answerIndex: number) => {
     if (showAnswer) return // Não permitir mudar resposta após mostrar gabarito
@@ -154,7 +192,37 @@ export default function FreeQuestionsPracticePage() {
   }
 
   const handleRespond = async () => {
-    if (selectedAnswer === null || !currentQuestion) return
+    if (selectedAnswer === null || !currentQuestion || validatingLimit) return
+
+    // VALIDAÇÃO CRÍTICA: Verificar limites ANTES de permitir responder (para usuários Free)
+    if (!isPremium) {
+      setValidatingLimit(true)
+      try {
+        const validationResponse = await fetch('/api/user/validate-question-generation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ questionCount: 1 }),
+        })
+
+        if (!validationResponse.ok) {
+          // Limite atingido - não permitir responder
+          setLimitReached(true)
+          setValidatingLimit(false)
+          return
+        }
+      } catch (error) {
+        console.error('Erro ao validar limite:', error)
+        // Em caso de erro, bloquear por segurança
+        setLimitReached(true)
+        setValidatingLimit(false)
+        return
+      }
+      setValidatingLimit(false)
+    }
+
     setShowAnswer(true)
 
     // Salvar no histórico e resultado se o usuário estiver logado
@@ -201,8 +269,6 @@ export default function FreeQuestionsPracticePage() {
         if (!resultsResponse.ok) {
           const errorData = await resultsResponse.json()
           console.error('Erro ao salvar resultado:', errorData)
-        } else {
-          console.log('Resultado salvo com sucesso para métricas do dashboard')
         }
       } catch (error) {
         console.error('Erro ao salvar resultado:', error)
@@ -297,6 +363,71 @@ export default function FreeQuestionsPracticePage() {
       <DashboardLayout>
         <div className="flex min-h-[60vh] items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (limitReached) {
+    return (
+      <DashboardLayout>
+        <div className="container mx-auto max-w-4xl">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Limite diário atingido</AlertTitle>
+            <AlertDescription>
+              Você atingiu o limite diário de questões do plano Free.
+              <br />
+              <Link href="/plans" className="mt-2 inline-flex items-center gap-1 text-sm font-medium underline">
+                <Crown className="h-3 w-3" />
+                Assine um plano premium para praticar questões ilimitadas
+              </Link>
+            </AlertDescription>
+          </Alert>
+          <div className="mt-4">
+            <Button onClick={() => router.push('/free-questions')} variant="outline">
+              Voltar para Configuração
+            </Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (noMoreQuestions) {
+    const periodLabel = filters?.period ? `Período: ${filters.period}` : 'Período: Todos'
+    const sistemasLabel =
+      filters?.sistemas && filters.sistemas.length > 0
+        ? `Sistemas: ${filters.sistemas.join(', ')}`
+        : 'Sistemas: Todos'
+
+    return (
+      <DashboardLayout>
+        <div className="container mx-auto max-w-4xl">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Não há mais questões disponíveis</AlertTitle>
+            <AlertDescription>
+              Você esgotou as questões para os filtros selecionados.
+              <br />
+              <span className="font-medium">{periodLabel}</span>
+              <br />
+              <span className="font-medium">{sistemasLabel}</span>
+              <br />
+              <br />
+              Tente ajustar os filtros ou resete o histórico de questões respondidas.
+              <br />
+              <Link href="/settings" className="mt-2 inline-flex items-center gap-1 text-sm font-medium underline">
+                <RotateCcw className="h-3 w-3" />
+                Ir para Configurações
+              </Link>
+            </AlertDescription>
+          </Alert>
+          <div className="mt-4">
+            <Button onClick={() => router.push('/free-questions')} variant="outline">
+              Voltar para Configuração
+            </Button>
+          </div>
         </div>
       </DashboardLayout>
     )
@@ -482,10 +613,22 @@ export default function FreeQuestionsPracticePage() {
         </Card>
 
         {/* Botão Responder */}
-        {!showAnswer && hasSelectedAnswer && (
+        {!showAnswer && hasSelectedAnswer && !limitReached && (
           <div className="mb-6 flex justify-center">
-            <Button onClick={handleRespond} size="lg" className="cursor-pointer">
-              Responder
+            <Button 
+              onClick={handleRespond} 
+              size="lg" 
+              className="cursor-pointer"
+              disabled={validatingLimit}
+            >
+              {validatingLimit ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verificando...
+                </>
+              ) : (
+                'Responder'
+              )}
             </Button>
           </div>
         )}
@@ -497,11 +640,42 @@ export default function FreeQuestionsPracticePage() {
               <h2 className="text-xl font-semibold">Gabarito Comentado</h2>
             </CardHeader>
             <CardContent>
-              <div
-                className="prose prose-sm max-w-none break-words"
-                style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                dangerouslySetInnerHTML={{ __html: currentQuestion.explanation }}
-              />
+              {isPremium ? (
+                <div
+                  className="prose prose-sm max-w-none break-words"
+                  style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                  dangerouslySetInnerHTML={{ __html: currentQuestion.explanation }}
+                />
+              ) : (
+                <>
+                  <div
+                    className="prose prose-sm max-w-none break-words"
+                    style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                    dangerouslySetInnerHTML={{ 
+                      __html: currentQuestion.explanation.length > 150 
+                        ? currentQuestion.explanation.substring(0, 150) + '...' 
+                        : currentQuestion.explanation 
+                    }}
+                  />
+                  {currentQuestion.explanation.length > 150 && (
+                    <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Lock className="h-4 w-4 text-primary" />
+                        <p className="text-sm font-semibold text-primary">Comentário completo exclusivo Premium</p>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Assine o plano Premium para ter acesso ao comentário completo do gabarito de todas as questões.
+                      </p>
+                      <Link href="/plans">
+                        <Button size="sm" variant="outline" className="cursor-pointer">
+                          <Crown className="mr-2 h-4 w-4" />
+                          Ver planos
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         )}

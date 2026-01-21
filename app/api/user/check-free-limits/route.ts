@@ -9,12 +9,9 @@ import * as admin from 'firebase-admin'
  */
 export async function GET(request: NextRequest) {
   try {
-    console.log('[Free Limits] Iniciando verificação de limites...')
-    
     // Verificar autenticação
     const token = request.cookies.get('firebase-token')?.value
     if (!token) {
-      console.log('[Free Limits] Token não encontrado')
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
@@ -22,10 +19,8 @@ export async function GET(request: NextRequest) {
     try {
       authUser = await verifyFirebaseToken(token)
       if (!authUser) {
-        console.log('[Free Limits] Token inválido ou expirado')
         return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
       }
-      console.log(`[Free Limits] Usuário autenticado: ${authUser.uid}`)
     } catch (authError: any) {
       console.error('[Free Limits] Erro ao verificar token:', authError)
       return NextResponse.json({ error: 'Erro ao verificar autenticação' }, { status: 401 })
@@ -35,7 +30,6 @@ export async function GET(request: NextRequest) {
     try {
       app = getAdminApp()
       db = app.firestore()
-      console.log('[Free Limits] Firebase Admin inicializado')
     } catch (firebaseError: any) {
       console.error('[Free Limits] Erro ao inicializar Firebase Admin:', firebaseError)
       return NextResponse.json(
@@ -48,7 +42,6 @@ export async function GET(request: NextRequest) {
     let userIsPremium = false
     try {
       userIsPremium = await isUserPremium(authUser.uid)
-      console.log(`[Free Limits] Usuário ${authUser.uid} é premium: ${userIsPremium}`)
     } catch (premiumError: any) {
       console.error('[Free Limits] Erro ao verificar status premium:', premiumError)
       // Se houver erro, considerar como não premium e continuar
@@ -96,7 +89,6 @@ export async function GET(request: NextRequest) {
     try {
       startTimestamp = admin.firestore.Timestamp.fromDate(startOfDay)
       endTimestamp = admin.firestore.Timestamp.fromDate(endOfDay)
-      console.log(`[Free Limits] Período: ${startOfDay.toISOString()} até ${endOfDay.toISOString()}`)
     } catch (timestampError: any) {
       console.error('[Free Limits] Erro ao criar timestamps:', timestampError)
       // Em caso de erro, usar valores padrão
@@ -108,39 +100,11 @@ export async function GET(request: NextRequest) {
     let todayResults
     let questionsGeneratedToday = 0
     try {
-      // Primeiro, buscar todos os resultados do usuário para debug
+      // Primeiro, buscar todos os resultados do usuário
       const allUserResults = await db
         .collection('results')
         .where('userId', '==', authUser.uid)
         .get()
-      
-      console.log(`[Free Limits] Total de resultados do usuário ${authUser.uid}: ${allUserResults.size}`)
-      
-      // Log dos resultados para debug
-      if (allUserResults.size > 0) {
-        allUserResults.forEach((doc) => {
-          const data = doc.data()
-          const createdAt = data.createdAt
-          let createdAtDate: Date | null = null
-          
-          try {
-            if (createdAt?.toDate && typeof createdAt.toDate === 'function') {
-              createdAtDate = createdAt.toDate()
-            } else if (createdAt?.seconds) {
-              createdAtDate = new Date(createdAt.seconds * 1000)
-            } else if (createdAt instanceof Date) {
-              createdAtDate = createdAt
-            }
-            
-            if (createdAtDate) {
-              const isToday = createdAtDate >= startOfDay && createdAtDate < endOfDay
-              console.log(`[Free Limits] Resultado ${doc.id}: createdAt=${createdAtDate.toISOString()}, questionsCount=${data.questionsCount || 0}, isToday=${isToday}`)
-            }
-          } catch (dateError) {
-            console.error(`[Free Limits] Erro ao processar data do resultado ${doc.id}:`, dateError)
-          }
-        })
-      }
       
       // Tentar buscar com query filtrada
       todayResults = await db
@@ -150,12 +114,8 @@ export async function GET(request: NextRequest) {
         .where('createdAt', '<', endTimestamp)
         .get()
 
-      console.log(`[Free Limits] Resultados encontrados pela query filtrada: ${todayResults.size}`)
-
       // Se a query filtrada não retornar resultados mas sabemos que existem, filtrar manualmente
       if (todayResults.size === 0 && allUserResults.size > 0) {
-        console.log('[Free Limits] Query filtrada não retornou resultados, filtrando manualmente...')
-        
         allUserResults.forEach((doc) => {
           try {
             const data = doc.data()
@@ -176,7 +136,6 @@ export async function GET(request: NextRequest) {
               const count = data.questionsCount || 0
               const questionCount = typeof count === 'number' ? count : parseInt(String(count)) || 0
               questionsGeneratedToday += questionCount
-              console.log(`[Free Limits] Resultado ${doc.id} adicionado manualmente: ${questionCount} questões`)
             }
           } catch (docError) {
             console.error(`[Free Limits] Erro ao processar documento ${doc.id}:`, docError)
@@ -195,8 +154,6 @@ export async function GET(request: NextRequest) {
           }
         })
       }
-      
-      console.log(`[Free Limits] User ${authUser.uid}: ${questionsGeneratedToday} questões geradas hoje de ${todayResults.size} resultado(s)`)
     } catch (queryError: any) {
       console.error('[Free Limits] Erro ao buscar resultados:', queryError)
       console.error('[Free Limits] Detalhes do erro:', {
@@ -207,7 +164,6 @@ export async function GET(request: NextRequest) {
       
       // Se houver erro na query, tentar buscar todos os resultados e filtrar manualmente
       try {
-        console.log('[Free Limits] Tentando buscar todos os resultados do usuário como fallback...')
         const allResults = await db
           .collection('results')
           .where('userId', '==', authUser.uid)
@@ -234,8 +190,6 @@ export async function GET(request: NextRequest) {
             // Ignorar documentos com erro
           }
         })
-        
-        console.log(`[Free Limits] Fallback: ${questionsGeneratedToday} questões encontradas`)
       } catch (fallbackError) {
         console.error('[Free Limits] Erro no fallback:', fallbackError)
         questionsGeneratedToday = 0
@@ -254,8 +208,6 @@ export async function GET(request: NextRequest) {
     // Calcular quando o limite será resetado (próxima meia-noite UTC)
     const resetTime = endOfDay.getTime()
     const timeUntilReset = Math.max(0, resetTime - now.getTime())
-    
-    console.log(`[Free Limits] User ${authUser.uid} - canGenerate: ${canGenerateMore}, remaining: ${remainingQuestions}, timeUntilReset: ${Math.round(timeUntilReset / 1000 / 60)} minutos`)
 
     return NextResponse.json({
       isPremium: false,

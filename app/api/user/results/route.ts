@@ -100,16 +100,6 @@ export async function POST(request: NextRequest) {
 
     // Extrair áreas/matérias únicas
     const subjects = Array.from(new Set(processedQuestions.map((q: any) => q.subject || q.area).filter(Boolean)))
-    
-    console.log('Salvando resultado:', {
-      userId: authUser.uid,
-      questionsCount: processedQuestions.length,
-      correctCount,
-      incorrectCount,
-      percentage,
-      subjects,
-      isPremium: userIsPremium,
-    })
 
     // Validar e normalizar timeSpent
     let normalizedTimeSpent: number | null = null
@@ -143,8 +133,6 @@ export async function POST(request: NextRequest) {
     })
 
     const docRef = await db.collection('results').add(resultData)
-    
-    console.log('Resultado salvo com sucesso:', docRef.id)
 
     // Garantir que createdAt e updatedAt sejam objetos Date válidos
     let createdAtDate: Date

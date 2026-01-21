@@ -119,15 +119,6 @@ export async function POST(request: NextRequest) {
         step: 30,
         digits: 6,
       })
-      
-      // Gerar um código de teste para verificar se está funcionando
-      const testCode = authenticator.generate(newSecret, { step: 30 })
-      console.log('Generated secret and test code:', {
-        secretLength: newSecret.length,
-        secretPrefix: newSecret.substring(0, 8),
-        testCode,
-        otpAuthUrl,
-      })
 
       // Salvar secret temporariamente (não ativado ainda)
       if (userDoc.exists) {
@@ -175,12 +166,6 @@ export async function POST(request: NextRequest) {
 
       // Verificar se o secret do request corresponde ao do banco
       if (storedSecret !== secret) {
-        console.log('Secret mismatch:', {
-          requestSecret: secret.substring(0, 8) + '...',
-          storedSecret: storedSecret.substring(0, 8) + '...',
-          requestLength: secret.length,
-          storedLength: storedSecret.length,
-        })
         return NextResponse.json(
           { error: 'Secret inválido. Gere um novo secret.' },
           { status: 400 }
@@ -208,27 +193,6 @@ export async function POST(request: NextRequest) {
       })
 
       if (!isValid) {
-        // Tentar verificar com window ainda maior como fallback (para debug)
-        const isValidWithLargerWindow = authenticator.check(normalizedCode, storedSecret, { 
-          window: 5,
-          step: 30,
-        })
-        
-        // Gerar código atual para debug
-        const currentCode = authenticator.generate(storedSecret, { step: 30 })
-        
-        console.log('2FA Verification Debug:', {
-          codeLength: normalizedCode.length,
-          codeFormat: /^\d{6}$/.test(normalizedCode),
-          secretLength: storedSecret.length,
-          secretPrefix: storedSecret.substring(0, 8),
-          providedCode: normalizedCode,
-          currentGeneratedCode: currentCode,
-          isValid,
-          isValidWithLargerWindow,
-          timestamp: new Date().toISOString(),
-        })
-
         return NextResponse.json(
           { 
             error: 'Código inválido. Verifique e tente novamente.',

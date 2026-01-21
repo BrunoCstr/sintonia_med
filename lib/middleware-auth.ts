@@ -55,7 +55,6 @@ export async function syncRoleWithFirestore(uid: string, claimRole: UserRole): P
           role: claimRole,
           roleUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         })
-        console.log(`✅ Role sincronizada: ${uid} - Firestore: ${firestoreRole} → Claims: ${claimRole}`)
       }
     }
   } catch (error) {

@@ -100,11 +100,6 @@ export async function GET(request: NextRequest) {
       1,
       3, 0, 0, 0 // 03:00 UTC = 00:00 BRT
     ))
-    
-    console.log(`[Dashboard Stats] Períodos calculados:`)
-    console.log(`  - Hoje (Brasília): ${todayStart.toISOString()} até ${todayEnd.toISOString()}`)
-    console.log(`  - Semana (Brasília): ${weekStart.toISOString()}`)
-    console.log(`  - Mês (Brasília): ${monthStart.toISOString()}`)
 
     // Buscar resultados de simulados (coleção permanente)
     const resultsSnapshot = await db
@@ -117,10 +112,6 @@ export async function GET(request: NextRequest) {
     let weekCount = 0
     let monthCount = 0
     let totalCount = 0
-
-    console.log(`[Dashboard Stats] Calculando estatísticas para usuário ${authUser.uid}`)
-    console.log(`[Dashboard Stats] Início do dia (Brasília): ${todayStart.toISOString()}`)
-    console.log(`[Dashboard Stats] Total de resultados: ${resultsSnapshot.size}`)
 
     resultsSnapshot.forEach((doc) => {
       const data = doc.data()
@@ -137,29 +128,12 @@ export async function GET(request: NextRequest) {
       
       if (isToday) {
         todayCount += questionsAnswered
-        // Converter para BRT para log
-        const createdAtBrasilia = new Date(createdAt.getTime() - (3 * 60 * 60 * 1000))
-        console.log(`[Dashboard Stats] Resultado ${doc.id}: ${questionsAnswered} questões de hoje`)
-        console.log(`  - createdAt UTC: ${createdAt.toISOString()}`)
-        console.log(`  - createdAt BRT: ${createdAtBrasilia.toISOString().replace('Z', '')} (${createdAtBrasilia.getUTCFullYear()}-${String(createdAtBrasilia.getUTCMonth() + 1).padStart(2, '0')}-${String(createdAtBrasilia.getUTCDate()).padStart(2, '0')})`)
-      } else {
-        // Log para debug de resultados que não são de hoje
-        const createdAtBrasilia = new Date(createdAt.getTime() - (3 * 60 * 60 * 1000))
-        const createdAtDateBrasilia = `${createdAtBrasilia.getUTCFullYear()}-${String(createdAtBrasilia.getUTCMonth() + 1).padStart(2, '0')}-${String(createdAtBrasilia.getUTCDate()).padStart(2, '0')}`
-        const todayDateBrasilia = `${brasiliaTime.getUTCFullYear()}-${String(brasiliaTime.getUTCMonth() + 1).padStart(2, '0')}-${String(brasiliaTime.getUTCDate()).padStart(2, '0')}`
-        if (createdAtDateBrasilia !== todayDateBrasilia) {
-          console.log(`[Dashboard Stats] Resultado ${doc.id}: ${questionsAnswered} questões NÃO são de hoje`)
-          console.log(`  - Data do resultado (BRT): ${createdAtDateBrasilia}`)
-          console.log(`  - Data de hoje (BRT): ${todayDateBrasilia}`)
-        }
       }
       
       // Para semana e mês, comparar diretamente com timestamps UTC (já convertidos para início do dia em Brasília)
       if (createdAt >= weekStart) weekCount += questionsAnswered
       if (createdAt >= monthStart) monthCount += questionsAnswered
     })
-    
-    console.log(`[Dashboard Stats] Estatísticas finais - Hoje: ${todayCount}, Semana: ${weekCount}, Mês: ${monthCount}, Total: ${totalCount}`)
 
     // Calcular desempenho geral
     let totalCorrect = 0

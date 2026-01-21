@@ -47,7 +47,6 @@ export function getAdminApp(): admin.app.App {
       const serviceAccountPath = join(rootDir, firebaseAdminFiles[0])
       if (existsSync(serviceAccountPath)) {
         serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'))
-        console.log(`✅ Firebase Admin: Carregando service account de ${firebaseAdminFiles[0]}`)
       }
     }
   } catch (error) {
@@ -252,7 +251,6 @@ export async function isUserPremium(uid: string): Promise<boolean> {
           planExpiresAt: null,
           updatedAt: new Date(),
         })
-        console.log(`[isUserPremium] Plano expirado removido para usuário ${uid}`)
         return false
       }
       

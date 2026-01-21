@@ -137,7 +137,6 @@ function LoginForm() {
           
           if (alreadyVerifiedInSession) {
             // Usuário já passou pelo 2FA nesta sessão, pular verificação
-            console.log('✅ 2FA já verificado nesta sessão do navegador')
             if (typeof window !== 'undefined') {
               sessionStorage.removeItem('plansWelcomeShown')
               sessionStorage.setItem('justLoggedIn', 'true')
@@ -309,8 +308,6 @@ function LoginForm() {
             url: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/login`,
             handleCodeInApp: false,
           })
-          
-          console.log('✅ E-mail de verificação enviado com sucesso')
           
           // Fazer logout após enviar o e-mail
           await signOut(auth)

@@ -239,7 +239,6 @@ export async function sendVerificationEmail(
     }
 
     const info = await transporter.sendMail(mailOptions)
-    console.log('✅ E-mail de validação enviado com sucesso:', info.messageId)
   } catch (error: any) {
     console.error('❌ Erro ao enviar e-mail de validação:', error)
     

@@ -195,7 +195,6 @@ export default function QuizPage() {
   const handleFinish = useCallback(async () => {
     // Prevenir múltiplas chamadas simultâneas
     if (isFinishing) {
-      console.log('Já está finalizando, ignorando chamada duplicada')
       return
     }
 
@@ -291,8 +290,6 @@ export default function QuizPage() {
           throw new Error(errorMessage)
         }
 
-        console.log('Resultado salvo com sucesso:', resultsData.id)
-
         // Salvar questões respondidas no histórico do Firestore
         const answeredQuestionIds = Object.keys(answers)
         if (answeredQuestionIds.length > 0) {
@@ -309,9 +306,6 @@ export default function QuizPage() {
             const errorData = await historyResponse.json()
             console.error('Erro ao salvar histórico de questões:', errorData)
             // Não bloquear o fluxo se houver erro ao salvar histórico
-          } else {
-            const historyData = await historyResponse.json()
-            console.log('Histórico de questões salvo:', historyData.saved, 'questões')
           }
         }
         } catch (error) {
@@ -517,19 +511,19 @@ export default function QuizPage() {
                         }
                   }
                   className={cn(
-                    'w-full max-w-full cursor-pointer rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50 overflow-hidden select-none',
+                    'group w-full max-w-full cursor-pointer rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50 overflow-hidden select-none',
                     isSelected
                       ? 'border-primary bg-primary/5'
-                      : 'border-border bg-card hover:bg-accent'
+                      : 'border-border bg-card hover:bg-accent hover:text-accent-foreground'
                   )}
                 >
                   <div className="flex items-start gap-3 w-full max-w-full">
                     <div
                       className={cn(
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 font-semibold',
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 font-semibold transition-colors',
                         isSelected
                           ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-muted-foreground/30'
+                          : 'border-muted-foreground/30 group-hover:border-accent-foreground/50 group-hover:text-accent-foreground'
                       )}
                     >
                       {letter}

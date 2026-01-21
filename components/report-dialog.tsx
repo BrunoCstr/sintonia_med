@@ -110,7 +110,6 @@ export function ReportDialog({ open, onOpenChange, questionId, onSubmitSuccess }
       }
 
       const data = await response.json()
-      console.log('Report enviado com sucesso:', data)
 
       // Limpar formulário
       setReportTypes([])

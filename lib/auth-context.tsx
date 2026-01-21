@@ -176,14 +176,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
           body: JSON.stringify({ email, uid: userCredential.user.uid }),
         })
-        
-        if (response.ok) {
-          console.log('✅ E-mail de verificação enviado automaticamente via Nodemailer')
-        } else {
-          console.warn('⚠️ Não foi possível enviar e-mail automaticamente')
-        }
       } catch (emailError: any) {
-        console.warn('⚠️ Não foi possível enviar e-mail automaticamente:', emailError.message)
+        // Erro silencioso ao enviar e-mail
       }
       
       // Fazer logout para forçar verificação
@@ -229,19 +223,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json()
         emailSent = true
         verificationLink = data.link || null
-        
-        if (data.success) {
-          console.log('✅ E-mail de verificação enviado com sucesso via Nodemailer')
-        } else {
-          console.warn('⚠️ Link gerado mas e-mail pode não ter sido enviado:', data.warning || data.emailError)
-          // Em desenvolvimento, mostrar o link no console de forma destacada
-          if (verificationLink && typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-            console.group('🔗 LINK DE VERIFICAÇÃO (DESENVOLVIMENTO)')
-            console.log('Copie este link e cole no navegador para verificar o e-mail:')
-            console.log(verificationLink)
-            console.groupEnd()
-          }
-        }
       } else {
         const errorData = await response.json()
         console.error('Erro na API de verificação:', errorData.error)
@@ -303,17 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Sincronizar token após cadastro
     await syncTokenWithServer(user)
     
-    // Se o e-mail não foi enviado, lançar um erro informativo mas não bloquear
-    // O usuário pode usar o botão de reenviar na página de login
-    if (!emailSent) {
-      console.warn('⚠️ E-mail de verificação não foi enviado automaticamente')
-      if (verificationLink && typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-        // Em desenvolvimento, armazenar o link no localStorage para facilitar o acesso
-        localStorage.setItem('dev_verification_link', verificationLink)
-        console.log('💡 Link salvo no localStorage como "dev_verification_link"')
-      }
-      // Não lançar erro, apenas avisar - o usuário pode usar o botão de reenviar
-    }
+    // O usuário pode usar o botão de reenviar na página de login se necessário
   }
 
   const logout = async () => {
@@ -365,19 +336,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (fallbackResponse.ok) {
             const data = await fallbackResponse.json()
             if (data.success) {
-              console.log('✅ E-mail de verificação enviado via Nodemailer')
               return
-            }
-            
-            // Em desenvolvimento, mostrar o link se houver erro no envio
-            if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && data.link) {
-              console.group('🔗 LINK DE VERIFICAÇÃO (DESENVOLVIMENTO)')
-              console.log('E-mail pode não ter sido enviado. Use este link para verificar:')
-              console.log(data.link)
-              console.groupEnd()
-              
-              // Salvar no localStorage para facilitar
-              localStorage.setItem('dev_verification_link', data.link)
             }
             
             if (data.warning) {
@@ -390,9 +349,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const data = await response.json()
-      if (data.success) {
-        console.log('✅ E-mail de verificação reenviado com sucesso via Nodemailer')
-      } else if (data.alreadyVerified) {
+      if (data.alreadyVerified) {
         throw new Error('E-mail já está verificado')
       }
       

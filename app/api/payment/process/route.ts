@@ -34,8 +34,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { formData, preferenceId } = body
 
-    console.log('Dados recebidos do Payment Brick:', JSON.stringify({ formData, preferenceId }, null, 2))
-
     if (!formData || !preferenceId) {
       return NextResponse.json(
         { error: 'Dados de pagamento inválidos' },
@@ -100,8 +98,6 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    console.log('Dados enviados para Mercado Pago:', JSON.stringify(paymentBody, null, 2))
-
     // Criar instância de pagamento com chave de idempotência única por requisição
     const paymentClient = new Payment(baseClient)
     const paymentResponse = await paymentClient.create({
@@ -115,10 +111,6 @@ export async function POST(request: NextRequest) {
     // O status pode ser: 'approved', 'pending', 'authorized', 'in_process', 'in_mediation', 'rejected', 'cancelled', 'refunded', 'charged_back'
     const paymentStatus = paymentResponse.status || 'pending'
     const paymentStatusDetail = paymentResponse.status_detail || null
-
-    console.log('Status do pagamento:', paymentStatus)
-    console.log('Detalhes do status:', paymentStatusDetail)
-    console.log('Resposta completa do pagamento:', JSON.stringify(paymentResponse, null, 2))
 
     // Atualizar registro de pagamento
     await paymentDoc.ref.update({

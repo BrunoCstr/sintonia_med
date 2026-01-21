@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useLayoutEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useRole } from '@/lib/hooks/use-role'
@@ -27,6 +27,12 @@ export default function GeneratorPage() {
   const { isAdminMaster, isAdminQuestoes } = useRole()
   const { isPremium } = usePremium()
   const router = useRouter()
+  const isSafari =
+    typeof navigator !== 'undefined' &&
+    /safari/i.test(navigator.userAgent) &&
+    !/chrome|crios|android/i.test(navigator.userAgent)
+  const pendingScrollRestoreRef = useRef<{ y: number; ts: number } | null>(null)
+  const lastUserScrollTsRef = useRef(0)
   const [sistemas, setSistemas] = useState<MedicalArea[]>([])
   const [materias, setMaterias] = useState<Record<string, any[]>>({}) // Matérias por sistema
   const [loadingAreas, setLoadingAreas] = useState(true)
@@ -51,6 +57,39 @@ export default function GeneratorPage() {
   } | null>(null)
   const [checkingLimits, setCheckingLimits] = useState(true)
   const [timeUntilReset, setTimeUntilReset] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!isSafari || typeof window === 'undefined') return
+    const onScroll = () => {
+      lastUserScrollTsRef.current = Date.now()
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [isSafari])
+
+  const markScrollRestore = useCallback(() => {
+    if (!isSafari || typeof window === 'undefined') return
+    const y = window.scrollY
+    if (y > 0) pendingScrollRestoreRef.current = { y, ts: Date.now() }
+  }, [isSafari])
+
+  useLayoutEffect(() => {
+    if (!isSafari || pendingScrollRestoreRef.current === null) return
+    const pending = pendingScrollRestoreRef.current
+    pendingScrollRestoreRef.current = null
+    if (typeof window === 'undefined') return
+
+    const currentScroll = window.scrollY
+    const now = Date.now()
+    const userRecentlyScrolled = now - lastUserScrollTsRef.current < 120
+    const jumpedUp = currentScroll + 120 < pending.y
+    if (!userRecentlyScrolled && jumpedUp) {
+      const restore = () => window.scrollTo({ top: pending.y, left: 0 })
+      restore()
+      requestAnimationFrame(restore)
+      setTimeout(restore, 0)
+    }
+  }, [isSafari, timeUntilReset])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -260,11 +299,16 @@ export default function GeneratorPage() {
 
     // Atualizar a cada segundo
     const interval = setInterval(() => {
+      markScrollRestore()
+      if (isSafari) {
+        const active = document.activeElement
+        if (active && active instanceof HTMLElement) active.blur()
+      }
       updateCounter()
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [freeLimits, isPremium])
+  }, [freeLimits, isPremium, isSafari, markScrollRestore])
 
   // Função para formatar tempo restante
   const formatTimeRemaining = (ms: number) => {
@@ -290,7 +334,7 @@ export default function GeneratorPage() {
         }
         
         const data = await response.json()
-        const areas = data.areas || []
+        const areas: MedicalArea[] = data.areas || []
         
         setSistemas(areas)
         
@@ -303,7 +347,7 @@ export default function GeneratorPage() {
         const todasMaterias: string[] = []
         
         // Criar todas as promessas de requisição em paralelo
-        const materiasPromises = areas.map(async (sistema) => {
+        const materiasPromises = areas.map(async (sistema: MedicalArea) => {
           try {
             const materiasResponse = await fetch(`/api/materias?sistemaId=${sistema.id}`, {
               credentials: 'include',
@@ -815,7 +859,7 @@ export default function GeneratorPage() {
                       >
                         <span className="text-xs">{sistemaNome}</span>
                         {sistemaMaterias.length > 0 && (
-                          <span className="text-[10px] text-muted-foreground ml-1">
+                          <span className="text-[10px] text-white/90 dark:text-white/90 ml-1">
                             ({materiasSelecionadas.length}/{sistemaMaterias.length})
                           </span>
                         )}

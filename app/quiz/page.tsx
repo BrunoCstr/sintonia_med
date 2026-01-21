@@ -22,6 +22,104 @@ import type { Question as QuestionDB } from '@/lib/types'
 import { useAuth } from '@/lib/auth-context'
 import { usePremium } from '@/lib/hooks/use-premium'
 
+function formatTime(seconds: number) {
+  const isNegative = seconds < 0
+  const absSeconds = Math.abs(seconds)
+  const mins = Math.floor(absSeconds / 60)
+  const secs = absSeconds % 60
+  const sign = isNegative ? '-' : ''
+  return `${sign}${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+function FloatingTimer({
+  startSeconds,
+  paused,
+  allowNegativeTime,
+  isSafari,
+  lastUserScrollTsRef,
+  onTick,
+  onTimeUp,
+}: {
+  startSeconds: number
+  paused: boolean
+  allowNegativeTime: boolean
+  isSafari: boolean
+  lastUserScrollTsRef: React.MutableRefObject<number>
+  onTick: (value: number) => void
+  onTimeUp: () => void
+}) {
+  const [timeLeft, setTimeLeft] = useState(startSeconds)
+
+  useEffect(() => {
+    setTimeLeft(startSeconds)
+    onTick(startSeconds)
+  }, [startSeconds, onTick])
+
+  useEffect(() => {
+    if (paused) return
+
+    const timer = setInterval(() => {
+      // Safari: re-render + elemento focado pode "puxar" scroll para o topo.
+      // Removemos foco e, se houver pulo, restauramos o scroll.
+      const now = Date.now()
+      const userRecentlyScrolled = now - lastUserScrollTsRef.current < 120
+      const beforeY =
+        isSafari && typeof window !== 'undefined' && !userRecentlyScrolled ? window.scrollY : null
+
+      if (isSafari) {
+        const active = document.activeElement
+        if (active && active instanceof HTMLElement) active.blur()
+      }
+
+      setTimeLeft((prev) => {
+        // Se o tempo chegou a 0 e não permite negativo, trava em 0 e abre o dialog (uma vez)
+        if (prev === 0 && !allowNegativeTime) {
+          onTimeUp()
+          onTick(0)
+          return 0
+        }
+
+        const next = allowNegativeTime ? prev - 1 : prev > 0 ? prev - 1 : prev
+        onTick(next)
+        return next
+      })
+
+      if (beforeY !== null && typeof window !== 'undefined') {
+        requestAnimationFrame(() => {
+          const afterY = window.scrollY
+          const jumpedUp = afterY + 120 < beforeY
+          if (jumpedUp) {
+            const restore = () => window.scrollTo({ top: beforeY, left: 0 })
+            restore()
+            requestAnimationFrame(restore)
+            setTimeout(restore, 0)
+          }
+        })
+      }
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [paused, allowNegativeTime, isSafari, lastUserScrollTsRef, onTick, onTimeUp])
+
+  return (
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+      <div
+        className={cn(
+          'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium shadow-lg border backdrop-blur-sm',
+          timeLeft < 0
+            ? 'bg-destructive/90 text-destructive-foreground border-destructive'
+            : timeLeft < 60
+              ? 'bg-destructive/80 text-destructive-foreground border-destructive/50'
+              : 'bg-background/95 border-border'
+        )}
+      >
+        <Clock className="h-4 w-4" />
+        {formatTime(timeLeft)}
+      </div>
+    </div>
+  )
+}
+
 // Interface para questões no formato do quiz
 interface QuizQuestion {
   id: string
@@ -85,33 +183,52 @@ export default function QuizPage() {
   const [loading, setLoading] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, number>>({})
-  const [timeLeft, setTimeLeft] = useState<number | null>(null)
+  const [timerStartSeconds, setTimerStartSeconds] = useState<number | null>(null)
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [showNoQuestionsDialog, setShowNoQuestionsDialog] = useState(false)
   const [showTimeUpDialog, setShowTimeUpDialog] = useState(false)
   const [allowNegativeTime, setAllowNegativeTime] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const router = useRouter()
-  const pendingScrollRestoreRef = useRef<number | null>(null)
+  const pendingScrollRestoreRef = useRef<{ y: number; ts: number } | null>(null)
+  const lastUserScrollTsRef = useRef(0)
+  const timeLeftRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!isSafari || typeof window === 'undefined') return
+    const onScroll = () => {
+      lastUserScrollTsRef.current = Date.now()
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [isSafari])
 
   const markScrollRestore = useCallback(() => {
     if (!isSafari || typeof window === 'undefined') return
-    const currentScroll = window.scrollY
-    if (currentScroll > 0) {
-      pendingScrollRestoreRef.current = currentScroll
-    }
+    const y = window.scrollY
+    if (y > 0) pendingScrollRestoreRef.current = { y, ts: Date.now() }
   }, [isSafari])
 
   useLayoutEffect(() => {
     if (!isSafari || pendingScrollRestoreRef.current === null) return
-    const target = pendingScrollRestoreRef.current
+    const pending = pendingScrollRestoreRef.current
     pendingScrollRestoreRef.current = null
     if (typeof window === 'undefined') return
     const currentScroll = window.scrollY
-    if (target > 0 && currentScroll < Math.min(64, target)) {
-      window.scrollTo({ top: target })
+
+    // Safari pode "puxar" o scroll para manter o elemento focado visível
+    // a cada re-render (ex.: cronômetro). Se isso acontecer, restauramos.
+    const now = Date.now()
+    const userRecentlyScrolled = now - lastUserScrollTsRef.current < 120
+    const jumpedUp = currentScroll + 120 < pending.y
+    if (!userRecentlyScrolled && jumpedUp) {
+      const restore = () => window.scrollTo({ top: pending.y, left: 0 })
+      restore()
+      // Duas tentativas adicionais ajudam no Safari (timing de layout/paint).
+      requestAnimationFrame(restore)
+      setTimeout(restore, 0)
     }
-  }, [isSafari, currentIndex, answers, timeLeft])
+  }, [isSafari, currentIndex, answers])
 
   useEffect(() => {
     const loadQuestions = async () => {
@@ -167,7 +284,12 @@ export default function QuizPage() {
         setQuestions(quizQuestions)
 
         if (filters.timed && filters.timeLimit) {
-          setTimeLeft(filters.timeLimit * 60) // Convert to seconds
+          const start = filters.timeLimit * 60 // Convert to seconds
+          setTimerStartSeconds(start)
+          timeLeftRef.current = start
+        } else {
+          setTimerStartSeconds(null)
+          timeLeftRef.current = null
         }
         
         setLoading(false)
@@ -224,9 +346,9 @@ export default function QuizPage() {
         try {
         // Calcular tempo gasto (se houver timer)
         let timeSpent: number | null = null
-        if (timeLeft !== null && filters?.timeLimit && typeof filters.timeLimit === 'number') {
+        if (timeLeftRef.current !== null && filters?.timeLimit && typeof filters.timeLimit === 'number') {
           const totalSeconds = filters.timeLimit * 60
-          const remainingSeconds = typeof timeLeft === 'number' ? timeLeft : 0
+          const remainingSeconds = typeof timeLeftRef.current === 'number' ? timeLeftRef.current : 0
           // Se o tempo for negativo, o tempo gasto é o tempo limite + o tempo negativo (em valor absoluto)
           const spent = remainingSeconds < 0 
             ? totalSeconds + Math.abs(remainingSeconds)
@@ -321,50 +443,16 @@ export default function QuizPage() {
       // Ainda redireciona para results mesmo se houver erro
       router.push('/results')
     }
-  }, [questions, answers, user, router, timeLeft, isFinishing])
+  }, [questions, answers, user, router, isFinishing])
 
-  useEffect(() => {
-    if (timeLeft === null) return
-    
-    // Pausar o timer se o dialog de tempo esgotado estiver aberto
-    if (showTimeUpDialog) return
+  const handleTimerTick = useCallback((v: number) => {
+    timeLeftRef.current = v
+  }, [])
 
-    const timer = setInterval(() => {
-      markScrollRestore()
-      setTimeLeft((prev) => {
-        if (prev === null) return null
-        
-        // Se o tempo chegou a 0 e ainda não mostrou o dialog, mostrar o dialog
-        if (prev === 0 && !allowNegativeTime) {
-          setShowTimeUpDialog(true)
-          return 0
-        }
-        
-        // Se permitir tempo negativo, continuar contando
-        if (allowNegativeTime) {
-          return prev - 1
-        }
-        
-        // Se ainda tem tempo, continuar contando normalmente
-        if (prev > 0) {
-          return prev - 1
-        }
-        
-        return prev
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [timeLeft, allowNegativeTime, showTimeUpDialog, markScrollRestore])
-
-  const formatTime = (seconds: number) => {
-    const isNegative = seconds < 0
-    const absSeconds = Math.abs(seconds)
-    const mins = Math.floor(absSeconds / 60)
-    const secs = absSeconds % 60
-    const sign = isNegative ? '-' : ''
-    return `${sign}${mins}:${secs.toString().padStart(2, '0')}`
-  }
+  const handleTimeUp = useCallback(() => {
+    // Evitar reabrir se já está aberto
+    setShowTimeUpDialog((open) => (open ? open : true))
+  }, [])
 
   if (loading) {
     return (
@@ -417,17 +505,16 @@ export default function QuizPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 py-8">
       {/* Cronômetro Flutuante - Fixed para acompanhar o scroll */}
-      {timeLeft !== null && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-          <div className={cn(
-            "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium shadow-lg border backdrop-blur-sm",
-            timeLeft < 0 ? "bg-destructive/90 text-destructive-foreground border-destructive" : 
-            timeLeft < 60 ? "bg-destructive/80 text-destructive-foreground border-destructive/50" : "bg-background/95 border-border"
-          )}>
-            <Clock className="h-4 w-4" />
-            {formatTime(timeLeft)}
-          </div>
-        </div>
+      {timerStartSeconds !== null && (
+        <FloatingTimer
+          startSeconds={timerStartSeconds}
+          paused={showTimeUpDialog}
+          allowNegativeTime={allowNegativeTime}
+          isSafari={isSafari}
+          lastUserScrollTsRef={lastUserScrollTsRef}
+          onTick={handleTimerTick}
+          onTimeUp={handleTimeUp}
+        />
       )}
 
       <div className="container mx-auto max-w-4xl px-4 w-full">

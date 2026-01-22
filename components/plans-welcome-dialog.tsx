@@ -17,7 +17,8 @@ import { Check, Sparkles, Crown, ArrowLeft, TrendingUp, ShieldCheck, Loader2 } f
 import { usePremium } from '@/lib/hooks/use-premium'
 import { auth } from '@/lib/firebase'
 import { formatPrice } from '@/lib/utils'
-import { PaymentBrick, PaymentErrorInfo } from '@/components/payment-brick'
+import { PaymentBrick } from '@/components/payment-brick'
+import { PixPaymentQr, type PixQrData } from '@/components/pix-payment-qr'
 import { toast } from 'sonner'
 
 interface Plan {
@@ -64,6 +65,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
   const [checkoutData, setCheckoutData] = useState<{ preferenceId: string; amount: number } | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [processingPayment, setProcessingPayment] = useState(false)
+  const [pixData, setPixData] = useState<PixQrData | null>(null)
   const [couponCode, setCouponCode] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<{ 
     code: string; 
@@ -107,6 +109,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
       setShowCheckout(false)
       setCheckoutData(null)
       setSelectedPlan(null)
+      setPixData(null)
       setCouponCode('')
       setAppliedCoupon(null)
     }
@@ -341,6 +344,7 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
                     setShowCheckout(false)
                     setCheckoutData(null)
                     setSelectedPlan(null)
+                    setPixData(null)
                   }}
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -353,29 +357,56 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
               <span>Pagamento seguro via MercadoPago</span>
             </div>
             
-            <PaymentBrick
-              publicKey={process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || ''}
-              preferenceId={checkoutData.preferenceId}
-              amount={checkoutData.amount}
-              onPaymentSuccess={(paymentId, status) => {
-                setProcessingPayment(true)
-                setShowCheckout(false)
-                onOpenChange(false)
-                router.push(`/payment/success?status=${status}&payment_id=${paymentId}`)
-              }}
-              onPaymentError={(error) => {
-                console.error('Erro no pagamento:', error)
-                const friendlyMessage = getFriendlyPaymentError(error.status, error.statusDetail) || error.message
-                setShowCheckout(false)
-                setSelectedPlan(null)
-                setCheckoutData(null)
-                router.push(
-                  `/payment/failure?status=${error.status || 'rejected'}&message=${encodeURIComponent(
-                    friendlyMessage
-                  )}`
-                )
-              }}
-            />
+            {pixData ? (
+              <PixPaymentQr
+                data={pixData}
+                onBackToMethods={() => setPixData(null)}
+              />
+            ) : (
+              <PaymentBrick
+                publicKey={process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || ''}
+                preferenceId={checkoutData.preferenceId}
+                amount={checkoutData.amount}
+                onPaymentSuccess={(paymentId, status) => {
+                  setProcessingPayment(true)
+                  setShowCheckout(false)
+                  setPixData(null)
+                  onOpenChange(false)
+                  router.push(`/payment/success?status=${status}&payment_id=${paymentId}`)
+                }}
+                onPaymentPending={(info) => {
+                  const isPix = (info.paymentMethodId || '').toLowerCase() === 'pix' || Boolean(info.pix)
+                  if (isPix) {
+                    setPixData({
+                      paymentId: info.paymentId,
+                      qrCode: info.pix?.qrCode ?? null,
+                      qrCodeBase64: info.pix?.qrCodeBase64 ?? null,
+                      ticketUrl: info.pix?.ticketUrl ?? null,
+                    })
+                    return
+                  }
+
+                  // Outros métodos pendentes (ex.: boleto). Mantém fluxo padrão.
+                  setShowCheckout(false)
+                  setCheckoutData(null)
+                  setSelectedPlan(null)
+                  router.push(`/payment/pending`)
+                }}
+                onPaymentError={(error) => {
+                  console.error('Erro no pagamento:', error)
+                  const friendlyMessage = getFriendlyPaymentError(error.status, error.statusDetail) || error.message
+                  setShowCheckout(false)
+                  setPixData(null)
+                  setSelectedPlan(null)
+                  setCheckoutData(null)
+                  router.push(
+                    `/payment/failure?status=${error.status || 'rejected'}&message=${encodeURIComponent(
+                      friendlyMessage
+                    )}`
+                  )
+                }}
+              />
+            )}
           </>
         ) : loadingPlans ? (
           <div className="flex items-center justify-center py-12">

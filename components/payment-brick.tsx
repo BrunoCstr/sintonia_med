@@ -9,6 +9,7 @@ interface PaymentBrickProps {
   preferenceId: string
   amount: number
   onPaymentSuccess: (paymentId: string, status: string) => void
+  onPaymentPending?: (info: PaymentPendingInfo) => void
   onPaymentError: (error: PaymentErrorInfo) => void
   onReady?: () => void
 }
@@ -20,6 +21,19 @@ export interface PaymentErrorInfo {
   paymentId?: string
 }
 
+export interface PaymentPendingInfo {
+  paymentId: string
+  status: string
+  statusDetail?: string | null
+  paymentMethodId?: string
+  pix?: {
+    qrCode?: string | null
+    qrCodeBase64?: string | null
+    ticketUrl?: string | null
+  } | null
+  message?: string
+}
+
 // Gerar uma chave única para forçar re-renderização do Payment Brick
 let brickInstanceCounter = 0
 
@@ -28,6 +42,7 @@ export function PaymentBrick({
   preferenceId,
   amount,
   onPaymentSuccess,
+  onPaymentPending,
   onPaymentError,
   onReady,
 }: PaymentBrickProps) {
@@ -113,20 +128,37 @@ export function PaymentBrick({
         throw errorInfo
       }
 
-      // Verificar se o pagamento foi realmente aprovado
-      if (data.success && data.status === 'approved') {
-        // Chamar callback de sucesso apenas se aprovado
-        onPaymentSuccess(data.paymentId, data.status)
-      } else {
-        // Pagamento não aprovado - tratar como erro
-        const errorInfo: PaymentErrorInfo = {
-          message: data.message || 'Pagamento não aprovado.',
-          status: data.status,
-          statusDetail: data.statusDetail,
-          paymentId: data.paymentId,
-        }
-        throw errorInfo
+      const status: string | undefined = data?.status
+
+      // Aprovado (cartão, etc.)
+      if (data?.success && status === 'approved') {
+        onPaymentSuccess(data.paymentId, status)
+        return data
       }
+
+      // Para PIX, o status inicial normalmente é pending (e é quando o QR code existe)
+      if (data?.success && (status === 'pending' || status === 'in_process' || status === 'authorized')) {
+        if (onPaymentPending) {
+          onPaymentPending({
+            paymentId: data.paymentId,
+            status,
+            statusDetail: data.statusDetail ?? null,
+            paymentMethodId: data.paymentMethodId,
+            pix: data.pix ?? null,
+            message: data.message,
+          })
+        }
+        return data
+      }
+
+      // Caso contrário, tratar como erro
+      const errorInfo: PaymentErrorInfo = {
+        message: data?.message || 'Pagamento não aprovado.',
+        status: data?.status,
+        statusDetail: data?.statusDetail,
+        paymentId: data?.paymentId,
+      }
+      throw errorInfo
     } catch (err: any) {
       console.error('Erro ao processar pagamento:', err)
       const paymentError: PaymentErrorInfo = {

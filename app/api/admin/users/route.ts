@@ -64,6 +64,9 @@ export async function GET(request: NextRequest) {
       let status = 'expired'
       if (isDisabled) {
         status = 'disabled'
+      } else if (userData.plan === 'lifetime') {
+        // Plano vitalício sempre está ativo
+        status = 'active'
       } else if (userData.plan && userData.planExpiresAt) {
         const expiresAt = userData.planExpiresAt.toDate ? userData.planExpiresAt.toDate() : new Date(userData.planExpiresAt)
         if (expiresAt > new Date()) {

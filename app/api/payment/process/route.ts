@@ -63,32 +63,24 @@ export async function POST(request: NextRequest) {
     const paymentData = paymentDoc.data()
 
     // Criar pagamento no Mercado Pago usando os dados do form
-    // O Payment Brick já inclui todas as informações do cartão no token, incluindo o nome do titular
-    // O nome do titular é usado pelo Mercado Pago para determinar o status em testes (APRO=aprovado, OTHE=rejeitado, etc)
+    // Observação importante: para PIX não existe token de cartão; o Mercado Pago devolve QR Code no response.
     // Arredondar valor para 2 casas decimais para evitar problemas de precisão de ponto flutuante
     const transactionAmount = Math.round((paymentData.amount || 0) * 100) / 100
-    
-    const paymentBody = {
+
+    const paymentMethodId: string | undefined = formData.payment_method_id
+    const isPix = (paymentMethodId || '').toLowerCase() === 'pix'
+
+    const basePaymentBody: any = {
       transaction_amount: Number(transactionAmount.toFixed(2)), // Garantir exatamente 2 casas decimais
-      token: formData.token,
       description: `Assinatura ${paymentData.planId === 'monthly' ? 'Mensal' : 'Semestral'} - SintoniaMed`,
-      installments: formData.installments || 1,
-      payment_method_id: formData.payment_method_id,
-      issuer_id: formData.issuer_id,
+      payment_method_id: paymentMethodId,
       payer: {
         email: formData.payer?.email || authUser.email,
         identification: formData.payer?.identification,
-        // Incluir nome do titular se disponível (importante para testes)
+        // Incluir nome do pagador se disponível
         first_name: formData.payer?.first_name || formData.cardholder?.name || null,
         last_name: formData.payer?.last_name || null,
       },
-      // Incluir informações do cardholder se disponíveis
-      ...(formData.cardholder && {
-        cardholder: {
-          name: formData.cardholder.name,
-          identification: formData.cardholder.identification,
-        },
-      }),
       metadata: {
         userId: authUser.uid,
         planId: paymentData.planId,
@@ -96,6 +88,30 @@ export async function POST(request: NextRequest) {
         discount: paymentData.discount,
         expiresAt: paymentData.expiresAt?.toDate ? paymentData.expiresAt.toDate().toISOString() : paymentData.expiresAt,
       },
+    }
+
+    // Para cartão, o Brick envia token/issuer/installments.
+    // Para PIX, não deve enviar token/issuer/installments.
+    const paymentBody: any = isPix
+      ? basePaymentBody
+      : {
+          ...basePaymentBody,
+          token: formData.token,
+          installments: formData.installments || 1,
+          issuer_id: formData.issuer_id,
+          ...(formData.cardholder && {
+            cardholder: {
+              name: formData.cardholder.name,
+              identification: formData.cardholder.identification,
+            },
+          }),
+        }
+
+    if (!isPix && (!paymentBody.token || typeof paymentBody.token !== 'string')) {
+      return NextResponse.json(
+        { error: 'Token do cartão não recebido. Tente novamente.' },
+        { status: 400 }
+      )
     }
 
     // Criar instância de pagamento com chave de idempotência única por requisição
@@ -111,6 +127,16 @@ export async function POST(request: NextRequest) {
     // O status pode ser: 'approved', 'pending', 'authorized', 'in_process', 'in_mediation', 'rejected', 'cancelled', 'refunded', 'charged_back'
     const paymentStatus = paymentResponse.status || 'pending'
     const paymentStatusDetail = paymentResponse.status_detail || null
+
+    // Dados de PIX (quando aplicável)
+    const pixTransactionData: any = (paymentResponse as any)?.point_of_interaction?.transaction_data
+    const pixData = pixTransactionData
+      ? {
+          qrCode: pixTransactionData.qr_code || null,
+          qrCodeBase64: pixTransactionData.qr_code_base64 || null,
+          ticketUrl: pixTransactionData.ticket_url || null,
+        }
+      : null
 
     // Atualizar registro de pagamento
     await paymentDoc.ref.update({
@@ -164,29 +190,42 @@ export async function POST(request: NextRequest) {
     }
 
     // Retornar resposta baseada no status
+    // Importante: para PIX, o status inicial costuma ser "pending" e isso NÃO é erro; é quando o QR Code existe.
     if (paymentStatus === 'approved') {
       return NextResponse.json({
         success: true,
         paymentId,
         status: paymentStatus,
+        statusDetail: paymentStatusDetail,
+        paymentMethodId,
+        ...(pixData ? { pix: pixData } : {}),
       })
-    } else if (paymentStatus === 'pending' || paymentStatus === 'in_process' || paymentStatus === 'authorized') {
-      // Pagamento pendente ou em processamento
-      return NextResponse.json({
-        success: false,
-        paymentId,
-        status: paymentStatus,
-        message: 'Pagamento pendente de confirmação',
-      })
-    } else {
-      // Pagamento rejeitado, cancelado ou outro status negativo
-      return NextResponse.json({
-        success: false,
-        paymentId,
-        status: paymentStatus,
-        message: `Pagamento ${paymentStatus}. Status: ${paymentStatusDetail || 'N/A'}`,
-      }, { status: 400 })
     }
+
+    if (paymentStatus === 'pending' || paymentStatus === 'in_process' || paymentStatus === 'authorized') {
+      return NextResponse.json({
+        success: true,
+        paymentId,
+        status: paymentStatus,
+        statusDetail: paymentStatusDetail,
+        paymentMethodId,
+        message: 'Pagamento pendente de confirmação',
+        ...(pixData ? { pix: pixData } : {}),
+      })
+    }
+
+    // Pagamento rejeitado, cancelado ou outro status negativo
+    return NextResponse.json(
+      {
+        success: false,
+        paymentId,
+        status: paymentStatus,
+        statusDetail: paymentStatusDetail,
+        paymentMethodId,
+        message: `Pagamento ${paymentStatus}. Status: ${paymentStatusDetail || 'N/A'}`,
+      },
+      { status: 400 }
+    )
   } catch (error: any) {
     console.error('Erro ao processar pagamento:', error)
     console.error('Detalhes do erro:', error.response?.data || error.message)

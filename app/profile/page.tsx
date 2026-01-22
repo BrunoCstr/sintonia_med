@@ -17,6 +17,7 @@ import { TwoFactorSettings } from '@/components/admin/two-factor-settings'
 import { useRouter } from 'next/navigation'
 import { auth } from '@/lib/firebase'
 import { PaymentBrick } from '@/components/payment-brick'
+import { PixPaymentQr, type PixQrData } from '@/components/pix-payment-qr'
 import {
   Dialog,
   DialogContent,
@@ -127,6 +128,7 @@ export default function ProfilePage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [showCheckout, setShowCheckout] = useState(false)
   const [checkoutData, setCheckoutData] = useState<{ preferenceId: string; amount: number } | null>(null)
+  const [pixData, setPixData] = useState<PixQrData | null>(null)
 
   // Tornar overlay transparente quando o dialog estiver aberto
   useEffect(() => {
@@ -951,6 +953,7 @@ export default function ProfilePage() {
           setSelectedPlan(null) // Resetar estado do botão quando fechar o dialog
           setSubscribing(false) // Resetar estado de processamento
           setCheckoutData(null) // Limpar dados do checkout
+          setPixData(null)
         }
       }}>
         <DialogContent
@@ -973,32 +976,59 @@ export default function ProfilePage() {
           </div>
 
           {checkoutData && (
-            <PaymentBrick
-              publicKey={process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || ''}
-              preferenceId={checkoutData.preferenceId}
-              amount={checkoutData.amount}
-              onPaymentSuccess={(paymentId, status) => {
-                setSubscribing(false)
-                setShowCheckout(false)
-                if (refreshUserProfile) {
-                  refreshUserProfile()
-                }
-                router.push(`/payment/success?status=${status}&payment_id=${paymentId}`)
-              }}
-              onPaymentError={(error) => {
-                console.error('Erro no pagamento:', error)
-                const friendlyMessage = getFriendlyPaymentError(error.status, error.statusDetail) || error.message
-                setSubscribing(false)
-                setSelectedPlan(null)
-                setShowCheckout(false)
-                setCheckoutData(null) // Limpar dados do checkout
-                router.push(
-                  `/payment/failure?status=${error.status || 'rejected'}&message=${encodeURIComponent(
-                    friendlyMessage
-                  )}`
-                )
-              }}
-            />
+            pixData ? (
+              <PixPaymentQr
+                data={pixData}
+                onBackToMethods={() => setPixData(null)}
+              />
+            ) : (
+              <PaymentBrick
+                publicKey={process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || ''}
+                preferenceId={checkoutData.preferenceId}
+                amount={checkoutData.amount}
+                onPaymentSuccess={(paymentId, status) => {
+                  setSubscribing(false)
+                  setShowCheckout(false)
+                  setPixData(null)
+                  if (refreshUserProfile) {
+                    refreshUserProfile()
+                  }
+                  router.push(`/payment/success?status=${status}&payment_id=${paymentId}`)
+                }}
+                onPaymentPending={(info) => {
+                  const isPix = (info.paymentMethodId || '').toLowerCase() === 'pix' || Boolean(info.pix)
+                  if (isPix) {
+                    setPixData({
+                      paymentId: info.paymentId,
+                      qrCode: info.pix?.qrCode ?? null,
+                      qrCodeBase64: info.pix?.qrCodeBase64 ?? null,
+                      ticketUrl: info.pix?.ticketUrl ?? null,
+                    })
+                    return
+                  }
+
+                  setSubscribing(false)
+                  setSelectedPlan(null)
+                  setShowCheckout(false)
+                  setCheckoutData(null)
+                  router.push('/payment/pending')
+                }}
+                onPaymentError={(error) => {
+                  console.error('Erro no pagamento:', error)
+                  const friendlyMessage = getFriendlyPaymentError(error.status, error.statusDetail) || error.message
+                  setSubscribing(false)
+                  setPixData(null)
+                  setSelectedPlan(null)
+                  setShowCheckout(false)
+                  setCheckoutData(null) // Limpar dados do checkout
+                  router.push(
+                    `/payment/failure?status=${error.status || 'rejected'}&message=${encodeURIComponent(
+                      friendlyMessage
+                    )}`
+                  )
+                }}
+              />
+            )
           )}
         </DialogContent>
       </Dialog>

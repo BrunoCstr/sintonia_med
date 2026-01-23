@@ -73,6 +73,8 @@ export async function POST(request: NextRequest) {
     const basePaymentBody: any = {
       transaction_amount: Number(transactionAmount.toFixed(2)), // Garantir exatamente 2 casas decimais
       description: `Assinatura ${paymentData.planId === 'monthly' ? 'Mensal' : 'Semestral'} - SintoniaMed`,
+      // Referência externa para facilitar conciliação/ownership mesmo se metadata falhar
+      external_reference: authUser.uid,
       payment_method_id: paymentMethodId,
       payer: {
         email: formData.payer?.email || authUser.email,

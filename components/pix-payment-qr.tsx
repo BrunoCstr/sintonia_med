@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +21,7 @@ interface PixPaymentQrProps {
 }
 
 export function PixPaymentQr({ data, onBackToMethods, onConfirmed }: PixPaymentQrProps) {
+  const router = useRouter()
   const qrImageSrc = useMemo(() => {
     if (!data.qrCodeBase64) return null
     // MP costuma devolver PNG em base64 (sem prefixo data:)
@@ -59,6 +61,21 @@ export function PixPaymentQr({ data, onBackToMethods, onConfirmed }: PixPaymentQ
       if (status === 'approved') {
         toast.success('Pagamento confirmado! Liberando acesso...', { duration: 3000 })
         onConfirmed?.(data.paymentId)
+        return
+      }
+
+      // Se o pagamento foi rejeitado/cancelado, redirecionar para a página de falha (mesmo fluxo do cartão)
+      const negativeStatuses = new Set(['rejected', 'cancelled', 'refunded', 'charged_back'])
+      if (status && negativeStatuses.has(status)) {
+        const message =
+          status === 'rejected'
+            ? 'Pagamento rejeitado.'
+            : status === 'cancelled'
+              ? 'Pagamento cancelado.'
+              : 'Pagamento não aprovado.'
+
+        toast.error(message, { duration: 3500 })
+        router.push(`/payment/failure?status=${encodeURIComponent(status)}&message=${encodeURIComponent(message)}`)
       }
     } catch (e: any) {
       console.error('Erro ao verificar status do PIX:', e)

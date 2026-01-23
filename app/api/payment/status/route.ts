@@ -38,23 +38,63 @@ export async function GET(request: NextRequest) {
 
     const paymentData: any = await mpPayment.get({ id: paymentId })
 
-    const metadata = paymentData?.metadata || {}
-    const userIdFromMetadata = metadata.userId as string | undefined
-    if (!userIdFromMetadata || userIdFromMetadata !== authUser.uid) {
-      return NextResponse.json({ error: 'Pagamento não pertence ao usuário' }, { status: 403 })
-    }
-
-    const planId = metadata.planId as string | undefined
-    const discount = (metadata.discount as number) || 0
-    const couponCode = (metadata.couponCode as string) || null
-    const expiresAtStr = metadata.expiresAt as string | undefined
-    const expiresAt = expiresAtStr ? new Date(expiresAtStr) : null
-
     const status = paymentData?.status || 'pending'
     const statusDetail = paymentData?.status_detail || null
 
     const app = getAdminApp()
     const db = app.firestore()
+
+    // 1) Ownership por Firestore (fonte de verdade do app)
+    const paymentsByIdSnap = await db
+      .collection('payments')
+      .where('paymentId', '==', paymentId)
+      .limit(1)
+      .get()
+
+    const paymentRecord = paymentsByIdSnap.empty ? null : paymentsByIdSnap.docs[0].data()
+    const paymentRecordUserId = paymentRecord?.userId as string | undefined
+
+    // 2) Ownership por Mercado Pago (fallback)
+    const metadata = paymentData?.metadata || {}
+    const userIdFromMetadata =
+      (metadata.userId as string | undefined) ||
+      ((metadata as any).user_id as string | undefined) ||
+      ((metadata as any).uid as string | undefined)
+    const externalReference = paymentData?.external_reference as string | undefined
+
+    const belongsToUser =
+      (paymentRecordUserId && paymentRecordUserId === authUser.uid) ||
+      (userIdFromMetadata && userIdFromMetadata === authUser.uid) ||
+      (externalReference && externalReference === authUser.uid)
+
+    if (!belongsToUser) {
+      // Se o pagamento existe no Firestore, mas pertence a outro user, negar explicitamente
+      if (paymentRecordUserId && paymentRecordUserId !== authUser.uid) {
+        return NextResponse.json({ error: 'Pagamento não pertence ao usuário' }, { status: 403 })
+      }
+      // Se nem Firestore nem MP batem, negar
+      return NextResponse.json({ error: 'Pagamento não pertence ao usuário' }, { status: 403 })
+    }
+
+    // Dados para ativação (preferir metadata do MP; cair para Firestore se faltar)
+    const planId =
+      (metadata.planId as string | undefined) ||
+      ((metadata as any).plan_id as string | undefined) ||
+      (paymentRecord?.planId as string | undefined)
+    const discount = ((metadata.discount as number) || 0) ?? 0
+    const couponCode = ((metadata.couponCode as string) || null) ?? (paymentRecord?.couponCode as string | null) ?? null
+    const expiresAtStr =
+      (metadata.expiresAt as string | undefined) ||
+      ((metadata as any).expires_at as string | undefined)
+
+    const expiresAt =
+      expiresAtStr
+        ? new Date(expiresAtStr)
+        : paymentRecord?.expiresAt?.toDate
+          ? paymentRecord.expiresAt.toDate()
+          : paymentRecord?.expiresAt
+            ? new Date(paymentRecord.expiresAt)
+            : null
 
     // Atualizar/normalizar registro de payments
     const paymentsSnapshot = await db

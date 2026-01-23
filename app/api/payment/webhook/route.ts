@@ -32,23 +32,71 @@ export async function POST(request: NextRequest) {
       // Buscar informações do pagamento no Mercado Pago
       const paymentData = await payment.get({ id: paymentId })
 
-      if (!paymentData.metadata || !paymentData.metadata.userId) {
-        console.error('Metadata não encontrada no pagamento:', paymentId)
-        return NextResponse.json({ received: true })
-      }
-
-      const userId = paymentData.metadata.userId as string
-      const planId = paymentData.metadata.planId as string
-      const couponCode = paymentData.metadata.couponCode as string | null
-      const discount = (paymentData.metadata.discount as number) || 0
-      const expiresAtStr = paymentData.metadata.expiresAt as string
-
       const app = getAdminApp()
       const db = app.firestore()
 
+      const metadata: any = paymentData?.metadata || {}
+
+      // Tentar identificar usuário de forma robusta:
+      // - metadata.userId (padrão do app)
+      // - metadata.user_id (variante)
+      // - external_reference (fallback)
+      // - Firestore payments por paymentId (último recurso)
+      let userId: string | null =
+        (typeof metadata.userId === 'string' && metadata.userId) ||
+        (typeof metadata.user_id === 'string' && metadata.user_id) ||
+        (typeof paymentData?.external_reference === 'string' && paymentData.external_reference) ||
+        null
+
+      // Buscar registro de pagamento existente (por paymentId) para fallback de dados
+      const paymentByIdSnap = await db
+        .collection('payments')
+        .where('paymentId', '==', paymentId)
+        .limit(1)
+        .get()
+
+      const existingPaymentDoc = paymentByIdSnap.empty ? null : paymentByIdSnap.docs[0]
+      const existingPaymentData = existingPaymentDoc?.data()
+
+      if (!userId && existingPaymentData?.userId) {
+        userId = existingPaymentData.userId as string
+      }
+
+      if (!userId) {
+        console.error('Não foi possível identificar userId do pagamento:', paymentId)
+        return NextResponse.json({ received: true })
+      }
+
+      const planId: string | undefined =
+        (typeof metadata.planId === 'string' && metadata.planId) ||
+        (typeof metadata.plan_id === 'string' && metadata.plan_id) ||
+        (existingPaymentData?.planId as string | undefined)
+
+      const couponCode: string | null =
+        (metadata.couponCode as string | null) ??
+        (existingPaymentData?.couponCode as string | null) ??
+        null
+
+      const discount: number =
+        (typeof metadata.discount === 'number' ? metadata.discount : 0) ||
+        (typeof existingPaymentData?.discount === 'number' ? existingPaymentData.discount : 0) ||
+        0
+
+      const expiresAtStr: string | undefined =
+        (typeof metadata.expiresAt === 'string' && metadata.expiresAt) ||
+        (typeof metadata.expires_at === 'string' && metadata.expires_at) ||
+        undefined
+
       // Verificar status do pagamento
       const paymentStatus = paymentData.status
-      const expiresAt = new Date(expiresAtStr)
+      const expiresAt =
+        expiresAtStr
+          ? new Date(expiresAtStr)
+          : existingPaymentData?.expiresAt?.toDate
+            ? existingPaymentData.expiresAt.toDate()
+            : existingPaymentData?.expiresAt
+              ? new Date(existingPaymentData.expiresAt)
+              : null
 
       // Buscar registro de pagamento existente
       // Primeiro tenta buscar por paymentId (caso já tenha sido processado antes)
@@ -91,7 +139,7 @@ export async function POST(request: NextRequest) {
           // Criar novo registro se não existir (caso o registro não tenha sido criado antes)
           paymentRef = await db.collection('payments').add({
             userId,
-            planId,
+            planId: planId || null,
             preferenceId: null, // Não temos acesso ao preferenceId aqui
             paymentId,
             status: paymentStatus,
@@ -99,13 +147,23 @@ export async function POST(request: NextRequest) {
             couponCode,
             discount,
             createdAt: new Date(),
-            expiresAt,
+            expiresAt: expiresAt || null,
           })
         }
       }
 
       // Se o pagamento foi aprovado, ativar a assinatura
       if (paymentStatus === 'approved') {
+        if (!planId || !expiresAt) {
+          console.error('Webhook: dados insuficientes para ativar assinatura', {
+            paymentId,
+            userId,
+            planId,
+            expiresAt,
+          })
+          return NextResponse.json({ received: true })
+        }
+
         const userRef = db.collection('users').doc(userId)
         await userRef.update({
           plan: planId,
@@ -113,18 +171,27 @@ export async function POST(request: NextRequest) {
           updatedAt: new Date(),
         })
 
-        // Criar registro de assinatura
-        await db.collection('subscriptions').add({
-          userId,
-          plan: planId,
-          status: 'active',
-          startDate: new Date(),
-          expiresAt,
-          paymentId,
-          couponCode,
-          discount: discount / 100,
-          createdAt: new Date(),
-        })
+        // Evitar duplicar subscriptions (webhook pode ser reenviado)
+        const subsSnap = await db
+          .collection('subscriptions')
+          .where('userId', '==', userId)
+          .where('paymentId', '==', paymentId)
+          .limit(1)
+          .get()
+
+        if (subsSnap.empty) {
+          await db.collection('subscriptions').add({
+            userId,
+            plan: planId,
+            status: 'active',
+            startDate: new Date(),
+            expiresAt,
+            paymentId,
+            couponCode,
+            discount: discount / 100,
+            createdAt: new Date(),
+          })
+        }
 
         // Registrar uso do cupom se aplicado
         if (couponCode && discount > 0) {

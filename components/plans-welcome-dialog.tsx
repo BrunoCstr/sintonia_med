@@ -361,6 +361,13 @@ export function PlansWelcomeDialog({ open, onOpenChange, onContinueFree }: Plans
               <PixPaymentQr
                 data={pixData}
                 onBackToMethods={() => setPixData(null)}
+                onConfirmed={(paymentId) => {
+                  setProcessingPayment(true)
+                  setShowCheckout(false)
+                  setPixData(null)
+                  onOpenChange(false)
+                  router.push(`/payment/success?status=approved&payment_id=${paymentId}`)
+                }}
               />
             ) : (
               <PaymentBrick

@@ -980,6 +980,15 @@ export default function ProfilePage() {
               <PixPaymentQr
                 data={pixData}
                 onBackToMethods={() => setPixData(null)}
+                onConfirmed={(paymentId) => {
+                  setSubscribing(false)
+                  setShowCheckout(false)
+                  setPixData(null)
+                  if (refreshUserProfile) {
+                    refreshUserProfile()
+                  }
+                  router.push(`/payment/success?status=approved&payment_id=${paymentId}`)
+                }}
               />
             ) : (
               <PaymentBrick

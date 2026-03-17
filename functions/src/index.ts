@@ -697,7 +697,7 @@ export const weeklyQuestionsBackup = functions.scheduler.onSchedule(
   {
     schedule: '0 0 * * 1', // Toda segunda-feira às 00:00 UTC
     timeZone: 'America/Sao_Paulo', // Horário de Brasília
-    memory: '256MiB',
+    memory: '1GiB',
     timeoutSeconds: 540,
     secrets: ['EMAIL_USER', 'EMAIL_PASSWORD', 'CLIENT_EMAIL'], // Secrets do Firebase
   },
@@ -799,7 +799,7 @@ export const weeklyQuestionsBackup = functions.scheduler.onSchedule(
  */
 export const backupQuestionsManual = functions.https.onRequest(
   {
-    memory: '256MiB',
+    memory: '1GiB',
     timeoutSeconds: 540,
     invoker: 'public', // Permite invocações não autenticadas
     secrets: ['EMAIL_USER', 'EMAIL_PASSWORD', 'CLIENT_EMAIL'], // Secrets do Firebase
